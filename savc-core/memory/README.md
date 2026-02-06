@@ -1,7 +1,15 @@
-# SAVC Memory (local-only by default)
+# SAVC Memory (local-first)
 
-`savc-core/memory/` 可能包含对话摘要、用户偏好与关系状态等隐私信息。
+`savc-core/memory/` stores conversation summaries, user profile signals, and relationship state.
 
-- Phase 0 默认 **不提交** 任何记忆内容到 Git（见 `.gitignore`）。
-- 仓库仅保留目录骨架（`.gitkeep`）用于后续功能落地。
+Default policy:
+- Runtime memory remains local-only and is ignored by Git.
+- Only non-sensitive schema/template files are tracked for collaboration.
 
+Directory overview:
+- `episodic/`: conversation summaries by date.
+- `semantic/`: stable facts, user profile, learned knowledge.
+- `procedural/`: reusable workflows and tool patterns.
+- `emotional/`: relationship and mood tracking.
+- `tools/`: tool discovery and learning queue.
+- `growth/`: long-term improvement milestones.

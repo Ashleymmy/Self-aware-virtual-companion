@@ -29,6 +29,21 @@ Thumbs.db
 
 # SAVC memory (default local-only, may contain private data)
 savc-core/memory/**
+!savc-core/memory/
+!savc-core/memory/**/
 !savc-core/memory/**/.gitkeep
 !savc-core/memory/README.md
 
+# Memory schema templates (safe to track)
+!savc-core/memory/episodic/index.md
+!savc-core/memory/semantic/user-profile.md
+!savc-core/memory/semantic/knowledge-base.md
+!savc-core/memory/semantic/facts.md
+!savc-core/memory/procedural/workflows.md
+!savc-core/memory/procedural/tool-usage.md
+!savc-core/memory/emotional/relationship.md
+!savc-core/memory/emotional/mood-log.md
+!savc-core/memory/emotional/milestones.md
+!savc-core/memory/tools/available.md
+!savc-core/memory/tools/learning-queue.md
+!savc-core/memory/growth/milestones.md
