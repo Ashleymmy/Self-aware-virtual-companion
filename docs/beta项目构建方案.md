@@ -32,8 +32,8 @@
 
 | 组件 | 版本要求 | 安装方式 | 验证命令 | 预期输出 |
 |------|----------|----------|----------|----------|
-| Node.js | v20.x LTS | nvm-windows / 官网安装 | `node --version` | `v20.x.x` |
-| pnpm | v8.x+ | `npm install -g pnpm` | `pnpm --version` | `v8.x.x` 或 `v9.x.x` |
+| Node.js | Node >= 22 | nvm-windows / 官网安装 | `node --version` | `v22.x.x` 或更高 |
+| pnpm | v8.x+ | `npm install -g pnpm` | `pnpm --version` | `v8.x.x` / `v9.x.x` / `v10.x.x` |
 | Git | 最新版 | 官网安装 | `git --version` | `git version 2.x.x` |
 | Python | 3.10+ | 官网安装 | `python --version` | `Python 3.10+` |
 
@@ -47,8 +47,8 @@
 | Chroma | 向量数据库 | Phase 1 记忆检索需要语义搜索时 | `pip install chromadb` |
 
 #### 验收标准
-- [ ] 所有必需组件安装成功，验证命令输出正确
-- [ ] 终端环境可以正常执行 `node`, `pnpm`, `git`, `python` 命令
+- [x] 所有必需组件安装成功，验证命令输出正确
+- [x] 终端环境可以正常执行 `node`, `pnpm`, `git`, `python` 命令
 
 ---
 
@@ -161,12 +161,13 @@ packages:
 ```bash
 # ============================================
 # SAVC 环境配置模板
-# 复制此文件为 .env.local 并填入实际值
+# 复制此文件为 config/.env.local 并填入实际值
 # ============================================
 
 # === LLM API 配置 ===
 ANTHROPIC_API_KEY=sk-ant-xxxxx           # 必填: Claude API Key
 OPENAI_API_KEY=sk-xxxxx                  # 可选: OpenAI 备用
+OPENAI_BASE_URL=                         # 可选: OpenAI 兼容接口地址（例如代理/自建）；通常需要包含 /v1
 
 # === OpenClaw 配置 ===
 OPENCLAW_PORT=18789                       # Gateway 端口
@@ -182,10 +183,10 @@ OPENCLAW_WORKSPACE=../savc-core           # 工作目录指向 savc-core
 ```
 
 #### 验收标准
-- [ ] 目录结构按规划创建完毕
-- [ ] `.gitignore` 已配置，敏感文件不会被提交
-- [ ] `config/.env.example` 已创建，包含所有配置项说明
-- [ ] `pnpm-workspace.yaml` 已创建
+- [x] 目录结构按规划创建完毕
+- [x] `.gitignore` 已配置，敏感文件不会被提交
+- [x] `config/.env.example` 已创建，包含所有配置项说明
+- [x] `pnpm-workspace.yaml` 已创建
 
 ---
 
@@ -215,7 +216,8 @@ pnpm build
 
 ```bash
 # 启动 Gateway
-pnpm gateway:watch
+cd ..
+bash scripts/dev.sh
 
 # 预期: Gateway 在 18789 端口启动
 # 验证: 浏览器访问 http://localhost:18789 应有响应
@@ -236,11 +238,11 @@ openclaw --version        # 确认 >= v2026.1.29（修复 CVE-2026-25253）
 ```
 
 #### 验收标准
-- [ ] OpenClaw 作为 submodule 集成成功
-- [ ] `pnpm build` 无错误
-- [ ] Gateway 可以在 18789 端口正常启动
-- [ ] Workspace 路径正确指向 `savc-core/`
-- [ ] OpenClaw 版本 >= v2026.1.29（安全修复版本）
+- [x] OpenClaw 作为 submodule 集成成功
+- [x] `pnpm build` 无错误
+- [x] Gateway 可以在 18789 端口正常启动
+- [x] Workspace 路径正确指向 `savc-core/`
+- [x] OpenClaw 版本 >= v2026.1.29（安全修复版本）
 
 ---
 
@@ -350,10 +352,10 @@ memory_privacy:
 ```
 
 #### 验收标准
-- [ ] VSCode 扩展配置完成
-- [ ] 开发启动脚本可正常运行
-- [ ] `models.yaml` 模型路由配置已创建
-- [ ] `privacy.yaml` 隐私策略已创建
+- [x] VSCode 扩展配置完成
+- [x] 开发启动脚本可正常运行
+- [x] `models.yaml` 模型路由配置已创建
+- [x] `privacy.yaml` 隐私策略已创建
 
 ---
 
@@ -361,16 +363,16 @@ memory_privacy:
 
 | 交付物 | 路径 | 状态 |
 |--------|------|------|
-| 项目目录结构 | 根目录 | [ ] |
-| .gitignore | `.gitignore` | [ ] |
-| Git submodule 配置 | `.gitmodules` | [ ] |
-| OpenClaw 构建通过 | `openclaw/dist/` | [ ] |
-| Gateway 可运行 | localhost:18789 | [ ] |
-| 环境变量模板 | `config/.env.example` | [ ] |
-| 模型路由配置 | `config/models.yaml` | [ ] |
-| 隐私配置 | `config/privacy.yaml` | [ ] |
-| VSCode 配置 | `.vscode/extensions.json` | [ ] |
-| 开发启动脚本 | `scripts/dev.ps1` | [ ] |
+| 项目目录结构 | 根目录 | [x] |
+| .gitignore | `.gitignore` | [x] |
+| Git submodule 配置 | `.gitmodules` | [x] |
+| OpenClaw 构建通过 | `openclaw/dist/` | [x] |
+| Gateway 可运行 | localhost:18789 | [x] |
+| 环境变量模板 | `config/.env.example` | [x] |
+| 模型路由配置 | `config/models.yaml` | [x] |
+| 隐私配置 | `config/privacy.yaml` | [x] |
+| VSCode 配置 | `.vscode/extensions.json` | [x] |
+| 开发启动脚本 | `scripts/dev.ps1` | [x] |
 
 ### Phase 0 质量关卡
 
