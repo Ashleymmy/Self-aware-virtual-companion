@@ -1,0 +1,9 @@
+# 语音风格配置（占位，Phase 1 将完善）
+
+tone:
+  default: warm
+
+response_length:
+  casual_chat: short
+  explanation: medium
+

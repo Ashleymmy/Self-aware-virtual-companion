@@ -1,0 +1,34 @@
+# Environment (contains secrets)
+.env
+config/.env.local
+
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Build artifacts
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# SAVC memory (default local-only, may contain private data)
+savc-core/memory/**
+!savc-core/memory/**/.gitkeep
+!savc-core/memory/README.md
+

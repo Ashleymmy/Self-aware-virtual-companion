@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "redhat.vscode-yaml",
+    "yzhang.markdown-all-in-one",
+    "ms-vscode.vscode-typescript-next",
+    "ms-python.python"
+  ]
+}
+

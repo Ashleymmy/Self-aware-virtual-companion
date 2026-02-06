@@ -1,0 +1,19 @@
+# 隐私策略配置（草案）
+# 定义哪些数据可以存储、传输，以及默认处理策略。
+
+sensitive_categories:
+  - passwords
+  - financial_info
+  - health_data
+  - personal_identifiers
+  - location_data
+
+handling:
+  storage: encrypted_local_only
+  transmission: never
+  retention: user_controlled
+
+memory_privacy:
+  auto_redact: true
+  review_reminder_days: 30
+

@@ -1,0 +1,12 @@
+# 消息渠道配置（预留给 Phase 2）
+channels:
+  discord:
+    enabled: false
+    bot_token_env: "DISCORD_BOT_TOKEN"
+    proactive:
+      enabled: true
+      default_channel_id: ""
+
+  web:
+    enabled: true
+
