@@ -53,6 +53,8 @@ require_file "savc-core/skills/memory-manager/SKILL.md"
 require_file "tests/phase1-dialogue-scenarios.md"
 require_file "scripts/memory_runtime.mjs"
 require_file "scripts/test_phase1_runtime.sh"
+require_contains "scripts/memory_runtime.mjs" "compress-window"
+require_contains "scripts/memory_runtime.mjs" "search"
 
 for path in \
   "savc-core/memory/episodic/index.md" \

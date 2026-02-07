@@ -1,0 +1,41 @@
+# Proactive engine runtime configuration
+
+scheduler:
+  timezone: "Asia/Shanghai"
+  jobs:
+    morning_greeting: "0 8 * * *"
+    midday_reminder: "0 12 * * *"
+    evening_reflection: "0 22 * * *"
+    weekly_review: "0 10 * * 1"
+    idle_check: "*/30 * * * *"
+
+providers:
+  calendar:
+    provider: "google"
+    calendar_id_env: "GOOGLE_CALENDAR_ID"
+    service_account_json_env: "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON"
+    lookahead_minutes: 120
+  weather:
+    provider: "openweather"
+    api_key_env: "OPENWEATHER_API_KEY"
+    lat_env: "OPENWEATHER_LAT"
+    lon_env: "OPENWEATHER_LON"
+    units: "metric"
+
+limits:
+  max_daily_messages: 5
+  quiet_hours_start: "23:00"
+  quiet_hours_end: "07:00"
+  idle_threshold_hours: 4
+
+routing:
+  default_channel: "discord"
+  fallback_channel: "web"
+
+watch:
+  enabled: true
+  path: "."
+  ignore:
+    - "**/.git/**"
+    - "**/node_modules/**"
+    - "**/openclaw/dist/**"

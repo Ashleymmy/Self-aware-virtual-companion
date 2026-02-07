@@ -14,10 +14,21 @@
     "test:phase1": "bash scripts/test_phase1.sh",
     "test:phase2": "bash scripts/test_phase2.sh",
     "test:phase3": "bash scripts/test_phase3.sh",
+    "test:phase3:longrun": "bash scripts/test_phase3_longrun.sh",
+    "test:status": "bash scripts/test_phase_status.sh",
     "test:all": "bash scripts/test_phase1.sh && bash scripts/test_phase2.sh && bash scripts/test_phase3.sh",
+    "phase2:run": "bash scripts/phase2_run_once.sh auto",
+    "phase2:cron:install": "bash scripts/phase2_cron_install.sh",
+    "phase2:cron:remove": "bash scripts/phase2_cron_remove.sh",
     "phase3:daily": "bash scripts/phase3_run_daily.sh",
     "phase3:monthly": "bash scripts/phase3_run_monthly.sh",
     "phase3:cron:install": "bash scripts/phase3_cron_install.sh",
     "phase3:cron:remove": "bash scripts/phase3_cron_remove.sh"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "googleapis": "^157.0.0",
+    "js-yaml": "^4.1.0",
+    "node-cron": "^4.2.1"
   }
 }

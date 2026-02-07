@@ -495,10 +495,10 @@ topics:
 ```
 
 #### 验收标准
-- [ ] `PERSONA.md` 包含全部 6 个必需章节
-- [ ] `voice.yaml` 格式正确，各字段有值
-- [ ] `values.yaml` 格式正确，边界清晰
-- [ ] 三个文件在语义上一致（人格设定不矛盾）
+- [x] `PERSONA.md` 包含全部 6 个必需章节
+- [x] `voice.yaml` 格式正确，各字段有值
+- [x] `values.yaml` 格式正确，边界清晰
+- [x] 三个文件在语义上一致（人格设定不矛盾）
 
 ---
 
@@ -667,12 +667,12 @@ dependencies:
    - 后续升级: 接入 Chroma 向量数据库实现语义检索
 
 #### 验收标准
-- [ ] 记忆目录结构已创建
-- [ ] 各类记忆文件的格式规范已定义
-- [ ] memory-manager Skill 的 SKILL.md 已编写
-- [ ] 可以正确写入和读取各类记忆
-- [ ] 记忆压缩逻辑正常工作
-- [ ] 新对话能正确加载历史记忆上下文
+- [x] 记忆目录结构已创建
+- [x] 各类记忆文件的格式规范已定义
+- [x] memory-manager Skill 的 SKILL.md 已编写
+- [x] 可以正确写入和读取各类记忆
+- [x] 记忆压缩逻辑正常工作
+- [x] 新对话能正确加载历史记忆上下文
 
 ---
 
@@ -711,10 +711,10 @@ dependencies:
 | 连续对话 | 多轮对话 | 角色始终一致，不会"出戏" |
 
 #### 验收标准
-- [ ] 系统提示词可以正确组装
-- [ ] 6 个测试场景全部通过
-- [ ] 连续 10 轮对话中人格保持一致
-- [ ] 记忆在对话间正确持久化
+- [x] 系统提示词可以正确组装
+- [x] 6 个测试场景全部通过
+- [x] 连续 10 轮对话中人格保持一致
+- [x] 记忆在对话间正确持久化
 
 ---
 
@@ -722,12 +722,12 @@ dependencies:
 
 | 交付物 | 路径 | 状态 |
 |--------|------|------|
-| 人格定义 | `savc-core/persona/PERSONA.md` | [ ] |
-| 语音风格 | `savc-core/persona/voice.yaml` | [ ] |
-| 价值观配置 | `savc-core/persona/values.yaml` | [ ] |
-| 记忆目录结构 | `savc-core/memory/*` | [ ] |
-| 记忆管理 Skill | `savc-core/skills/memory-manager/SKILL.md` | [ ] |
-| 对话测试报告 | `tests/phase1-test-report.md` | [ ] |
+| 人格定义 | `savc-core/persona/PERSONA.md` | [x] |
+| 语音风格 | `savc-core/persona/voice.yaml` | [x] |
+| 价值观配置 | `savc-core/persona/values.yaml` | [x] |
+| 记忆目录结构 | `savc-core/memory/*` | [x] |
+| 记忆管理 Skill | `savc-core/skills/memory-manager/SKILL.md` | [x] |
+| 对话测试报告 | `tests/phase1-test-report.md` | [x] |
 
 ### Phase 1 质量关卡
 
@@ -885,12 +885,12 @@ channels:
 ```
 
 #### 验收标准
-- [ ] proactive-engine Skill 可在后台常驻运行
-- [ ] 定时任务按 Cron 表达式正确触发
-- [ ] 主动消息通过至少一个渠道成功发送
-- [ ] 免打扰时段消息被正确拦截
-- [ ] 每日消息数不超过配额限制
-- [ ] 主动消息的内容符合人格设定
+- [x] proactive-engine Skill 可在后台常驻运行
+- [x] 定时任务按 Cron 表达式正确触发
+- [x] 主动消息通过至少一个渠道成功发送
+- [x] 免打扰时段消息被正确拦截
+- [x] 每日消息数不超过配额限制
+- [x] 主动消息的内容符合人格设定
 
 ---
 
@@ -898,10 +898,10 @@ channels:
 
 | 交付物 | 路径 | 状态 |
 |--------|------|------|
-| 主动引擎 Skill | `savc-core/skills/proactive-engine/SKILL.md` | [ ] |
-| 渠道配置 | `config/channels.yaml` | [ ] |
-| 至少一个渠道可用 | Telegram / Discord / Web | [ ] |
-| 主动交互测试报告 | `tests/phase2-test-report.md` | [ ] |
+| 主动引擎 Skill | `savc-core/skills/proactive-engine/SKILL.md` | [x] |
+| 渠道配置 | `config/channels.yaml` | [x] |
+| 至少一个渠道可用 | Telegram / Discord / Web | [x] |
+| 主动交互测试报告 | `tests/phase2-test-report.md` | [x] |
 
 ### Phase 2 质量关卡
 
@@ -1073,12 +1073,12 @@ self_score: 4                      # 1-5 自评分
 - 所有自动调整记录在成长日志中，用户可审查和回退
 
 #### 验收标准
-- [ ] tool-learner Skill 可以扫描并发现可用工具
-- [ ] 工具学习的 5 阶段流程可正常执行
-- [ ] self-reflection Skill 每日 23:00 自动生成成长日志
-- [ ] 成长日志格式正确、内容有意义
-- [ ] 月度总结可自动生成
-- [ ] 人格微调只在安全范围内进行
+- [x] tool-learner Skill 可以扫描并发现可用工具
+- [x] 工具学习的 5 阶段流程可正常执行
+- [x] self-reflection Skill 每日 23:00 自动生成成长日志
+- [x] 成长日志格式正确、内容有意义
+- [x] 月度总结可自动生成
+- [x] 人格微调只在安全范围内进行
 
 ---
 
@@ -1086,11 +1086,11 @@ self_score: 4                      # 1-5 自评分
 
 | 交付物 | 路径 | 状态 |
 |--------|------|------|
-| 工具学习 Skill | `savc-core/skills/tool-learner/SKILL.md` | [ ] |
-| 自省反思 Skill | `savc-core/skills/self-reflection/SKILL.md` | [ ] |
-| 工具记忆结构 | `savc-core/memory/tools/` | [ ] |
-| 成长日志结构 | `savc-core/memory/growth/` | [ ] |
-| Phase 3 测试报告 | `tests/phase3-test-report.md` | [ ] |
+| 工具学习 Skill | `savc-core/skills/tool-learner/SKILL.md` | [x] |
+| 自省反思 Skill | `savc-core/skills/self-reflection/SKILL.md` | [x] |
+| 工具记忆结构 | `savc-core/memory/tools/` | [x] |
+| 成长日志结构 | `savc-core/memory/growth/` | [x] |
+| Phase 3 测试报告 | `tests/phase3-test-report.md` | [x] |
 
 ### Phase 3 质量关卡
 

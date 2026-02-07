@@ -11,7 +11,9 @@
   - 人格文件结构与字段完整性
   - 记忆模板文件存在性
   - `memory-manager` 关键字段与触发器
-  - 运行时记忆联调（写入/读取/压缩）
+  - 运行时记忆联调（写入/读取/检索/压缩）
+  - 周/月窗口压缩产物与索引更新
+  - 敏感信息写入脱敏防护
   - 系统提示词组装产物与 token 预算（<= 3000）
   - OpenClaw health 冒烟检查
   - 1.3 场景回放与连续对话转录
@@ -27,7 +29,9 @@
 - [x] 各类记忆文件格式规范已定义
 - [x] `savc-core/skills/memory-manager/SKILL.md` 已编写
 - [x] 可以正确写入和读取各类记忆（`scripts/test_phase1_runtime.sh`）
-- [x] 记忆压缩逻辑正常工作（`scripts/test_phase1_runtime.sh`）
+- [x] 记忆检索（关键词）可用（`memory_runtime search`）
+- [x] 记忆压缩逻辑正常工作（单日 + 周/月窗口，`scripts/test_phase1_runtime.sh`）
+- [x] 记忆写入默认脱敏（token/password/key/id-like）
 - [x] 新对话能正确加载历史记忆上下文（`scripts/test_phase1_runtime.sh`）
 
 ## 1.3 人格注入与对话测试
