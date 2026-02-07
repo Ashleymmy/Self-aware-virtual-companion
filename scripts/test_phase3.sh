@@ -48,6 +48,12 @@ require_file "savc-core/skills/self-reflection/SKILL.md"
 require_file "scripts/tool_learner_runtime.mjs"
 require_file "scripts/self_reflection_runtime.mjs"
 
+
+require_file "scripts/phase3_run_daily.sh"
+require_file "scripts/phase3_run_monthly.sh"
+require_file "scripts/phase3_cron_install.sh"
+require_file "scripts/phase3_cron_remove.sh"
+
 # 2) SKILL checks
 require_contains "savc-core/skills/tool-learner/SKILL.md" "name: tool-learner"
 require_contains "savc-core/skills/tool-learner/SKILL.md" "on_schedule"

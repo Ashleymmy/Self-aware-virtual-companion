@@ -11,6 +11,7 @@
   - 工具发现写入 `memory/tools/` 能力
   - 工具学习目录脚手架生成
   - 成长日志与月度总结生成 + 汇总逻辑
+  - 本地调度脚本存在性（可用于系统 cron）
 
 ## 验收清单
 - [x] `savc-core/skills/tool-learner/SKILL.md` 完整定义（触发器/依赖/安全约束）
@@ -20,6 +21,7 @@
 - [x] 工具目录脚手架（schema/examples/mastery-level）可生成
 - [x] 成长日志可生成 `memory/growth/YYYY-MM-DD.md`
 - [x] 月度总结可生成并聚合统计
+- [x] 本地调度脚本可用（`scripts/phase3_run_*.sh`）
 
 ## 运行记录
 - `scripts/test_phase3.sh`: PASS
