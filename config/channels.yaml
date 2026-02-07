@@ -7,8 +7,10 @@ channels:
       enabled: true
       default_chat_id: ""
 
+  # 注意：OpenClaw Discord 自动回复的运行时主配置在 ~/.openclaw/openclaw.json；
+  # 此文件主要用于 Phase2 proactive 脚本的渠道路由与发送目标。
   discord:
-    enabled: false
+    enabled: true
     bot_token_env: "DISCORD_BOT_TOKEN"
     proactive:
       enabled: true
