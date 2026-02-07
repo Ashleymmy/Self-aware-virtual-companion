@@ -9,15 +9,17 @@
 - 覆盖范围:
   - tool-learner / self-reflection Skill 配置完整性
   - 工具发现写入 `memory/tools/` 能力
-  - 成长日志与月度总结生成
+  - 工具学习目录脚手架生成
+  - 成长日志与月度总结生成 + 汇总逻辑
 
 ## 验收清单
 - [x] `savc-core/skills/tool-learner/SKILL.md` 完整定义（触发器/依赖/安全约束）
 - [x] `savc-core/skills/self-reflection/SKILL.md` 完整定义（schedule/依赖/安全约束）
 - [x] 工具发现可写入 `memory/tools/available.md`
 - [x] 工具学习队列可写入 `memory/tools/learning-queue.md`
+- [x] 工具目录脚手架（schema/examples/mastery-level）可生成
 - [x] 成长日志可生成 `memory/growth/YYYY-MM-DD.md`
-- [x] 月度总结可生成 `memory/growth/monthly-summary/YYYY-MM.md`
+- [x] 月度总结可生成并聚合统计
 
 ## 运行记录
 - `scripts/test_phase3.sh`: PASS

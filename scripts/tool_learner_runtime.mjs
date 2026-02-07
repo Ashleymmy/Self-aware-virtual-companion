@@ -67,10 +67,78 @@ function normalizeList(value) {
     .filter(Boolean);
 }
 
+function sanitizeToolName(name) {
+  return name.trim().replace(/[\/\s:]+/g, '_');
+}
+
+async function scaffoldTool(toolRoot, toolName, date) {
+  const dirName = sanitizeToolName(toolName);
+  const toolDir = path.join(toolRoot, dirName);
+  await fs.mkdir(toolDir, { recursive: true });
+
+  const schemaFile = path.join(toolDir, 'schema.md');
+  const examplesFile = path.join(toolDir, 'examples.md');
+  const masteryFile = path.join(toolDir, 'mastery-level.md');
+
+  await ensureFile(
+    schemaFile,
+    [
+      '---',
+      `tool: "${toolName}"`,
+      `last_updated: "${date}"`,
+      '---',
+      '',
+      `# ${toolName}`,
+      '',
+      '## Schema',
+      '- [待补充] 粘贴工具 schema 或 OpenAPI 摘要。',
+      '',
+      '## Notes',
+      '- [待补充]',
+      '',
+    ].join('\n'),
+  );
+
+  await ensureFile(
+    examplesFile,
+    [
+      '---',
+      `tool: "${toolName}"`,
+      `last_updated: "${date}"`,
+      '---',
+      '',
+      `# ${toolName} Examples`,
+      '',
+      '## Example 1',
+      '- [待补充] 描述调用参数与预期结果。',
+      '',
+    ].join('\n'),
+  );
+
+  await ensureFile(
+    masteryFile,
+    [
+      '---',
+      `tool: "${toolName}"`,
+      `last_updated: "${date}"`,
+      '---',
+      '',
+      '# Mastery Level',
+      '',
+      '- level: 1/5 (newbie)',
+      '- progress: [待补充]',
+      '',
+    ].join('\n'),
+  );
+
+  return toolDir;
+}
+
 async function discoverTools(options) {
   const workspace = path.resolve(options.workspace || 'savc-core');
   const memoryRoot = path.join(workspace, 'memory', 'tools');
   const date = options.date || todayISO();
+  const scaffold = options.scaffold === undefined ? true : options.scaffold !== 'false';
 
   const tools = normalizeList(options.tools);
   if (tools.length === 0 && options['tools-json']) {
@@ -131,6 +199,9 @@ async function discoverTools(options) {
     const queueLine = `- [pending] ${tool}: auto-discovered ${date}`;
     if (!learningText.includes(queueLine)) {
       learningText = `${learningText.trimEnd()}\n${queueLine}\n`;
+    }
+    if (scaffold) {
+      await scaffoldTool(memoryRoot, tool, date);
     }
   }
 
