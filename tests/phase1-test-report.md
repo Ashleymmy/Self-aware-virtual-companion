@@ -1,29 +1,44 @@
-# Phase 1 测试报告（进行中）
+# Phase 1 测试报告
 
 ## 范围
 - 文档基准: `docs/beta项目构建方案.md`
-- 当前阶段: Phase 1（1.1 与 1.2 基础落地）
+- 当前阶段: Phase 1（1.1 / 1.2 已落地，1.3 进入验证）
+
+## 自动化检查（可重复执行）
+- 核心验收: `bash scripts/test_phase1.sh`
+- 1.3 对话回放: `bash scripts/test_phase1_dialogue.sh`
+- 覆盖范围:
+  - 人格文件结构与字段完整性
+  - 记忆模板文件存在性
+  - `memory-manager` 关键字段与触发器
+  - 运行时记忆联调（写入/读取/压缩）
+  - 系统提示词组装产物与 token 预算（<= 3000）
+  - OpenClaw health 冒烟检查
+  - 1.3 场景回放与连续对话转录
 
 ## 1.1 人格系统
 - [x] `savc-core/persona/PERSONA.md` 包含 6 个必需章节
-- [x] `savc-core/persona/voice.yaml` 字段完整且可解析
-- [x] `savc-core/persona/values.yaml` 字段完整且边界清晰
-- [x] 三文件语义一致（语气、边界、关系定位一致）
+- [x] `savc-core/persona/voice.yaml` 格式正确，各字段有值
+- [x] `savc-core/persona/values.yaml` 格式正确，边界清晰
+- [x] 三个文件语义一致（人格设定不矛盾）
 
 ## 1.2 记忆管理系统
-- [x] 记忆目录结构已补齐模板文件
-- [x] 各类记忆文件格式规范已落地
-- [x] `savc-core/skills/memory-manager/SKILL.md` 已实现 v1.0 规范
-- [ ] 自动写入与读取（待接入实际对话触发验证）
-- [ ] 压缩逻辑执行验证（待触发阈值场景）
-- [ ] 新对话自动加载历史记忆验证（待联调）
+- [x] 记忆目录结构已创建
+- [x] 各类记忆文件格式规范已定义
+- [x] `savc-core/skills/memory-manager/SKILL.md` 已编写
+- [x] 可以正确写入和读取各类记忆（`scripts/test_phase1_runtime.sh`）
+- [x] 记忆压缩逻辑正常工作（`scripts/test_phase1_runtime.sh`）
+- [x] 新对话能正确加载历史记忆上下文（`scripts/test_phase1_runtime.sh`）
 
 ## 1.3 人格注入与对话测试
-- [ ] 系统提示词组装验证（待执行）
-- [ ] 6 个对话场景验证（待执行）
-- [ ] 连续 10 轮人格一致性测试（待执行）
-- [ ] 重启后记忆持久化测试（待执行）
+- [x] 系统提示词可以正确组装（`tests/artifacts/phase1-system-prompt.md`）
+- [x] 6 个测试场景全部通过（`tests/phase1-dialogue-report.md` 状态 `PASS`）
+- [x] 连续 10 轮对话中人格保持一致（`tests/phase1-dialogue-report.md` 状态 `PASS`）
+- [x] 记忆在对话间正确持久化（`tests/phase1-dialogue-report.md` 状态 `PASS`）
 
-## 备注
-- 当前网络不可用，暂未推送远端。
-- 待网路恢复后统一 push Phase 1 提交。
+## 当前阻塞
+- 无。
+
+## 当前结论
+- Phase 1 已完成：人格、记忆与对话一致性测试全部通过。
+- 可进入 Phase 2 实施（主动交互引擎）。
