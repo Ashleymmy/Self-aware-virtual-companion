@@ -1,5 +1,12 @@
-# 消息渠道配置（预留给 Phase 2）
+# 消息渠道配置
 channels:
+  telegram:
+    enabled: false
+    bot_token_env: "TELEGRAM_BOT_TOKEN"
+    proactive:
+      enabled: true
+      default_chat_id: ""
+
   discord:
     enabled: false
     bot_token_env: "DISCORD_BOT_TOKEN"
@@ -9,4 +16,6 @@ channels:
 
   web:
     enabled: true
-
+    port: 3000
+    proactive:
+      enabled: true

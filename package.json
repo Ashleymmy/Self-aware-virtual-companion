@@ -12,6 +12,7 @@
     "test:phase1:runtime": "bash scripts/test_phase1_runtime.sh",
     "test:phase1:dialogue": "bash scripts/test_phase1_dialogue.sh",
     "test:phase1": "bash scripts/test_phase1.sh",
-    "test:all": "bash scripts/test_phase1.sh"
+    "test:phase2": "bash scripts/test_phase2.sh",
+    "test:all": "bash scripts/test_phase1.sh && bash scripts/test_phase2.sh"
   }
 }
