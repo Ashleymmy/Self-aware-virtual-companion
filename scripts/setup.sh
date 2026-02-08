@@ -86,6 +86,8 @@ upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "ANTHROPIC_API_KEY" "${ANTHROPIC_API_KEY
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_API_KEY" "${OPENAI_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_BASE_URL" "${OPENAI_BASE_URL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "DISCORD_BOT_TOKEN" "${DISCORD_BOT_TOKEN:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "BRAVE_API_KEY" "${BRAVE_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "SILICON_EMBEDDING_API_KEY" "${SILICON_EMBEDDING_API_KEY:-}"
 
 if [[ -n "${OPENCLAW_WORKSPACE:-}" ]]; then
   if [[ "${OPENCLAW_WORKSPACE}" = /* ]]; then
@@ -115,6 +117,23 @@ fi
 
 OPENCLAW_PORT_EFFECTIVE="${OPENCLAW_PORT:-18789}"
 
+if [[ -n "${SILICON_EMBEDDING_API_KEY:-}" ]]; then
+  MEMORY_SEARCH_REMOTE_BLOCK="$(cat <<'JSON'
+        "remote": {
+          "baseUrl": "https://api.siliconflow.cn/v1",
+          "apiKey": "${SILICON_EMBEDDING_API_KEY}"
+        },
+JSON
+)"
+else
+  MEMORY_SEARCH_REMOTE_BLOCK="$(cat <<'JSON'
+        "remote": {
+          "baseUrl": "https://api.siliconflow.cn/v1"
+        },
+JSON
+)"
+fi
+
 cat > "${OPENCLAW_CONFIG}" <<JSON
 {
   "gateway": {
@@ -131,6 +150,13 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
       "model": {
         "primary": "anthropic/claude-sonnet-4",
         "fallbacks": []
+      },
+      "memorySearch": {
+        "enabled": true,
+        "provider": "openai",
+${MEMORY_SEARCH_REMOTE_BLOCK}
+        "model": "Qwen/Qwen3-Embedding-8B",
+        "fallback": "none"
       }
     }
   }
