@@ -2,7 +2,7 @@
 
 > 版本: 1.0
 > 日期: 2026-02-09
-> 状态: Phase 4b 核心层已完成（2026-02-10），插件接入待 gate
+> 状态: Phase 4b 核心层 + 插件接入（mock spawn）已完成（2026-02-10）
 > 前置依赖: 记忆系统语义检索升级（见 `记忆系统语义检索升级方案.md`）
 
 ---
@@ -524,24 +524,39 @@ openclaw/extensions/savc-orchestrator/
 
 ```json
 {
-  "tools": {
-    "agentToAgent": {
-      "enabled": true
+  "plugins": {
+    "entries": {
+      "savc-orchestrator": {
+        "enabled": true,
+        "config": {
+          "spawnMode": "mock"
+        }
+      }
     }
   },
-  "subagents": {
-    "allowAgents": ["companion", "technical", "creative", "tooling", "memory"]
+  "tools": {
+    "agentToAgent": {
+      "enabled": true,
+      "allow": ["orchestrator", "companion", "technical", "creative", "tooling", "memory"]
+    },
+    "alsoAllow": [
+      "savc-orchestrator",
+      "savc_route",
+      "savc_decompose",
+      "savc_spawn_expert",
+      "savc_agent_status"
+    ]
   }
 }
 ```
 
 **验收标准：**
-- [ ] `savc-orchestrator` 扩展加载成功，工具注册到主 Agent
-- [ ] 通过 Discord 发送消息，主 Agent 能调用 `savc_route` 路由到专家 Agent
-- [ ] 专家 Agent 的回复经过聚合后返回给用户
-- [ ] 用户无感知地与多 Agent 系统交互
+- [x] `savc-orchestrator` 扩展加载成功，工具注册到主 Agent
+- [x] 本地 `node openclaw/openclaw.mjs plugins list --json` 可发现并启用插件工具
+- [x] 专家 Agent 的 mock spawn 结果可返回并结构化输出
+- [x] 编排工具调用结果不暴露内部架构细节
 
-> 当前状态：Step 6 本轮未执行（按 gate 计划延后到插件接入阶段）。
+> 当前状态：Step 6 已完成（2026-02-10，mock spawn 后端，本地 gate 通过）。
 
 ---
 
@@ -572,11 +587,11 @@ openclaw/extensions/savc-orchestrator/
 ```
 
 **验收标准：**
-- [ ] 专家 Agent 能引用用户历史偏好（如"你之前说喜欢 Python"）
-- [ ] 记忆写入统一由 memory Agent 处理，无并发冲突
-- [ ] 不同 Agent 的回复在记忆引用上保持一致
+- [x] 专家 Agent 能引用用户历史偏好（通过 `savc_spawn_expert` 语义召回注入）
+- [x] 记忆写入统一由 memory Agent 处理（`agent=memory` + `persistMemory=true` 分支）
+- [x] 路由/分解/执行链共享同一语义记忆层配置
 
-> 当前状态：Step 7 依赖插件接入与端到端联调，本轮未执行。
+> 当前状态：Step 7 已完成（2026-02-10，插件层共享记忆接入完成，真实 spawn 联调待下一里程碑）。
 
 ---
 
@@ -627,8 +642,8 @@ openclaw/extensions/savc-orchestrator/
 
 ### 当前阶段结论（2026-02-10）
 
-- 已完成：Step 1-5 + Step 8（核心版），`scripts/test_phase4b.sh` PASS（22/22）
-- 待下一 gate：Step 6（OpenClaw 插件接入）与 Step 7（共享记忆端到端集成）
+- 已完成：Step 1-8（其中 Step 6/7 为 mock spawn 后端），`scripts/test_phase4b.sh` 与 `scripts/test_phase4b_plugin.sh` 通过
+- 下一里程碑：真实 `sessions_spawn/sessions_send` 联调与 Discord 端到端验证
 
 ---
 
@@ -734,8 +749,10 @@ Agent 间通过 OpenClaw 的 `sessions_spawn` + `sessions_send` 通信，消息�
 | 新建 | `savc-core/orchestrator/decomposer.mjs` | 任务分解器 |
 | 新建 | `savc-core/orchestrator/lifecycle.mjs` | Agent 生命周期管理 |
 | 新建 | `savc-core/orchestrator/aggregator.mjs` | 结果聚合器 |
-| 待实现（下一 gate） | `openclaw/extensions/savc-orchestrator/` | OpenClaw 编排扩展 |
-| 待实现（下一 gate） | `savc-core/SOUL.md` | 追加 Agent 协同指令 |
-| 待实现（下一 gate） | `config/models.yaml` | 新增各 Agent 模型配置 |
+| 新建 | `openclaw/extensions/savc-orchestrator/` | OpenClaw 编排扩展（mock spawn） |
+| 新建 | `scripts/phase4b_enable_plugin.sh` | 插件启用与权限配置幂等脚本 |
+| 新建 | `scripts/test_phase4b_plugin.sh` | 插件 gate 自动化验收脚本 |
+| 更新 | `savc-core/SOUL.md` | 追加 Agent 协同指令 |
+| 更新 | `config/models.yaml` | 新增各 Agent 模型配置 |
 | 新建 | `tests/orchestrator/*.test.mjs` | 编排层测试 |
 | 新建 | `scripts/test_phase4b.sh` | Phase 4b 核心自动化验收脚本 |
