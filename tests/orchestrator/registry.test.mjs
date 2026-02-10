@@ -41,7 +41,7 @@ async function main() {
   await copyDir(sourceDir, tempDir);
 
   const agents = await discoverAgents(tempDir, { watch: true, forceReload: true });
-  assert.equal(agents.length, 6);
+  assert.equal(agents.length, 7);
 
   const names = listAgents();
   assert.ok(names.includes('companion'));

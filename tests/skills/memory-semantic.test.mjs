@@ -4,13 +4,15 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  autoCapture,
+  autoRecall,
   embed,
-  store,
-  search,
-  remove,
-  stats,
-  migrate,
   health,
+  migrate,
+  remove,
+  search,
+  stats,
+  store,
 } from '../../scripts/memory_semantic.mjs';
 
 async function main() {
@@ -86,6 +88,46 @@ async function main() {
   const check = await health({ workspace });
   assert.equal(check.db.ok, true);
   assert.equal(check.embedding.ok, true);
+
+  const oldTimestamp = Date.now() - 120 * 24 * 60 * 60 * 1000;
+  const oldText = '历史偏好：用户更偏向使用 requests 处理接口。';
+  await store(oldText, {
+    workspace,
+    category: 'preference',
+    source: 'decay-test',
+    createdAt: oldTimestamp,
+    updatedAt: oldTimestamp,
+  });
+  const decayEnabled = await search(oldText, {
+    workspace,
+    limit: 1,
+    minScore: 0,
+    decayEnabled: true,
+  });
+  const decayDisabled = await search(oldText, {
+    workspace,
+    limit: 1,
+    minScore: 0,
+    decayEnabled: false,
+  });
+  assert.ok(decayEnabled.matches.length >= 1, 'decay search should return item');
+  assert.ok(decayDisabled.matches.length >= 1, 'non-decay search should return item');
+  assert.ok(decayEnabled.matches[0].score <= decayDisabled.matches[0].score + 1e-9);
+  assert.ok(decayEnabled.matches[0].decay <= 1);
+
+  const recall = await autoRecall('Python', { workspace, limit: 2, minScore: 0.1 });
+  assert.ok(typeof recall.context === 'string');
+  assert.ok(recall.context.includes('<relevant-memories>') || recall.total === 0);
+
+  const captureText =
+    '请记住：我更喜欢用 TypeScript 和 pnpm 做工程化。联系方式是 test.user@example.com。';
+  const captureResult = await autoCapture(captureText, {
+    workspace,
+    source: 'test:auto-capture',
+    limit: 3,
+  });
+  assert.ok(captureResult.candidateCount >= 1);
+  assert.ok(captureResult.stored >= 1);
 
   console.log('[PASS] memory-semantic api works');
 }

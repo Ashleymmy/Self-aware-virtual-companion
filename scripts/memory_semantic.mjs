@@ -9,8 +9,22 @@ import OpenAI from 'openai';
 
 const TABLE_NAME = 'memories';
 const DEFAULT_MODEL = 'text-embedding-3-small';
+const DEFAULT_LOCAL_MODEL = 'nomic-embed-text';
+const DEFAULT_LOCAL_BASE_URL = 'http://127.0.0.1:11434';
+const DEFAULT_LOCAL_PATH = '/api/embeddings';
+const DEFAULT_LOCAL_VECTOR_DIM = 768;
 const DEFAULT_MIN_SCORE = 0.3;
 const DEFAULT_DUPLICATE_THRESHOLD = 0.95;
+const DEFAULT_DECAY_HALF_LIFE_DAYS = 30;
+const DEFAULT_DECAY_MIN_FACTOR = 0.35;
+const DEFAULT_CAPTURE_IMPORTANCE = 0.7;
+
+const AUTO_CAPTURE_TRIGGERS = [
+  /记住|记得|回忆|偏好|喜欢|讨厌|总是|永远不要|联系我|邮箱|电话|计划|决定|截止/i,
+  /remember|prefer|like|dislike|love|hate|always|never|important|decide|plan|deadline/i,
+  /[\w.+-]+@[\w.-]+\.\w+/,
+  /\+\d{6,}/,
+];
 
 const CATEGORY_SET = new Set(['preference', 'fact', 'decision', 'entity', 'episodic', 'other']);
 
@@ -93,16 +107,53 @@ function resolveStatePath(workspace) {
 }
 
 function resolveEmbeddingMode(options = {}) {
-  return String(options.embeddingMode || process.env.SAVC_EMBEDDING_MODE || 'prod').toLowerCase();
+  const raw = String(options.embeddingMode || process.env.SAVC_EMBEDDING_MODE || 'prod')
+    .trim()
+    .toLowerCase();
+  if (raw === 'production') return 'prod';
+  if (raw === 'test') return 'mock';
+  if (raw === 'ollama') return 'local';
+  if (raw === 'local') return 'local';
+  if (raw === 'mock') return 'mock';
+  return 'prod';
+}
+
+function resolveLocalEmbeddingModel(options = {}) {
+  return String(options.localModel || process.env.LOCAL_EMBEDDING_MODEL || DEFAULT_LOCAL_MODEL).trim() || DEFAULT_LOCAL_MODEL;
 }
 
 function resolveEmbeddingModel(options = {}) {
+  if (resolveEmbeddingMode(options) === 'local') {
+    return resolveLocalEmbeddingModel(options);
+  }
   return String(options.model || process.env.EMBEDDING_MODEL || DEFAULT_MODEL).trim();
 }
 
-function vectorDimsForModel(model) {
+function vectorDimsForModel(model, mode = 'prod', options = {}) {
+  if (mode === 'local') {
+    const configured = parseInteger(
+      options.localVectorDim || process.env.LOCAL_EMBEDDING_VECTOR_DIM,
+      DEFAULT_LOCAL_VECTOR_DIM,
+    );
+    return Math.max(1, configured);
+  }
   if (model === 'text-embedding-3-large') return 3072;
   return 1536;
+}
+
+function resolveLocalEmbeddingEndpoint(options = {}) {
+  const baseURL = String(options.localBaseURL || process.env.LOCAL_EMBEDDING_BASE_URL || DEFAULT_LOCAL_BASE_URL).trim();
+  const endpointPath = String(options.localPath || process.env.LOCAL_EMBEDDING_PATH || DEFAULT_LOCAL_PATH).trim();
+  const normalizedBase = baseURL.replace(/\/+$/, '');
+  const normalizedPath = endpointPath.startsWith('/') ? endpointPath : `/${endpointPath}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+function resolveBoolean(value, fallback) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return fallback;
+  }
+  return boolFlag(value);
 }
 
 function estimateTokens(text) {
@@ -178,6 +229,38 @@ function confidenceFromScore(score) {
   return 'low';
 }
 
+function resolveDecayConfig(options = {}) {
+  const enabled = resolveBoolean(options.decayEnabled ?? process.env.MEMORY_SEMANTIC_DECAY_ENABLED, true);
+  const halfLifeDays = Math.max(
+    1,
+    parseNumber(
+      options.decayHalfLifeDays ??
+        process.env.MEMORY_SEMANTIC_DECAY_HALF_LIFE_DAYS ??
+        process.env.MEMORY_SEMANTIC_DECAY_HALFLIFE_DAYS,
+      DEFAULT_DECAY_HALF_LIFE_DAYS,
+    ),
+  );
+  const minFactor = clamp(
+    parseNumber(options.decayMinFactor ?? process.env.MEMORY_SEMANTIC_DECAY_MIN_FACTOR, DEFAULT_DECAY_MIN_FACTOR),
+    0,
+    1,
+  );
+  return { enabled, halfLifeDays, minFactor };
+}
+
+function ageDaysFromTimestamp(timestampMs, nowMs = Date.now()) {
+  const value = Number.parseInt(String(timestampMs), 10);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.max(0, (nowMs - value) / (24 * 60 * 60 * 1000));
+}
+
+function decayFactorForAge(ageDays, decayConfig) {
+  if (!decayConfig.enabled) return 1;
+  if (!Number.isFinite(ageDays)) return 1;
+  const raw = Math.exp((-Math.LN2 * ageDays) / decayConfig.halfLifeDays);
+  return clamp(Math.max(decayConfig.minFactor, raw), decayConfig.minFactor, 1);
+}
+
 function parseDateLikeFromPath(filePath) {
   const match = String(filePath).match(/(\d{4}-\d{2}-\d{2})\.md$/);
   return match ? match[1] : null;
@@ -210,6 +293,82 @@ function createMockVector(text, vectorDim) {
 
   const norm = Math.sqrt(vector.reduce((sum, item) => sum + item * item, 0)) || 1;
   return vector.map((item) => item / norm);
+}
+
+async function createLocalVector(text, options = {}) {
+  const mode = resolveEmbeddingMode(options);
+  const model = resolveEmbeddingModel({ ...options, embeddingMode: mode });
+  const vectorDim = vectorDimsForModel(model, mode, options);
+  const endpoint = resolveLocalEmbeddingEndpoint(options);
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      prompt: text,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`local embedding request failed: ${response.status} ${response.statusText}`);
+  }
+
+  const payload = await response.json();
+  const fromOllama = Array.isArray(payload?.embedding) ? payload.embedding : null;
+  const fromOpenAICompat = Array.isArray(payload?.data?.[0]?.embedding) ? payload.data[0].embedding : null;
+  const rawVector = fromOllama || fromOpenAICompat;
+  if (!Array.isArray(rawVector)) {
+    throw new Error('local embedding response missing embedding vector');
+  }
+  return normalizeVector(rawVector, vectorDim);
+}
+
+function extractTextFromUnknown(value) {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+
+  if (Array.isArray(value)) {
+    return value.map((item) => extractTextFromUnknown(item)).filter(Boolean).join('\n');
+  }
+
+  if (typeof value.text === 'string') return value.text;
+  if (typeof value.content === 'string') return value.content;
+  if (Array.isArray(value.content)) {
+    return value.content.map((item) => extractTextFromUnknown(item)).filter(Boolean).join('\n');
+  }
+
+  if (Array.isArray(value.messages)) {
+    return value.messages.map((item) => extractTextFromUnknown(item)).filter(Boolean).join('\n');
+  }
+
+  return '';
+}
+
+function splitCaptureText(content) {
+  return String(content || '')
+    .split(/\n{2,}|(?<=[。！？!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function shouldAutoCapture(text, options = {}) {
+  const minChars = Math.max(1, parseInteger(options.minChars, 12));
+  const maxChars = Math.max(minChars, parseInteger(options.maxChars, 500));
+  if (text.length < minChars || text.length > maxChars) return false;
+  if (text.includes('<relevant-memories>') || text.includes('[相关记忆]')) return false;
+  if (/^#{1,6}\s+/.test(text) || /^```/.test(text) || /^[-*_]{3,}$/.test(text)) return false;
+  return AUTO_CAPTURE_TRIGGERS.some((pattern) => pattern.test(text));
+}
+
+function detectCaptureCategory(text) {
+  if (/(偏好|喜欢|讨厌|prefer|like|dislike|love|hate)/i.test(text)) return 'preference';
+  if (/(决定|计划|将会|deadline|截止|decide|plan|will)/i.test(text)) return 'decision';
+  if (/(\+\d{6,}|[\w.+-]+@[\w.-]+\.\w+|地址|微信|qq|telegram)/i.test(text)) return 'entity';
+  if (/(事实|信息|是|有|在|使用|is|are|has|have)/i.test(text)) return 'fact';
+  return 'other';
 }
 
 async function appendUsageLog(workspace, operation, tokens, elapsedMs, extra = '') {
@@ -273,8 +432,9 @@ async function recordRemoveState(workspace) {
 
 async function ensureInitialized(options = {}) {
   const workspace = resolveWorkspace(options);
-  const model = resolveEmbeddingModel(options);
-  const vectorDim = vectorDimsForModel(model);
+  const mode = resolveEmbeddingMode(options);
+  const model = resolveEmbeddingModel({ ...options, embeddingMode: mode });
+  const vectorDim = vectorDimsForModel(model, mode, options);
   const dbPath = resolveDbPath(workspace);
 
   const needsReset =
@@ -360,8 +520,8 @@ async function embedInternal(text, options = {}) {
 
   const workspace = resolveWorkspace(options);
   const mode = resolveEmbeddingMode(options);
-  const model = resolveEmbeddingModel(options);
-  const vectorDim = vectorDimsForModel(model);
+  const model = resolveEmbeddingModel({ ...options, embeddingMode: mode });
+  const vectorDim = vectorDimsForModel(model, mode, options);
 
   const start = Date.now();
   const tokens = estimateTokens(content);
@@ -370,6 +530,21 @@ async function embedInternal(text, options = {}) {
     const vector = createMockVector(content, vectorDim);
     if (!options.skipUsageLog) {
       await appendUsageLog(workspace, 'embed-mock', tokens, Date.now() - start, `model=${model}`);
+    }
+    return { vector, mode, model, tokens };
+  }
+
+  if (mode === 'local') {
+    const vector = await createLocalVector(content, { ...options, embeddingMode: mode, model });
+    if (!options.skipUsageLog) {
+      const endpoint = resolveLocalEmbeddingEndpoint(options);
+      await appendUsageLog(
+        workspace,
+        'embed-local',
+        tokens,
+        Date.now() - start,
+        `model=${model};endpoint=${endpoint}`,
+      );
     }
     return { vector, mode, model, tokens };
   }
@@ -389,7 +564,17 @@ async function embedInternal(text, options = {}) {
 }
 
 function normalizeStoreMetadata(metadata, workspace) {
-  const createdAt = Date.now();
+  const now = Date.now();
+  const createdAt = (() => {
+    const value = Number.parseInt(String(metadata.createdAt), 10);
+    if (!Number.isFinite(value) || value <= 0) return now;
+    return value;
+  })();
+  const updatedAt = (() => {
+    const value = Number.parseInt(String(metadata.updatedAt), 10);
+    if (!Number.isFinite(value) || value <= 0) return createdAt;
+    return value;
+  })();
   const source = String(metadata.source || 'conversation').trim() || 'conversation';
   const category = normalizeCategory(metadata.category);
   return {
@@ -398,7 +583,7 @@ function normalizeStoreMetadata(metadata, workspace) {
     category,
     source: source.startsWith(workspace) ? path.relative(workspace, source) : source,
     createdAt,
-    updatedAt: createdAt,
+    updatedAt,
   };
 }
 
@@ -608,6 +793,7 @@ export async function search(query, options = {}) {
     1,
   );
   const categoryFilter = options.category ? normalizeCategory(options.category) : null;
+  const decayConfig = resolveDecayConfig(options);
 
   await ensureInitialized({ ...options, workspace });
 
@@ -621,17 +807,30 @@ export async function search(query, options = {}) {
 
   const vectorRows = await dbState.table.vectorSearch(vector).limit(Math.max(limit * 4, limit)).toArray();
   const mapped = vectorRows
-    .map((row) => ({
-      id: row.id,
-      text: row.text,
-      score: normalizeScore(similarityFromDistance(row._distance)),
-      confidence: confidenceFromScore(similarityFromDistance(row._distance)),
-      importance: Number.parseFloat(String(row.importance)) || 0.5,
-      category: normalizeCategory(row.category),
-      source: row.source || null,
-      createdAt: Number.parseInt(String(row.createdAt), 10) || null,
-      updatedAt: Number.parseInt(String(row.updatedAt), 10) || null,
-    }))
+    .map((row) => {
+      const createdAt = Number.parseInt(String(row.createdAt), 10) || null;
+      const updatedAt = Number.parseInt(String(row.updatedAt), 10) || null;
+      const timestamp = updatedAt || createdAt;
+      const ageDays = ageDaysFromTimestamp(timestamp);
+      const rawScore = normalizeScore(similarityFromDistance(row._distance));
+      const decay = decayFactorForAge(ageDays, decayConfig);
+      const score = normalizeScore(rawScore * decay);
+
+      return {
+        id: row.id,
+        text: row.text,
+        score,
+        rawScore,
+        decay,
+        ageDays,
+        confidence: confidenceFromScore(score),
+        importance: Number.parseFloat(String(row.importance)) || 0.5,
+        category: normalizeCategory(row.category),
+        source: row.source || null,
+        createdAt,
+        updatedAt,
+      };
+    })
     .filter((row) => row.score >= minScore)
     .filter((row) => !categoryFilter || row.category === categoryFilter)
     .sort((left, right) => right.score - left.score)
@@ -641,6 +840,7 @@ export async function search(query, options = {}) {
     query,
     mode: 'semantic',
     fallback: false,
+    decay: decayConfig,
     total: mapped.length,
     matches: mapped,
   };
@@ -655,7 +855,10 @@ export async function remove(id, options = {}) {
     throw new Error(`invalid id format: ${id}`);
   }
 
-  await dbState.table.delete(`id = '${value}'`);
+  // Escape single quotes to prevent filter expression injection.
+  // UUID regex above already restricts to [0-9a-f-], but defense-in-depth.
+  const safeValue = value.replace(/'/g, "''");
+  await dbState.table.delete(`id = '${safeValue}'`);
   await recordRemoveState(workspace);
 
   return {
@@ -670,13 +873,18 @@ export async function stats(options = {}) {
 
   const count = await dbState.table.countRows();
   const state = await readState(workspace);
+  const mode = resolveEmbeddingMode(options);
+  const model = resolveEmbeddingModel({ ...options, embeddingMode: mode });
 
   return {
     workspace,
     dbPath: dbState.dbPath,
     table: TABLE_NAME,
-    model: resolveEmbeddingModel(options),
-    embeddingMode: resolveEmbeddingMode(options),
+    model,
+    embeddingMode: mode,
+    embeddingProvider: mode === 'local' ? 'local' : mode === 'mock' ? 'mock' : 'openai',
+    localEmbeddingEndpoint: mode === 'local' ? resolveLocalEmbeddingEndpoint(options) : null,
+    decay: resolveDecayConfig(options),
     count,
     totalWrites: state.totalWrites,
     totalRemoves: state.totalRemoves,
@@ -732,11 +940,16 @@ export async function migrate(markdownDir, options = {}) {
       }
 
       try {
+        const dateLike = parseDateLikeFromPath(filePath);
+        const timestamp = dateLike ? Date.parse(`${dateLike}T00:00:00Z`) : Number.NaN;
+        const normalizedTimestamp = Number.isFinite(timestamp) ? timestamp : undefined;
         const result = await store(segment, {
           workspace,
           category: parseMigrateCategory(filePath),
           source: filePath.startsWith(workspace) ? path.relative(workspace, filePath) : filePath,
           importance: 0.5,
+          createdAt: normalizedTimestamp,
+          updatedAt: normalizedTimestamp,
         }, options);
 
         if (result.stored) {
@@ -800,11 +1013,109 @@ export async function health(options = {}) {
     embedding: {
       ok: embeddingOk,
       mode,
-      model: resolveEmbeddingModel(options),
+      provider: mode === 'local' ? 'local' : mode === 'mock' ? 'mock' : 'openai',
+      model: resolveEmbeddingModel({ ...options, embeddingMode: mode }),
+      endpoint: mode === 'local' ? resolveLocalEmbeddingEndpoint(options) : null,
       error: embeddingError,
     },
+    decay: resolveDecayConfig(options),
     lastWriteAt: state.lastWriteAt,
     usageLog: resolveUsageLogPath(workspace),
+  };
+}
+
+export async function autoRecall(query, options = {}) {
+  const recallLimit = Math.max(1, parseInteger(options.limit || 3, 3));
+  const result = await search(query, {
+    ...options,
+    limit: recallLimit,
+  });
+  const lines = (result.matches || [])
+    .slice(0, recallLimit)
+    .map((item) => `- [${item.category}] ${item.text}`);
+
+  return {
+    query,
+    mode: result.mode,
+    fallback: result.fallback,
+    total: lines.length,
+    matches: (result.matches || []).slice(0, recallLimit),
+    context:
+      lines.length > 0
+        ? `<relevant-memories>\nThe following memories may be relevant:\n${lines.join('\n')}\n</relevant-memories>`
+        : '',
+  };
+}
+
+export async function autoCapture(input, options = {}) {
+  const workspace = resolveWorkspace(options);
+  const limit = Math.max(1, parseInteger(options.limit || 3, 3));
+  const source = String(options.source || 'auto-capture').trim() || 'auto-capture';
+  const importance = normalizeImportance(parseNumber(options.importance, DEFAULT_CAPTURE_IMPORTANCE));
+  const rawText = extractTextFromUnknown(input);
+  const fragments = splitCaptureText(rawText);
+  const deduped = [];
+  const seen = new Set();
+  for (const fragment of fragments) {
+    const cleaned = redactSensitiveText(fragment).trim();
+    if (!cleaned) continue;
+    if (seen.has(cleaned)) continue;
+    seen.add(cleaned);
+    deduped.push(cleaned);
+  }
+
+  const candidates = deduped.filter((text) => shouldAutoCapture(text, options));
+  const entries = [];
+  let duplicateSkipped = 0;
+  let skipped = deduped.length - candidates.length;
+  let errors = 0;
+
+  for (const text of candidates) {
+    if (entries.length >= limit) break;
+    const result = await store(
+      text,
+      {
+        workspace,
+        source,
+        category: detectCaptureCategory(text),
+        importance,
+      },
+      {
+        ...options,
+        workspace,
+      },
+    );
+
+    if (result.stored && result.entry) {
+      entries.push({
+        id: result.entry.id,
+        text: result.entry.text,
+        category: result.entry.category,
+        source: result.entry.source,
+      });
+      continue;
+    }
+    if (result.duplicate) {
+      duplicateSkipped += 1;
+      continue;
+    }
+    if (result.reason === 'embedding-unavailable') {
+      errors += 1;
+      continue;
+    }
+    skipped += 1;
+  }
+
+  return {
+    workspace,
+    source,
+    totalInput: fragments.length,
+    candidateCount: candidates.length,
+    stored: entries.length,
+    duplicateSkipped,
+    skipped,
+    errors,
+    entries,
   };
 }
 
@@ -828,7 +1139,9 @@ async function runCli() {
   const outputJson = boolFlag(args.json);
 
   if (!command) {
-    throw new Error('usage: memory_semantic.mjs <store|search|remove|stats|migrate|health> [--flags]');
+    throw new Error(
+      'usage: memory_semantic.mjs <store|search|remove|stats|migrate|health|auto-recall|auto-capture> [--flags]',
+    );
   }
 
   if (command === 'store') {
@@ -843,6 +1156,8 @@ async function runCli() {
         source: args.source,
         category: args.category,
         importance: args.importance,
+        createdAt: args['created-at'],
+        updatedAt: args['updated-at'],
         duplicateThreshold: args['duplicate-threshold'],
       },
       {
@@ -922,6 +1237,50 @@ async function runCli() {
   if (command === 'health') {
     const result = await health({
       workspace: args.workspace,
+      model: args.model,
+      embeddingMode: args['embedding-mode'],
+    });
+    console.log(JSON.stringify(result, null, outputJson ? 2 : 0));
+    return;
+  }
+
+  if (command === 'auto-recall') {
+    const query = String(args.query || args._[1] || '').trim();
+    if (!query) {
+      throw new Error('--query is required for auto-recall');
+    }
+    const result = await autoRecall(query, {
+      workspace: args.workspace,
+      limit: args.limit,
+      minScore: args['min-score'],
+      model: args.model,
+      embeddingMode: args['embedding-mode'],
+    });
+    if (outputJson) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log(result.context || '<relevant-memories>\n- 无\n</relevant-memories>');
+    return;
+  }
+
+  if (command === 'auto-capture') {
+    const textValue = String(args.text || args._[1] || '').trim();
+    const fileValue = String(args.file || '').trim();
+    if (!textValue && !fileValue) {
+      throw new Error('--text or --file is required for auto-capture');
+    }
+    let input = textValue;
+    if (fileValue) {
+      input = await fs.readFile(path.resolve(fileValue), 'utf8');
+    }
+    const result = await autoCapture(input, {
+      workspace: args.workspace,
+      source: args.source,
+      limit: args.limit,
+      minChars: args['min-chars'],
+      maxChars: args['max-chars'],
+      importance: args.importance,
       model: args.model,
       embeddingMode: args['embedding-mode'],
     });

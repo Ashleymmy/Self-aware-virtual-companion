@@ -35,7 +35,7 @@ for file in \
   fi
 done
 
-for yaml in orchestrator companion technical creative tooling memory; do
+for yaml in orchestrator companion technical creative tooling memory vibe-coder; do
   if [[ -f "${REPO_ROOT}/savc-core/agents/${yaml}.yaml" ]]; then
     pass "agent yaml exists: ${yaml}.yaml"
   else
@@ -100,10 +100,13 @@ assert.equal(s6.execution, 'sequential');
 const s7 = await routeMessage('你觉得呢', { agentsDir: 'savc-core/agents' });
 assert.equal(s7.agent, 'orchestrator');
 
+const s8 = await routeMessage('请从零搭建一个 Express 脚手架并自动修复测试', { agentsDir: 'savc-core/agents' });
+assert.equal(s8.agent, 'vibe-coder');
+
 console.log('ok');
 NODE
 then
-  pass "integration scenarios (1-7) passed"
+  pass "integration scenarios (1-8) passed"
 else
   fail "integration scenarios failed"
 fi

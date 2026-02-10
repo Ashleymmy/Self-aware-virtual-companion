@@ -15,6 +15,12 @@ async function main() {
   assert.equal(case3.agent, 'orchestrator');
   assert.equal(case3.level, 3);
 
+  const case4 = await routeMessage('请从零搭建一个 Express 脚手架并自动修复测试', {
+    agentsDir: 'savc-core/agents',
+  });
+  assert.equal(case4.agent, 'vibe-coder');
+  assert.ok([1, 2].includes(case4.level));
+
   console.log('[PASS] orchestrator router');
 }
 

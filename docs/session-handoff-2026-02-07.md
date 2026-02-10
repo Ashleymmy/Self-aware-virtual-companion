@@ -72,3 +72,68 @@ PHASE2_SEND=1 bash scripts/test_phase2.sh
 
 ## Next Work Item
 - Enter Phase 3 (tool-learner + self-reflection) implementation per `docs/beta项目构建方案.md`.
+
+---
+
+## 2026-02-10 Phase 4 Closure + Phase 5 Kickoff (Current Session)
+
+### Scope
+- Complete Phase 4 wrap-up items:
+  - Auto-Recall
+  - Auto-Capture
+  - Memory time-decay scoring
+  - Performance baseline pressure test
+  - `sessions_send` real-mode integration path
+  - Local embedding mode
+- Start Phase 5 (Vibe Coding) with an implementable baseline.
+
+### Key Changes Implemented
+- Memory semantic/runtime:
+  - `scripts/memory_semantic.mjs`
+    - Added embedding mode `local` (OpenAI-compatible local endpoint; default path `/api/embeddings`)
+    - Added decay-aware ranking (`rawScore`, `decay`, `ageDays`)
+    - Added `auto-recall` and `auto-capture` APIs + CLI subcommands
+  - `scripts/memory_runtime.mjs`
+    - Added `auto-recall` command
+    - Added `auto-capture` command
+  - `config/.env.example`
+    - Added local embedding and decay related env vars
+- Orchestrator plugin (real backend):
+  - `openclaw/extensions/savc-orchestrator/src/real-session-adapter.ts`
+    - Added `sessions_send` adapter (`sendRealAgentMessage`)
+  - `openclaw/extensions/savc-orchestrator/src/tool-spawn-expert.ts`
+    - Added optional params `useSessionsSend`, `handoffMessage`, `handoffTimeoutSeconds`
+    - Added structured `details.data.spawn.sessionsSend` output
+    - Added post-run `autoCapture` branch when memory module supports it
+- Phase 4b perf gate:
+  - Added `scripts/test_phase4b_perf.sh` and npm script `test:phase4b:perf`
+- Phase 5c kickoff:
+  - Added `savc-core/agents/vibe-coder.yaml`
+  - Extended routing for vibe-coding intent in `savc-core/orchestrator/router.mjs`
+  - Added model mapping in `config/models.yaml`
+  - Added `scripts/test_phase5c.sh` and npm script `test:phase5c`
+
+### Tests Executed (2026-02-10)
+- Passed:
+  - `bash scripts/test_phase4a.sh` (PASS 25 / FAIL 0)
+  - `bash scripts/test_phase4b.sh` (PASS 23 / FAIL 0)
+  - `bash scripts/test_phase4b_plugin.sh` (PASS 14 / FAIL 0)
+  - `bash scripts/test_phase4b_plugin_real.sh` (PASS 12 / WARN 1 / FAIL 0; Discord env missing => SKIP)
+  - `bash scripts/test_phase4b_perf.sh` (PASS 6 / FAIL 0)
+  - `bash scripts/test_phase5c.sh` (PASS 4 / FAIL 0)
+  - `cd openclaw && pnpm exec vitest run extensions/savc-orchestrator/src/*.test.ts`
+- Known existing blocker (unchanged):
+  - `npm run -s test:phase2` still shows live env missing (`FAIL 1`) and is treated as historical/environmental.
+
+### Documentation Synced
+- Updated:
+  - `docs/记忆系统语义检索升级方案.md`
+  - `docs/多Agent协同编排方案.md`
+  - `docs/SAVC功能拓展路线图.md`
+  - `tests/phase4-test-report.md`
+
+### Current Working Tree Notes
+- Repo is intentionally dirty with Phase 4/5 related updates.
+- `tests/artifacts/phase1-system-prompt.md` was regenerated during regression runs and is currently modified.
+- OpenClaw submodule contains untracked plugin directory:
+  - `openclaw/extensions/savc-orchestrator/`

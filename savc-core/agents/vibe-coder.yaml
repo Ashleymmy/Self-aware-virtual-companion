@@ -1,0 +1,43 @@
+name: vibe-coder
+label: "Vibe Coding Agent"
+description: "自然语言驱动开发：需求理解、代码生成、测试执行与迭代修复"
+
+model:
+  provider: anthropic
+  name: claude-opus-4-5-20251101
+  thinking: high
+
+persona:
+  inherit: ../SOUL.md
+  override:
+    mode: technical
+    sweetness: low
+
+triggers:
+  intents:
+    - vibe_coding
+    - code_generation
+    - iterative_fix
+  keywords:
+    - "从零搭建"
+    - "脚手架"
+    - "自动修复"
+    - "vibe"
+    - "生成项目"
+
+tools:
+  allowed:
+    - bash
+    - file_read
+    - file_write
+    - file_edit
+    - memory_recall
+    - web_search
+    - sessions_spawn
+  denied:
+    - sessions_send
+
+limits:
+  max_turns: 80
+  timeout_seconds: 600
+  max_tokens_per_turn: 6000

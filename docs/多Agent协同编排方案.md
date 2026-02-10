@@ -2,7 +2,7 @@
 
 > 版本: 1.0
 > 日期: 2026-02-09
-> 状态: Phase 4b 核心层 + 插件接入（mock spawn）已完成（2026-02-10）
+> 状态: Phase 4b 核心层 + 插件接入已完成（默认 mock，已支持 real spawn，2026-02-10）
 > 前置依赖: 记忆系统语义检索升级（见 `记忆系统语义检索升级方案.md`）
 
 ---
@@ -535,10 +535,10 @@ openclaw/extensions/savc-orchestrator/
     }
   },
   "tools": {
-    "agentToAgent": {
-      "enabled": true,
-      "allow": ["orchestrator", "companion", "technical", "creative", "tooling", "memory"]
-    },
+      "agentToAgent": {
+        "enabled": true,
+        "allow": ["main", "orchestrator", "companion", "technical", "creative", "tooling", "memory", "vibe-coder"]
+      },
     "alsoAllow": [
       "savc-orchestrator",
       "savc_route",
@@ -554,9 +554,20 @@ openclaw/extensions/savc-orchestrator/
 - [x] `savc-orchestrator` 扩展加载成功，工具注册到主 Agent
 - [x] 本地 `node openclaw/openclaw.mjs plugins list --json` 可发现并启用插件工具
 - [x] 专家 Agent 的 mock spawn 结果可返回并结构化输出
+- [x] `spawnMode=real` 时可通过 `sessions_spawn` 执行并输出结构化 runId/status
+- [x] `useSessionsSend=true` 时可通过 `sessions_send` 完成子会话协同消息联调（结构化状态返回）
 - [x] 编排工具调用结果不暴露内部架构细节
 
-> 当前状态：Step 6 已完成（2026-02-10，mock spawn 后端，本地 gate 通过）。
+> 当前状态：Step 6 已完成（2026-02-10，默认 mock，可显式启用 real spawn，并支持可选 `sessions_send` 联调）。
+
+**real 模式启用与 gate 命令：**
+```bash
+bash scripts/phase4b_enable_plugin.sh --spawn-mode real --sync-agents
+bash scripts/test_phase4b.sh
+bash scripts/test_phase4b_plugin.sh
+bash scripts/test_phase4b_plugin_real.sh
+bash scripts/test_phase4b_perf.sh
+```
 
 ---
 
@@ -591,7 +602,7 @@ openclaw/extensions/savc-orchestrator/
 - [x] 记忆写入统一由 memory Agent 处理（`agent=memory` + `persistMemory=true` 分支）
 - [x] 路由/分解/执行链共享同一语义记忆层配置
 
-> 当前状态：Step 7 已完成（2026-02-10，插件层共享记忆接入完成，真实 spawn 联调待下一里程碑）。
+> 当前状态：Step 7 已完成（2026-02-10，插件层共享记忆接入完成，real spawn 链路已联调）。
 
 ---
 
@@ -635,15 +646,16 @@ openclaw/extensions/savc-orchestrator/
 **验收标准：**
 - [x] 所有单元测试通过
 - [x] 核心版 8 个场景通过（1-7 集成场景 + 超时场景在 lifecycle 测试覆盖）
-- [ ] 性能指标达到基线要求（待下一阶段压测）
+- [x] 性能指标达到基线要求（`scripts/test_phase4b_perf.sh`）
 - [x] Phase 1/3 回归通过；Phase 2 live env 缺失项保持既有阻塞结论
 
 ---
 
 ### 当前阶段结论（2026-02-10）
 
-- 已完成：Step 1-8（其中 Step 6/7 为 mock spawn 后端），`scripts/test_phase4b.sh` 与 `scripts/test_phase4b_plugin.sh` 通过
-- 下一里程碑：真实 `sessions_spawn/sessions_send` 联调与 Discord 端到端验证
+- 已完成：Step 1-8（Step 6/7 默认 mock，支持 real spawn + 可选 `sessions_send`），`scripts/test_phase4b.sh`、`scripts/test_phase4b_plugin.sh`、`scripts/test_phase4b_plugin_real.sh`、`scripts/test_phase4b_perf.sh` 通过
+- Discord 联调：采用软门槛；缺少 `DISCORD_BOT_TOKEN`/`DISCORD_CHANNEL_ID` 时允许 SKIP，严格模式由 `PHASE4B_DISCORD_STRICT=1` 控制
+- 下一里程碑：推进 Phase 5（Vibe Coding/语音/视觉）并扩展真实多轮 A2A 编排
 
 ---
 
@@ -749,9 +761,12 @@ Agent 间通过 OpenClaw 的 `sessions_spawn` + `sessions_send` 通信，消息�
 | 新建 | `savc-core/orchestrator/decomposer.mjs` | 任务分解器 |
 | 新建 | `savc-core/orchestrator/lifecycle.mjs` | Agent 生命周期管理 |
 | 新建 | `savc-core/orchestrator/aggregator.mjs` | 结果聚合器 |
-| 新建 | `openclaw/extensions/savc-orchestrator/` | OpenClaw 编排扩展（mock spawn） |
-| 新建 | `scripts/phase4b_enable_plugin.sh` | 插件启用与权限配置幂等脚本 |
+| 新建 | `openclaw/extensions/savc-orchestrator/` | OpenClaw 编排扩展（默认 mock，支持 real spawn） |
+| 新建 | `openclaw/extensions/savc-orchestrator/src/real-session-adapter.ts` | real spawn 会话适配层 |
+| 新建 | `openclaw/extensions/savc-orchestrator/src/run-store.ts` | real run 状态缓存 |
+| 更新 | `scripts/phase4b_enable_plugin.sh` | 增加 `--spawn-mode` 与 `--sync-agents` 幂等补丁 |
 | 新建 | `scripts/test_phase4b_plugin.sh` | 插件 gate 自动化验收脚本 |
+| 新建 | `scripts/test_phase4b_plugin_real.sh` | 插件 real spawn gate 自动化验收脚本 |
 | 更新 | `savc-core/SOUL.md` | 追加 Agent 协同指令 |
 | 更新 | `config/models.yaml` | 新增各 Agent 模型配置 |
 | 新建 | `tests/orchestrator/*.test.mjs` | 编排层测试 |

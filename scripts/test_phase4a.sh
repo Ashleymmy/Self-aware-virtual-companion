@@ -34,6 +34,7 @@ require_file "scripts/memory_runtime.mjs"
 require_file "scripts/proactive_daemon.mjs"
 require_file "scripts/self_reflection_runtime.mjs"
 require_file "tests/skills/memory-semantic.test.mjs"
+require_file "tests/skills/memory-semantic-local.test.mjs"
 
 if node -e "import('@lancedb/lancedb').then(()=>process.exit(0)).catch(()=>process.exit(1))"; then
   pass "@lancedb/lancedb import ok"
@@ -51,6 +52,12 @@ if node "${REPO_ROOT}/tests/skills/memory-semantic.test.mjs" >/tmp/phase4a_memor
   pass "memory-semantic test passed"
 else
   fail "memory-semantic test failed (see /tmp/phase4a_memory_semantic_test.log)"
+fi
+
+if node "${REPO_ROOT}/tests/skills/memory-semantic-local.test.mjs" >/tmp/phase4a_memory_semantic_local_test.log 2>&1; then
+  pass "memory-semantic local embedding test passed"
+else
+  fail "memory-semantic local embedding test failed (see /tmp/phase4a_memory_semantic_local_test.log)"
 fi
 
 rm -rf "${TMP_ROOT}"
@@ -123,6 +130,68 @@ if rg -q --fixed-strings "## 相关语义记忆召回" "${TMP_ROOT}/load_context
 else
   fail "load --query missing semantic section"
 fi
+
+if node "${REPO_ROOT}/scripts/memory_runtime.mjs" auto-recall \
+  --workspace "${WORKSPACE}" \
+  --query "Python" \
+  --json >"${TMP_ROOT}/auto_recall.json"; then
+  pass "auto-recall command works"
+else
+  fail "auto-recall command failed"
+fi
+
+if node "${REPO_ROOT}/scripts/memory_runtime.mjs" auto-capture \
+  --workspace "${WORKSPACE}" \
+  --text "请记住：我偏好 TypeScript，并且邮箱是 test.user@example.com" \
+  --json >"${TMP_ROOT}/auto_capture.json"; then
+  pass "auto-capture command works"
+else
+  fail "auto-capture command failed"
+fi
+
+python3 - "${TMP_ROOT}/auto_recall.json" "${TMP_ROOT}/auto_capture.json" <<'PY'
+import json
+import sys
+recall = json.load(open(sys.argv[1], 'r', encoding='utf-8'))
+capture = json.load(open(sys.argv[2], 'r', encoding='utf-8'))
+assert 'context' in recall
+assert capture['candidateCount'] >= 1
+assert capture['stored'] >= 1
+PY
+pass "auto-recall/auto-capture output schema is valid"
+
+if node "${REPO_ROOT}/scripts/memory_semantic.mjs" store \
+  --workspace "${WORKSPACE}" \
+  --text "历史偏好：用户更偏向 requests 生态" \
+  --source "decay-check" \
+  --category preference \
+  --importance 0.6 \
+  --json >/tmp/phase4a_decay_store.log 2>&1; then
+  :
+fi
+
+if node "${REPO_ROOT}/scripts/memory_semantic.mjs" search \
+  --workspace "${WORKSPACE}" \
+  --query "历史偏好：用户更偏向 requests 生态" \
+  --limit 1 \
+  --min-score 0 \
+  --json >"${TMP_ROOT}/decay_check.json"; then
+  pass "semantic search with decay metadata works"
+else
+  fail "semantic search with decay metadata failed"
+fi
+
+python3 - "${TMP_ROOT}/decay_check.json" <<'PY'
+import json
+import sys
+payload = json.load(open(sys.argv[1], 'r', encoding='utf-8'))
+if payload.get('matches'):
+    item = payload['matches'][0]
+    assert 'rawScore' in item
+    assert 'decay' in item
+    assert item['score'] <= item['rawScore'] + 1e-9
+PY
+pass "decay score fields are present"
 
 node "${REPO_ROOT}/scripts/memory_semantic.mjs" migrate "${WORKSPACE}/memory/semantic" \
   --workspace "${WORKSPACE}" --json >"${TMP_ROOT}/migrate_once.json"

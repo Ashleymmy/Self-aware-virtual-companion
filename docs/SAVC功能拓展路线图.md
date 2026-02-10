@@ -2,7 +2,7 @@
 
 > 版本: 1.0
 > 日期: 2026-02-09
-> 状态: 执行中（Phase 4a 已完成；Phase 4b 核心层 + 插件 mock 已完成）
+> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5c 已启动并完成 M-C1）
 
 ---
 
@@ -88,9 +88,9 @@ Phase 6:  (F) Live2D 互动    ← 依赖语音 + 视觉的情绪信号
 | M-B3 | 任务分解器 | 复杂请求正确拆分 | ✅ 完成 |
 | M-B4 | Agent 生命周期管理 | spawn/wait/cancel 全部可用 | ✅ 完成 |
 | M-B5 | 结果聚合器 | 多 Agent 输出统一整合 | ✅ 完成 |
-| M-B6 | OpenClaw 扩展集成 | 插件发现、工具注册、可调用 | ✅ 完成（mock 版） |
-| M-B7 | 共享记忆集成 | 语义召回注入 + memory 持久化分支 | ✅ 完成（mock 版） |
-| M-B8 | 测试通过 | 8 个集成场景 + 性能基线达标 | ✅ 核心与插件测试通过（真实 spawn 联调待下一里程碑） |
+| M-B6 | OpenClaw 扩展集成 | 插件发现、工具注册、可调用 | ✅ 完成（默认 mock，支持 real） |
+| M-B7 | 共享记忆集成 | 语义召回注入 + memory 持久化分支 | ✅ 完成（mock + real） |
+| M-B8 | 测试通过 | 8 个集成场景 + 性能基线达标 | ✅ 核心 + 插件 + real backend + sessions_send + perf baseline 通过（Discord 联调软门槛） |
 
 ---
 
@@ -155,12 +155,12 @@ tools:
 
 ### 3.4 里程碑
 
-| 里程碑 | 内容 | 验收标准 |
-|--------|------|----------|
-| M-C1 | vibe-coder Agent 定义 + 基础工具链 | Agent 可 spawn 并执行文件操作 |
-| M-C2 | 项目感知能力 | 能正确分析项目结构并生成一致代码 |
-| M-C3 | 迭代修复循环 | 错误自动修复，3 轮内通过率 > 80% |
-| M-C4 | 端到端验证 | 通过自然语言生成完整可运行的小项目 |
+| 里程碑 | 内容 | 验收标准 | 状态 |
+|--------|------|----------|------|
+| M-C1 | vibe-coder Agent 定义 + 基础工具链 | Agent 可 spawn 并执行文件操作 | ✅ 完成（`savc-core/agents/vibe-coder.yaml` + `scripts/test_phase5c.sh`） |
+| M-C2 | 项目感知能力 | 能正确分析项目结构并生成一致代码 | ⏳ 进行中 |
+| M-C3 | 迭代修复循环 | 错误自动修复，3 轮内通过率 > 80% | ⏳ 进行中 |
+| M-C4 | 端到端验证 | 通过自然语言生成完整可运行的小项目 | ⏳ 进行中 |
 
 ---
 
@@ -425,10 +425,10 @@ const EMOTION_MAP = {
   └── Phase 4a: 记忆语义检索 ██████████ (已完成)
 
 2026 Q1-Q2
-  └── Phase 4b: 多 Agent 编排 █████████░ (核心+插件mock完成，真实spawn联调待下一里程碑)
+  └── Phase 4b: 多 Agent 编排 ██████████ (核心+插件完成，默认mock/可切real)
 
 2026 Q2-Q3 (可并行)
-  ├── Phase 5c: Vibe Coding  ██░░░░░░░░
+  ├── Phase 5c: Vibe Coding  ████░░░░░░
   ├── Phase 5d: 实时语音     ██░░░░░░░░
   └── Phase 5e: 视觉能力     ██░░░░░░░░
 

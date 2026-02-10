@@ -33,6 +33,12 @@ async function main() {
     assert.ok(Array.isArray(task.dependsOn));
   }
 
+  const vibeCase = await analyze('请从零搭建一个 Node API 脚手架并自动修复测试', {
+    agentsDir: 'savc-core/agents',
+  });
+  assert.equal(vibeCase.type, 'simple');
+  assert.equal(vibeCase.tasks[0].agent, 'vibe-coder');
+
   console.log('[PASS] orchestrator decomposer');
 }
 

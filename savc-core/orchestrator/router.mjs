@@ -10,6 +10,11 @@ const LEVEL_FALLBACK = 3;
 
 const INTENT_RULES = [
   {
+    intent: 'vibe_coding',
+    agent: 'vibe-coder',
+    regex: /(从零搭建|脚手架|自动修复|迭代修复|生成项目|vibe|scaffold|boilerplate|project skeleton|create .*project)/i,
+  },
+  {
     intent: 'technical_explanation',
     agent: 'technical',
     regex: /(sql|查询|优化|慢|索引|数据库|bug|报错|代码|debug|排障|架构|实现)/i,

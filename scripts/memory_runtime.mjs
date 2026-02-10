@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { search as semanticSearch, store as semanticStore } from './memory_semantic.mjs';
+import {
+  autoCapture as semanticAutoCapture,
+  autoRecall as semanticAutoRecall,
+  search as semanticSearch,
+  store as semanticStore,
+} from './memory_semantic.mjs';
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -58,6 +63,14 @@ function estimateTokens(text) {
   const chars = text.length;
   const words = text.split(/\s+/).filter(Boolean).length;
   return Math.max(Math.ceil(chars / 2), Math.ceil(words * 1.5));
+}
+
+function boolFlag(value, fallback = false) {
+  if (value === undefined || value === null) return fallback;
+  if (value === true || value === false) return value;
+  const text = String(value).trim().toLowerCase();
+  if (!text) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(text);
 }
 
 function splitFrontmatter(text) {
@@ -844,12 +857,89 @@ async function searchMemory(options) {
   }
 }
 
+async function autoRecallMemory(options) {
+  const workspace = path.resolve(options.workspace || 'savc-core');
+  const outputJson = boolFlag(options.json, false);
+  const query = String(options.query || options.prompt || options._?.[1] || '').trim();
+  const limit = Number.parseInt(String(options.limit || '3'), 10);
+
+  if (!query) {
+    throw new Error('--query is required for auto-recall');
+  }
+
+  const result = await semanticAutoRecall(query, {
+    workspace,
+    limit,
+    minScore: options['min-score'],
+  });
+
+  if (options.output) {
+    const outputPath = path.resolve(String(options.output));
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+    await fs.writeFile(outputPath, `${result.context || ''}\n`, 'utf8');
+  }
+
+  if (outputJson) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log(`# Auto Recall: ${query}`);
+  console.log(`total: ${result.total}`);
+  if (result.context) {
+    console.log(result.context);
+  } else {
+    console.log('<relevant-memories>\n- 无\n</relevant-memories>');
+  }
+}
+
+async function autoCaptureMemory(options) {
+  const workspace = path.resolve(options.workspace || 'savc-core');
+  const outputJson = boolFlag(options.json, false);
+  const textArg = String(options.text || '').trim();
+  const fileArg = String(options.file || '').trim();
+  const textFallback = String(options._?.[1] || '').trim();
+  let inputText = textArg || textFallback;
+
+  if (fileArg) {
+    const filePath = path.resolve(fileArg);
+    inputText = await fs.readFile(filePath, 'utf8');
+  }
+
+  if (!inputText) {
+    throw new Error('--text/--file is required for auto-capture');
+  }
+
+  const result = await semanticAutoCapture(inputText, {
+    workspace,
+    source: options.source || 'memory-runtime:auto-capture',
+    limit: options.limit,
+    minChars: options['min-chars'],
+    maxChars: options['max-chars'],
+    importance: options.importance,
+  });
+
+  if (outputJson) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log(`# Auto Capture`);
+  console.log(`stored: ${result.stored}`);
+  console.log(`candidateCount: ${result.candidateCount}`);
+  for (const entry of result.entries || []) {
+    console.log(`- [${entry.category}] ${entry.text}`);
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const command = args._[0];
 
   if (!command) {
-    throw new Error('usage: memory_runtime.mjs <write|load|compress|search|compress-window> [--flags]');
+    throw new Error(
+      'usage: memory_runtime.mjs <write|load|compress|search|compress-window|auto-recall|auto-capture> [--flags]',
+    );
   }
 
   if (command === 'write') {
@@ -870,6 +960,14 @@ async function main() {
   }
   if (command === 'compress-window') {
     await compressWindow(args);
+    return;
+  }
+  if (command === 'auto-recall') {
+    await autoRecallMemory(args);
+    return;
+  }
+  if (command === 'auto-capture') {
+    await autoCaptureMemory(args);
     return;
   }
 
