@@ -2,7 +2,7 @@
 
 > 版本: 1.0
 > 日期: 2026-02-09
-> 状态: 规划中
+> 状态: 执行中（Phase 4a 已完成；Phase 4b 核心层已完成）
 
 ---
 
@@ -57,14 +57,14 @@ Phase 6:  (F) Live2D 互动    ← 依赖语音 + 视觉的情绪信号
 
 **里程碑：**
 
-| 里程碑 | 内容 | 验收标准 |
-|--------|------|----------|
-| M-A1 | 依赖安装 + LanceDB 可用 | `import('@lancedb/lancedb')` 无报错 |
-| M-A2 | `memory_semantic.mjs` 开发完成 | store/search/migrate 全部可用 |
-| M-A3 | 集成到 `memory_runtime.mjs` | `--mode semantic` 可用，双写生效 |
-| M-A4 | 历史数据迁移完成 | 语义搜索能召回历史记忆 |
-| M-A5 | 下游脚本适配 | proactive + reflection 使用语义搜索 |
-| M-A6 | 调优与监控上线 | usage.log + health 命令可用 |
+| 里程碑 | 内容 | 验收标准 | 状态 |
+|--------|------|----------|------|
+| M-A1 | 依赖安装 + LanceDB 可用 | `import('@lancedb/lancedb')` 无报错 | ✅ 完成 |
+| M-A2 | `memory_semantic.mjs` 开发完成 | store/search/migrate 全部可用 | ✅ 完成 |
+| M-A3 | 集成到 `memory_runtime.mjs` | `--mode semantic` 可用，双写生效 | ✅ 完成 |
+| M-A4 | 历史数据迁移完成 | 语义搜索能召回历史记忆 | ✅ 完成 |
+| M-A5 | 下游脚本适配 | proactive + reflection 使用语义搜索 | ✅ 完成 |
+| M-A6 | 调优与监控上线 | usage.log + health 命令可用 | ✅ 完成 |
 
 ---
 
@@ -81,16 +81,16 @@ Phase 6:  (F) Live2D 互动    ← 依赖语音 + 视觉的情绪信号
 
 **里程碑：**
 
-| 里程碑 | 内容 | 验收标准 |
-|--------|------|----------|
-| M-B1 | Agent 定义 + 注册发现 | 6 个 YAML 定义，自动发现可用 |
-| M-B2 | 意图路由器 | 三级路由正确分发 |
-| M-B3 | 任务分解器 | 复杂请求正确拆分 |
-| M-B4 | Agent 生命周期管理 | spawn/wait/cancel 全部可用 |
-| M-B5 | 结果聚合器 | 多 Agent 输出统一整合 |
-| M-B6 | OpenClaw 扩展集成 | 端到端通过 Discord 验证 |
-| M-B7 | 共享记忆集成 | Agent 间记忆上下文连贯 |
-| M-B8 | 测试通过 | 8 个集成场景 + 性能基线达标 |
+| 里程碑 | 内容 | 验收标准 | 状态 |
+|--------|------|----------|------|
+| M-B1 | Agent 定义 + 注册发现 | 6 个 YAML 定义，自动发现可用 | ✅ 完成 |
+| M-B2 | 意图路由器 | 三级路由正确分发 | ✅ 完成 |
+| M-B3 | 任务分解器 | 复杂请求正确拆分 | ✅ 完成 |
+| M-B4 | Agent 生命周期管理 | spawn/wait/cancel 全部可用 | ✅ 完成 |
+| M-B5 | 结果聚合器 | 多 Agent 输出统一整合 | ✅ 完成 |
+| M-B6 | OpenClaw 扩展集成 | 端到端通过 Discord 验证 | ⏳ 待 gate |
+| M-B7 | 共享记忆集成 | Agent 间记忆上下文连贯 | ⏳ 待 gate |
+| M-B8 | 测试通过 | 8 个集成场景 + 性能基线达标 | ✅ 核心版完成（性能压测待补） |
 
 ---
 
@@ -422,10 +422,10 @@ const EMOTION_MAP = {
 
 ```
 2026 Q1 (当前)
-  └── Phase 4a: 记忆语义检索 ████████░░ (Step 1-6)
+  └── Phase 4a: 记忆语义检索 ██████████ (已完成)
 
 2026 Q1-Q2
-  └── Phase 4b: 多 Agent 编排 ████░░░░░░ (Step 1-8)
+  └── Phase 4b: 多 Agent 编排 ███████░░░ (核心完成，插件接入待 gate)
 
 2026 Q2-Q3 (可并行)
   ├── Phase 5c: Vibe Coding  ██░░░░░░░░

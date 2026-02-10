@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { search as semanticSearch } from './memory_semantic.mjs';
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -234,6 +235,55 @@ async function loadProactiveState(workspace) {
   return JSON.parse(raw);
 }
 
+function dateFromTimestamp(value) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed)) return null;
+  return new Date(parsed).toISOString().slice(0, 10);
+}
+
+async function recallHistoricalMemories(workspace, date, topics) {
+  const queries = [];
+  if (topics.length > 0) {
+    queries.push(`关于 ${topics[0]} 的历史上下文`);
+  }
+  queries.push('最近用户关心的话题');
+  queries.push('近期用户偏好与决策');
+
+  const picked = [];
+  const seen = new Set();
+
+  for (const query of queries) {
+    let result;
+    try {
+      result = await semanticSearch(query, {
+        workspace,
+        limit: 5,
+      });
+    } catch {
+      continue;
+    }
+    for (const item of result.matches || []) {
+      const text = String(item.text || '').replace(/\s+/g, ' ').trim();
+      if (!text) continue;
+      const memoryDate = item.updatedAt ? dateFromTimestamp(item.updatedAt) : dateFromTimestamp(item.createdAt);
+      if (memoryDate && memoryDate === date) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      picked.push({
+        text,
+        score: Number.parseFloat(String(item.score)) || null,
+        source: item.source || null,
+      });
+      if (picked.length >= 3) {
+        return picked;
+      }
+    }
+  }
+
+  return picked;
+}
+
 async function updateUserProfile(workspace, date, topics) {
   const profileFile = path.join(workspace, 'memory', 'semantic', 'user-profile.md');
   if (!(await exists(profileFile))) return;
@@ -315,6 +365,7 @@ async function writeDaily(options) {
   const improvePoints = [];
   const learnedPoints = [];
   const plans = [];
+  const historicalMemories = await recallHistoricalMemories(workspace, date, topics);
 
   if (conversationCount > 0) {
     goodPoints.push(`保持了 ${conversationCount} 轮对话连续性`);
@@ -345,6 +396,13 @@ async function writeDaily(options) {
 
   if (proactiveState && Number.isFinite(proactiveState.dailyCount)) {
     learnedPoints.push(`主动消息状态: 今日已触达 ${proactiveState.dailyCount} 次`);
+  }
+
+  if (historicalMemories.length > 0) {
+    const top = historicalMemories[0];
+    goodPoints.push('引入历史语义记忆补充长期上下文');
+    learnedPoints.push(`历史记忆补充: ${top.text}`);
+    plans.push(`结合历史上下文继续推进: ${top.text.slice(0, 24)}...`);
   }
 
   if (goodPoints.length === 0) {
@@ -393,6 +451,15 @@ async function writeDaily(options) {
     '',
     '## 今日所学',
     ...learnedPoints.map((item) => `- ${item}`),
+    '',
+    '## 历史相关记忆',
+    ...(historicalMemories.length > 0
+      ? historicalMemories.map((item) => {
+          const source = item.source ? ` (${item.source})` : '';
+          const score = Number.isFinite(item.score) ? ` [score=${item.score.toFixed(4)}]` : '';
+          return `- ${item.text}${source}${score}`;
+        })
+      : ['- 无']),
     '',
     '## 人格微调',
     ...tuningDirectives.map((item) => `- ${item}`),

@@ -6,6 +6,7 @@ import cron from 'node-cron';
 import chokidar from 'chokidar';
 import yaml from 'js-yaml';
 import { google } from 'googleapis';
+import { search as semanticSearch } from './memory_semantic.mjs';
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -175,7 +176,37 @@ async function analyzeMood(workspace, now) {
   };
 }
 
+function summarizeTopicFromText(text) {
+  const cleaned = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return '';
+  if (cleaned.length <= 48) return cleaned;
+  return `${cleaned.slice(0, 48)}...`;
+}
+
 async function readLatestTopic(workspace) {
+  try {
+    const semantic = await semanticSearch('最近用户关心的话题', {
+      workspace,
+      limit: 3,
+    });
+    if ((semantic.matches || []).length > 0) {
+      const top = semantic.matches[0];
+      const topic = summarizeTopicFromText(top.text);
+      if (topic) {
+        return {
+          date: top.updatedAt ? new Date(top.updatedAt).toISOString().slice(0, 10) : null,
+          topic,
+          source: 'semantic',
+          score: top.score || null,
+        };
+      }
+    }
+  } catch {
+    // fallback to index-based extraction
+  }
+
   const indexFile = path.join(workspace, 'memory', 'episodic', 'index.md');
   if (!(await exists(indexFile))) return null;
 
@@ -192,7 +223,11 @@ async function readLatestTopic(workspace) {
     rows.push({ date: parts[0], topic: parts[1] || '' });
   }
   if (rows.length === 0) return null;
-  return rows[rows.length - 1];
+  return {
+    ...rows[rows.length - 1],
+    source: 'index',
+    score: null,
+  };
 }
 
 async function fetchWeather(providerConfig) {

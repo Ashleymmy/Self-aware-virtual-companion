@@ -15,6 +15,8 @@
     "test:phase2": "bash scripts/test_phase2.sh",
     "test:phase3": "bash scripts/test_phase3.sh",
     "test:phase3:longrun": "bash scripts/test_phase3_longrun.sh",
+    "test:phase4a": "bash scripts/test_phase4a.sh",
+    "test:phase4b": "bash scripts/test_phase4b.sh",
     "test:status": "bash scripts/test_phase_status.sh",
     "test:all": "bash scripts/test_phase1.sh && bash scripts/test_phase2.sh && bash scripts/test_phase3.sh",
     "phase2:run": "bash scripts/phase2_run_once.sh auto",
@@ -26,9 +28,11 @@
     "phase3:cron:remove": "bash scripts/phase3_cron_remove.sh"
   },
   "dependencies": {
+    "@lancedb/lancedb": "^0.26.2",
     "chokidar": "^4.0.3",
     "googleapis": "^157.0.0",
     "js-yaml": "^4.1.0",
-    "node-cron": "^4.2.1"
+    "node-cron": "^4.2.1",
+    "openai": "^6.19.0"
   }
 }

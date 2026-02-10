@@ -1,0 +1,41 @@
+name: technical
+label: "技术 Agent"
+description: "负责代码生成、技术排障、架构建议、文档编写"
+
+model:
+  provider: anthropic
+  name: claude-opus-4-5-20251101
+  thinking: high
+
+persona:
+  inherit: ../SOUL.md
+  override:
+    mode: technical
+    sweetness: low
+
+triggers:
+  intents:
+    - code_generation
+    - debugging
+    - architecture
+    - technical_explanation
+  keywords:
+    - "代码"
+    - "bug"
+    - "报错"
+    - "怎么实现"
+
+tools:
+  allowed:
+    - bash
+    - file_read
+    - file_write
+    - memory_recall
+    - web_search
+  denied:
+    - sessions_spawn
+
+limits:
+  max_turns: 50
+  timeout_seconds: 300
+  max_tokens_per_turn: 4000

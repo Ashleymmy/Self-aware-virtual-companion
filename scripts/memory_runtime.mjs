@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { search as semanticSearch, store as semanticStore } from './memory_semantic.mjs';
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -328,6 +329,22 @@ async function writeMemory(options) {
     await fs.writeFile(relationshipFile, relationshipText, 'utf8');
   }
 
+  // Phase 4a: best-effort dual-write to semantic vector memory.
+  try {
+    const semanticResult = await semanticStore(summary, {
+      workspace,
+      category: 'episodic',
+      source: path.relative(workspace, dayFile),
+      importance: 0.6,
+    });
+    if (!semanticResult.stored && semanticResult.reason === 'embedding-unavailable') {
+      console.error('[WARN] semantic-store skipped: embedding unavailable');
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[WARN] semantic-store failed: ${message}`);
+  }
+
   console.log(`WROTE ${dayFile}`);
 }
 
@@ -336,6 +353,7 @@ async function loadContext(options) {
   const memoryRoot = path.join(workspace, 'memory');
   const days = Number.parseInt(String(options.days || '3'), 10);
   const maxTokens = Number.parseInt(String(options['max-tokens'] || '2000'), 10);
+  const query = String(options.query || '').trim();
 
   const profileFile = path.join(memoryRoot, 'semantic', 'user-profile.md');
   const relationshipFile = path.join(memoryRoot, 'emotional', 'relationship.md');
@@ -368,25 +386,26 @@ async function loadContext(options) {
     episodicChunks.push(`### ${path.basename(file, '.md')}\n\n${content}`);
   }
 
-  let context = [
-    '# Phase1 Runtime Memory Context',
-    '',
-    '## 用户画像摘要',
-    '',
-    profile,
-    '',
-    '## 关系状态',
-    '',
-    relationship,
-    '',
-    '## 最近情景记忆',
-    '',
-    episodicChunks.join('\n\n'),
-  ].join('\n').trim() + '\n';
+  const semanticChunks = [];
+  if (query) {
+    try {
+      const semanticResult = await semanticSearch(query, {
+        workspace,
+        limit: 3,
+      });
+      for (const item of semanticResult.matches || []) {
+        const source = item.source ? ` (${item.source})` : '';
+        const score = Number.isFinite(item.score) ? ` [score=${item.score.toFixed(4)}]` : '';
+        semanticChunks.push(`- ${item.text}${source}${score}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[WARN] semantic-load failed: ${message}`);
+    }
+  }
 
-  while (estimateTokens(context) > maxTokens && episodicChunks.length > 0) {
-    episodicChunks.pop();
-    context = [
+  function buildContext() {
+    return [
       '# Phase1 Runtime Memory Context',
       '',
       '## 用户画像摘要',
@@ -400,7 +419,23 @@ async function loadContext(options) {
       '## 最近情景记忆',
       '',
       episodicChunks.join('\n\n'),
+      '',
+      '## 相关语义记忆召回',
+      '',
+      semanticChunks.length > 0 ? semanticChunks.join('\n') : '- 无',
     ].join('\n').trim() + '\n';
+  }
+
+  let context = buildContext();
+
+  while (estimateTokens(context) > maxTokens && semanticChunks.length > 0) {
+    semanticChunks.pop();
+    context = buildContext();
+  }
+
+  while (estimateTokens(context) > maxTokens && episodicChunks.length > 0) {
+    episodicChunks.pop();
+    context = buildContext();
   }
 
   if (options.output) {
@@ -585,16 +620,29 @@ async function compressWindow(options) {
   console.log(`WROTE ${outPath}`);
 }
 
-async function searchMemory(options) {
+function confidenceToKeywordScore(confidence) {
+  if (confidence === 'high') return 1;
+  if (confidence === 'medium') return 0.7;
+  return 0.4;
+}
+
+function confidenceFromScore(score) {
+  if (score >= 0.8) return 'high';
+  if (score >= 0.6) return 'medium';
+  return 'low';
+}
+
+function dateFromTimestamp(value) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed)) return null;
+  return new Date(parsed).toISOString().slice(0, 10);
+}
+
+async function keywordSearchMemory(options) {
   const workspace = path.resolve(options.workspace || 'savc-core');
   const memoryRoot = path.join(workspace, 'memory');
   const query = String(options.query || '').trim();
   const limit = Number.parseInt(String(options.limit || '10'), 10);
-  const outputJson = String(options.json || '').toLowerCase() === 'true' || options.json === true;
-
-  if (!query) {
-    throw new Error('--query is required for search');
-  }
 
   const roots = [
     { type: 'episodic', dir: path.join(memoryRoot, 'episodic') },
@@ -634,7 +682,152 @@ async function searchMemory(options) {
     }
   }
 
-  const result = { query, total, matches };
+  return { query, total, matches, mode: 'keyword' };
+}
+
+function mapSemanticMatchesToRuntime(semanticResult, workspace) {
+  return (semanticResult.matches || []).map((item) => {
+    const file = item.source
+      ? (path.isAbsolute(item.source) ? path.relative(workspace, item.source) : item.source)
+      : null;
+    const score = Number.parseFloat(String(item.score)) || 0;
+    return {
+      type: 'semantic',
+      file,
+      date: item.updatedAt ? dateFromTimestamp(item.updatedAt) : dateFromTimestamp(item.createdAt),
+      excerpt: String(item.text || '').replace(/\s+/g, ' ').trim().slice(0, 200),
+      confidence: confidenceFromScore(score),
+      score,
+    };
+  });
+}
+
+async function searchMemory(options) {
+  const workspace = path.resolve(options.workspace || 'savc-core');
+  const query = String(options.query || options._?.[1] || '').trim();
+  const limit = Number.parseInt(String(options.limit || '10'), 10);
+  const mode = String(options.mode || 'keyword').trim().toLowerCase();
+  const outputJson = String(options.json || '').toLowerCase() === 'true' || options.json === true;
+
+  if (!query) {
+    throw new Error('--query is required for search');
+  }
+  if (!['keyword', 'semantic', 'hybrid'].includes(mode)) {
+    throw new Error('--mode must be keyword, semantic, or hybrid');
+  }
+
+  if (mode === 'keyword') {
+    const result = await keywordSearchMemory({ ...options, workspace, query, limit });
+    if (outputJson) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log(`# Search: ${query}`);
+    console.log(`mode: keyword`);
+    console.log(`total: ${result.total}`);
+    for (const item of result.matches) {
+      console.log(`- [${item.type}] ${item.file}${item.date ? ` (${item.date})` : ''}`);
+      console.log(`  ${item.excerpt}`);
+      console.log(`  confidence=${item.confidence}`);
+    }
+    return;
+  }
+
+  if (mode === 'semantic') {
+    let semanticResult;
+    try {
+      semanticResult = await semanticSearch(query, {
+        workspace,
+        limit,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[WARN] semantic-search failed: ${message}`);
+      semanticResult = { matches: [] };
+    }
+
+    const matches = mapSemanticMatchesToRuntime(semanticResult, workspace).slice(0, limit);
+    const result = {
+      query,
+      mode: 'semantic',
+      total: matches.length,
+      matches,
+    };
+    if (outputJson) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log(`# Search: ${query}`);
+    console.log(`mode: semantic`);
+    console.log(`total: ${result.total}`);
+    for (const item of result.matches) {
+      console.log(`- [${item.type}] ${item.file || 'vector'}${item.date ? ` (${item.date})` : ''}`);
+      console.log(`  ${item.excerpt}`);
+      console.log(`  confidence=${item.confidence} score=${item.score.toFixed(4)}`);
+    }
+    return;
+  }
+
+  const keywordResult = await keywordSearchMemory({ ...options, workspace, query, limit: limit * 3 });
+  let semanticResult;
+  try {
+    semanticResult = await semanticSearch(query, {
+      workspace,
+      limit: limit * 3,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[WARN] hybrid semantic branch failed: ${message}`);
+    semanticResult = { matches: [] };
+  }
+
+  const semanticMatches = mapSemanticMatchesToRuntime(semanticResult, workspace);
+  const alphaRaw = Number.parseFloat(String(process.env.MEMORY_SEMANTIC_HYBRID_ALPHA || '0.7'));
+  const alpha = Number.isFinite(alphaRaw) ? Math.min(1, Math.max(0, alphaRaw)) : 0.7;
+  const merged = new Map();
+
+  for (const item of keywordResult.matches) {
+    const key = `${item.file || 'keyword'}::${item.excerpt.toLowerCase()}`;
+    const keywordScore = confidenceToKeywordScore(item.confidence);
+    merged.set(key, {
+      ...item,
+      type: 'hybrid',
+      score: (1 - alpha) * keywordScore,
+    });
+  }
+
+  for (const item of semanticMatches) {
+    const key = `${item.file || 'semantic'}::${item.excerpt.toLowerCase()}`;
+    const semanticScore = Number.parseFloat(String(item.score)) || 0;
+    if (merged.has(key)) {
+      const current = merged.get(key);
+      const keywordScore = confidenceToKeywordScore(current.confidence);
+      const combined = alpha * semanticScore + (1 - alpha) * keywordScore;
+      merged.set(key, {
+        ...current,
+        score: combined,
+        confidence: confidenceFromScore(combined),
+      });
+      continue;
+    }
+    const combined = alpha * semanticScore;
+    merged.set(key, {
+      ...item,
+      type: 'hybrid',
+      score: combined,
+      confidence: confidenceFromScore(combined),
+    });
+  }
+
+  const matches = Array.from(merged.values())
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limit);
+  const result = {
+    query,
+    mode: 'hybrid',
+    total: matches.length,
+    matches,
+  };
 
   if (outputJson) {
     console.log(JSON.stringify(result, null, 2));
@@ -642,11 +835,12 @@ async function searchMemory(options) {
   }
 
   console.log(`# Search: ${query}`);
-  console.log(`total: ${total}`);
-  for (const item of matches) {
-    console.log(`- [${item.type}] ${item.file}${item.date ? ` (${item.date})` : ''}`);
+  console.log(`mode: hybrid`);
+  console.log(`total: ${result.total}`);
+  for (const item of result.matches) {
+    console.log(`- [${item.type}] ${item.file || 'vector'}${item.date ? ` (${item.date})` : ''}`);
     console.log(`  ${item.excerpt}`);
-    console.log(`  confidence=${item.confidence}`);
+    console.log(`  confidence=${item.confidence} score=${item.score.toFixed(4)}`);
   }
 }
 

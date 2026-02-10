@@ -1,0 +1,36 @@
+name: memory
+label: "记忆 Agent"
+description: "负责记忆读写、语义检索、记忆一致性维护"
+
+model:
+  provider: anthropic
+  name: claude-haiku-3-5-20241022
+
+persona:
+  inherit: ../SOUL.md
+  override:
+    mode: memory
+    sweetness: low
+
+triggers:
+  intents:
+    - memory_store
+    - memory_recall
+    - profile_update
+  keywords:
+    - "记住"
+    - "你还记得"
+    - "之前说过"
+    - "回忆"
+
+tools:
+  allowed:
+    - memory_recall
+    - memory_store
+  denied:
+    - sessions_spawn
+
+limits:
+  max_turns: 20
+  timeout_seconds: 120
+  max_tokens_per_turn: 1500

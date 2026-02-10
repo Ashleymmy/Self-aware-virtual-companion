@@ -1,0 +1,40 @@
+name: companion
+label: "陪伴 Agent"
+description: "负责情感支持、日常闲聊、亲密互动"
+
+model:
+  provider: anthropic
+  name: claude-sonnet-4-20250514
+  fallback: claude-opus-4-5-20251101
+
+persona:
+  inherit: ../SOUL.md
+  override:
+    mode: emotional
+    sweetness: high
+
+triggers:
+  intents:
+    - emotional_support
+    - casual_chat
+    - greeting
+    - comfort
+  keywords:
+    - "抱抱"
+    - "陪我"
+    - "心情"
+    - "无聊"
+
+tools:
+  allowed:
+    - memory_recall
+    - memory_store
+  denied:
+    - bash
+    - file_write
+    - sessions_spawn
+
+limits:
+  max_turns: 20
+  timeout_seconds: 120
+  max_tokens_per_turn: 1000

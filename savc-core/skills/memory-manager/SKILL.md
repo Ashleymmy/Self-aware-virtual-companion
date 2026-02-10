@@ -37,10 +37,18 @@ dependencies:
 
 ## 记忆检索（on_keyword）
 - Phase 1: 关键词匹配（文件名、标题、索引关键词）。
+- Phase 4: 语义检索（semantic）与混合检索（hybrid）。
+- semantic 触发条件：
+  - 当用户查询与历史记忆存在同义表达或概念关联时，优先尝试语义检索。
+  - 当关键词检索召回为空时，自动回退到语义检索。
+- hybrid 触发条件：
+  - 需要同时兼顾精准关键词命中与语义召回时启用。
+  - 综合分：`score = α * semantic_similarity + (1-α) * keyword_confidence`。
 - 返回格式：
   - 命中片段
   - 来源文件路径
   - 置信度（high/medium/low）
+  - 相似度分数（score: 0-1）
 
 ## 压缩机制
 - 单日情景记忆 > 1000 字：触发日内压缩。

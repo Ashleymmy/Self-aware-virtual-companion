@@ -1,0 +1,38 @@
+name: tooling
+label: "工具 Agent"
+description: "负责工具调用、外部 API 查询、简单执行任务"
+
+model:
+  provider: anthropic
+  name: claude-haiku-3-5-20241022
+
+persona:
+  inherit: ../SOUL.md
+  override:
+    mode: tooling
+    sweetness: low
+
+triggers:
+  intents:
+    - tool_call
+    - api_query
+    - weather_lookup
+    - schedule_lookup
+  keywords:
+    - "天气"
+    - "日历"
+    - "查一下"
+    - "工具"
+
+tools:
+  allowed:
+    - web_search
+    - bash
+    - memory_recall
+  denied:
+    - sessions_spawn
+
+limits:
+  max_turns: 15
+  timeout_seconds: 120
+  max_tokens_per_turn: 1200
