@@ -60,3 +60,14 @@
 - Phase 4b 核心层: 达到 B1~B5 与 B8（核心版）验收标准
 - Phase 4b 插件层: mock + real backend gate 均通过，`sessions_send` 联调分支已覆盖，默认发布模式保持 mock
 - Phase 5 推进: M-C1（vibe-coder 基础能力）已完成，M-C2+ 待继续推进
+
+## 增量更新（2026-02-12）
+- `bash scripts/test_phase5c.sh`
+  - 结果: PASS
+  - 汇总: PASS 7 / FAIL 0
+- 新增 `savc-core/orchestrator/vibe-coder.mjs`（项目感知 + 一致性计划 + 3 轮迭代修复）
+- 新增 `tests/orchestrator/vibe-coder.test.mjs`（项目感知、修复循环、lifecycle 接入）
+- Phase 5c 推进:
+  - M-C2（项目感知）已完成
+  - M-C3（迭代修复循环）已完成
+  - M-C4（端到端）已完成 mock 基线验证，真实代码执行链路仍在进行中

@@ -3,9 +3,22 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { formatVibeCodingReport, runVibeCodingTask } from './vibe-coder.mjs';
+
 const runs = new Map();
 
-let executor = async ({ agentDef, task }) => {
+const builtInExecutor = async ({ agentDef, task, options = {} }) => {
+  if (String(agentDef?.name || '').trim() === 'vibe-coder') {
+    const result = await runVibeCodingTask(task, {
+      workspaceDir: options.workspaceDir || process.cwd(),
+      maxRounds: options.maxFixRounds || options.maxRounds || 3,
+      maxScanFiles: options.maxScanFiles,
+      maxScanDepth: options.maxScanDepth,
+      runner: options.vibeRunner,
+    });
+    return formatVibeCodingReport(result);
+  }
+
   const delay = Number.parseInt(String(agentDef?.limits?.mock_delay_ms || 20), 10);
   await new Promise((resolve) => setTimeout(resolve, Number.isFinite(delay) ? delay : 20));
   if (/\[fail\]/i.test(task)) {
@@ -13,6 +26,8 @@ let executor = async ({ agentDef, task }) => {
   }
   return `${agentDef?.name || 'agent'}: ${task}`;
 };
+
+let executor = builtInExecutor;
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -48,6 +63,10 @@ function toDurationMs(startedAt, endedAt) {
 
 export function setExecutor(nextExecutor) {
   executor = nextExecutor;
+}
+
+export function resetExecutor() {
+  executor = builtInExecutor;
 }
 
 export async function spawnAgent(agentDef, task, options = {}) {
