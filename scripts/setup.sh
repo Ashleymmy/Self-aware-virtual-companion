@@ -84,6 +84,8 @@ fi
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENCLAW_GATEWAY_TOKEN" "${OPENCLAW_GATEWAY_TOKEN:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "ANTHROPIC_API_KEY" "${ANTHROPIC_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_API_KEY" "${OPENAI_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "ANYROUTER_API_KEY" "${ANYROUTER_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "WZW_API_KEY" "${WZW_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_BASE_URL" "${OPENAI_BASE_URL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "DISCORD_BOT_TOKEN" "${DISCORD_BOT_TOKEN:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "BRAVE_API_KEY" "${BRAVE_API_KEY:-}"
@@ -144,12 +146,88 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
       "token": "\${OPENCLAW_GATEWAY_TOKEN}"
     }
   },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "anyrouter": {
+        "baseUrl": "https://anyrouter.top",
+        "apiKey": "\${ANYROUTER_API_KEY}",
+        "api": "anthropic-messages",
+        "models": [
+          {
+            "id": "claude-opus-4-6",
+            "name": "Claude Opus 4.6",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "claude-sonnet-4-5-20250929",
+            "name": "Claude Sonnet 4.5",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          }
+        ]
+      },
+      "wzw": {
+        "baseUrl": "https://wzw.pp.ua/v1",
+        "apiKey": "\${WZW_API_KEY}",
+        "api": "anthropic-messages",
+        "models": [
+          {
+            "id": "claude-sonnet-4-5-20250929",
+            "name": "Claude Sonnet 4.5 (wzw)",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "claude-sonnet-4-20250514",
+            "name": "Claude Sonnet 4 (wzw)",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "claude-haiku-4-5-20251001",
+            "name": "Claude Haiku 4.5 (wzw)",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  },
   "agents": {
     "defaults": {
       "workspace": "${WORKSPACE_DIR_ABS}",
       "model": {
-        "primary": "anthropic/claude-sonnet-4",
-        "fallbacks": []
+        "primary": "anyrouter/claude-opus-4-6",
+        "fallbacks": [
+          "anyrouter/claude-sonnet-4-5-20250929",
+          "wzw/claude-sonnet-4-5-20250929",
+          "wzw/claude-sonnet-4-20250514",
+          "wzw/claude-haiku-4-5-20251001"
+        ]
+      },
+      "models": {
+        "anyrouter/claude-opus-4-6": { "alias": "opus" },
+        "anyrouter/claude-sonnet-4-5-20250929": { "alias": "sonnet" },
+        "wzw/claude-sonnet-4-5-20250929": { "alias": "wzw-sonnet" },
+        "wzw/claude-sonnet-4-20250514": {},
+        "wzw/claude-haiku-4-5-20251001": { "alias": "haiku" }
       },
       "memorySearch": {
         "enabled": true,

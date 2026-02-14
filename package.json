@@ -6,6 +6,7 @@
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "dev": "bash scripts/dev.sh",
+    "llm:failover:apply": "bash scripts/llm_enable_failover.sh",
     "doctor": "bash scripts/openclaw.sh doctor",
     "openclaw:version": "bash scripts/openclaw.sh --version",
     "prompt:phase1": "bash scripts/build_phase1_prompt.sh",

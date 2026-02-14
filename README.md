@@ -111,7 +111,7 @@ cp config/.env.example config/.env.local
 
 ### 配置
 
-1. **API 密钥** — 在 `config/.env.local` 中配置 Anthropic、OpenAI、Discord 等服务的 API Key
+1. **API 密钥** — 在 `config/.env.local` 中配置 AnyRouter、WZW、OpenAI、Discord 等服务的 API Key
 2. **消息通道** — 在 `config/channels.yaml` 中启用/禁用 Discord、Telegram、Web 通道
 3. **模型选择** — 在 `config/models.yaml` 中配置模型供应商和回退链
 4. **主动引擎** — 在 `config/proactive.yaml` 中设置定时任务和安静时段

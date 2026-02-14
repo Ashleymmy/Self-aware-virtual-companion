@@ -4,57 +4,57 @@
 routing:
   casual_chat:
     primary: "ollama/llama3"
-    fallback: "anthropic/claude-opus-4-6"
+    fallback: "anyrouter/claude-sonnet-4-5-20250929"
     max_tokens: 500
 
   complex_reasoning:
-    primary: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
     max_tokens: 4000
 
   tool_learning:
-    primary: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
     max_tokens: 2000
 
   memory_summarization:
-    primary: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
     max_tokens: 1000
 
   default:
-    primary: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
     max_tokens: 2000
 
 agents:
   orchestrator:
-    primary: "anthropic/claude-opus-4-6"
-    fallback: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
+    fallback: "anyrouter/claude-sonnet-4-5-20250929"
     max_tokens: 4000
 
   companion:
-    primary: "anthropic/claude-opus-4-6"
-    fallback: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
+    fallback: "anyrouter/claude-sonnet-4-5-20250929"
     max_tokens: 1200
 
   technical:
-    primary: "anthropic/claude-opus-4-6"
-    fallback: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
+    fallback: "anyrouter/claude-sonnet-4-5-20250929"
     max_tokens: 4000
 
   vibe-coder:
-    primary: "anthropic/claude-opus-4-6"
-    fallback: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
+    fallback: "anyrouter/claude-sonnet-4-5-20250929"
     max_tokens: 6000
 
   creative:
-    primary: "anthropic/claude-opus-4-6"
-    fallback: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
+    fallback: "anyrouter/claude-sonnet-4-5-20250929"
     max_tokens: 2400
 
   tooling:
-    primary: "anthropic/claude-opus-4-6"
-    fallback: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
+    fallback: "anyrouter/claude-sonnet-4-5-20250929"
     max_tokens: 1500
 
   memory:
-    primary: "anthropic/claude-opus-4-6"
-    fallback: "anthropic/claude-opus-4-6"
+    primary: "anyrouter/claude-opus-4-6"
+    fallback: "anyrouter/claude-sonnet-4-5-20250929"
     max_tokens: 1200
