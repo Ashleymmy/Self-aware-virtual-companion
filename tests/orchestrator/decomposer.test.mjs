@@ -39,6 +39,16 @@ async function main() {
   assert.equal(vibeCase.type, 'simple');
   assert.equal(vibeCase.tasks[0].agent, 'vibe-coder');
 
+  const visionTechCase = await analyze('这个报错截图帮我排障一下 <media:image>', {
+    agentsDir: 'savc-core/agents',
+  });
+  assert.equal(visionTechCase.type, 'compound');
+  assert.equal(visionTechCase.execution, 'sequential');
+  assert.equal(visionTechCase.tasks.length, 2);
+  assert.equal(visionTechCase.tasks[0].agent, 'vision');
+  assert.equal(visionTechCase.tasks[1].agent, 'technical');
+  assert.equal(visionTechCase.tasks[1].dependsOn[0], 'task-1');
+
   console.log('[PASS] orchestrator decomposer');
 }
 

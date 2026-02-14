@@ -3,17 +3,49 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { formatVisionReport, analyzeVisionTask } from './vision.mjs';
+import { buildVoiceExecutionPlan, formatVoicePlan } from './voice.mjs';
 import { formatVibeCodingReport, runVibeCodingTask } from './vibe-coder.mjs';
 
 const runs = new Map();
 
 const builtInExecutor = async ({ agentDef, task, options = {} }) => {
+  if (String(agentDef?.name || '').trim() === 'voice') {
+    const plan = buildVoiceExecutionPlan(task, {
+      defaultAction: 'initiate',
+      emotion: options.voiceEmotion,
+    });
+    if (typeof options.voiceRunner === 'function') {
+      const runnerResult = await options.voiceRunner(plan, { agentDef, task, options });
+      if (typeof runnerResult === 'string' && runnerResult.trim()) {
+        return runnerResult;
+      }
+    }
+    return formatVoicePlan(plan);
+  }
+
+  if (String(agentDef?.name || '').trim() === 'vision') {
+    const analysis = analyzeVisionTask(task, {
+      type: options.visionTaskType,
+    });
+    if (typeof options.visionRunner === 'function') {
+      const runnerResult = await options.visionRunner(analysis, { agentDef, task, options });
+      if (typeof runnerResult === 'string' && runnerResult.trim()) {
+        return runnerResult;
+      }
+    }
+    return formatVisionReport(analysis);
+  }
+
   if (String(agentDef?.name || '').trim() === 'vibe-coder') {
     const result = await runVibeCodingTask(task, {
       workspaceDir: options.workspaceDir || process.cwd(),
+      executionMode: options.executionMode || 'real',
+      outputDir: options.outputDir,
       maxRounds: options.maxFixRounds || options.maxRounds || 3,
       maxScanFiles: options.maxScanFiles,
       maxScanDepth: options.maxScanDepth,
+      commandTimeoutMs: options.commandTimeoutMs,
       runner: options.vibeRunner,
     });
     return formatVibeCodingReport(result);

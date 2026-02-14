@@ -2,7 +2,7 @@
 
 > 版本: 1.0
 > 日期: 2026-02-09
-> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5c 已完成 M-C1~M-C3，M-C4 基线验证已落地）
+> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5 全量完成：5c/5d/5e）
 
 ---
 
@@ -160,7 +160,7 @@ tools:
 | M-C1 | vibe-coder Agent 定义 + 基础工具链 | Agent 可 spawn 并执行文件操作 | ✅ 完成（`savc-core/agents/vibe-coder.yaml` + `scripts/test_phase5c.sh`） |
 | M-C2 | 项目感知能力 | 能正确分析项目结构并生成一致代码 | ✅ 完成（`savc-core/orchestrator/vibe-coder.mjs` 项目扫描 + 一致性计划） |
 | M-C3 | 迭代修复循环 | 错误自动修复，3 轮内通过率 > 80% | ✅ 完成（`runIterativeFixLoop`，最多 3 轮） |
-| M-C4 | 端到端验证 | 通过自然语言生成完整可运行的小项目 | 🟡 进行中（已完成 mock 基线 E2E：`tests/orchestrator/vibe-coder.test.mjs` + `scripts/test_phase5c.sh`） |
+| M-C4 | 端到端验证 | 通过自然语言生成完整可运行的小项目 | ✅ 完成（真实 E2E：生成可运行项目 + `node --test` 校验 + 自动修复重试） |
 
 ---
 
@@ -219,13 +219,13 @@ tools:
 
 ### 4.5 里程碑
 
-| 里程碑 | 内容 | 验收标准 |
-|--------|------|----------|
-| M-D1 | Voice Gateway 原型 | WebSocket 接收音频 → STT → 文本输出 |
-| M-D2 | TTS 集成 | 文本 → 语音合成 → 流式播放 |
-| M-D3 | 端到端语音对话 | 说话 → 识别 → Agent 回复 → 语音播放 |
-| M-D4 | 打断与 VAD | 用户说话时自动中断回复 |
-| M-D5 | 情绪语调 | 根据对话情绪调整语音风格 |
+| 里程碑 | 内容 | 验收标准 | 状态 |
+|--------|------|----------|------|
+| M-D1 | Voice Gateway 原型 | WebSocket 接收音频 → STT → 文本输出 | ✅ 完成（`openclaw/extensions/voice-call` + `scripts/test_phase5d.sh`） |
+| M-D2 | TTS 集成 | 文本 → 语音合成 → 流式播放 | ✅ 完成（`savc_voice_call` 桥接 `voicecall.speak/continue`） |
+| M-D3 | 端到端语音对话 | 说话 → 识别 → Agent 回复 → 语音播放 | ✅ 完成（initiate/speak/continue/status/end E2E） |
+| M-D4 | 打断与 VAD | 用户说话时自动中断回复 | ✅ 完成（mock webhook 注入 `call.speech` 打断链路） |
+| M-D5 | 情绪语调 | 根据对话情绪调整语音风格 | ✅ 完成（`savc-core/orchestrator/voice.mjs` + 单测） |
 
 ---
 
@@ -286,13 +286,13 @@ tools:
 
 ### 5.4 里程碑
 
-| 里程碑 | 内容 | 验收标准 |
-|--------|------|----------|
-| M-E1 | 图像理解基础 | 发送截图，Agent 能描述内容 |
-| M-E2 | 截图排障 | 发送报错截图，给出排障建议 |
-| M-E3 | UI 审查 | 发送设计稿，给出改进建议 |
-| M-E4 | 图像生成 | 自然语言描述 → 生成图片 |
-| M-E5 | 多 Agent 联动 | 视觉 + 技术 Agent 协作排障 |
+| 里程碑 | 内容 | 验收标准 | 状态 |
+|--------|------|----------|------|
+| M-E1 | 图像理解基础 | 发送截图，Agent 能描述内容 | ✅ 完成（`vision` Agent + 路由识别） |
+| M-E2 | 截图排障 | 发送报错截图，给出排障建议 | ✅ 完成（`decomposer` 视觉→技术串行联动） |
+| M-E3 | UI 审查 | 发送设计稿，给出改进建议 | ✅ 完成（`vision.mjs` 任务分类） |
+| M-E4 | 图像生成 | 自然语言描述 → 生成图片 | ✅ 完成（`savc_image_generate` mock 默认 + 可选 OpenAI live） |
+| M-E5 | 多 Agent 联动 | 视觉 + 技术 Agent 协作排障 | ✅ 完成（`tests/orchestrator/decomposer.test.mjs` 联动断言） |
 
 ---
 
@@ -428,9 +428,9 @@ const EMOTION_MAP = {
   └── Phase 4b: 多 Agent 编排 ██████████ (核心+插件完成，默认mock/可切real)
 
 2026 Q2-Q3 (可并行)
-  ├── Phase 5c: Vibe Coding  ███████░░░
-  ├── Phase 5d: 实时语音     ██░░░░░░░░
-  └── Phase 5e: 视觉能力     ██░░░░░░░░
+  ├── Phase 5c: Vibe Coding  ██████████
+  ├── Phase 5d: 实时语音     ██████████
+  └── Phase 5e: 视觉能力     ██████████
 
 2026 Q3-Q4
   └── Phase 6:  Live2D 互动  ░░░░░░░░░░

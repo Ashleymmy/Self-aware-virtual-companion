@@ -59,7 +59,7 @@
 - Phase 4a 收尾: Auto-Recall/Auto-Capture/时间衰减/本地 Embedding 已落地并通过自动化验证
 - Phase 4b 核心层: 达到 B1~B5 与 B8（核心版）验收标准
 - Phase 4b 插件层: mock + real backend gate 均通过，`sessions_send` 联调分支已覆盖，默认发布模式保持 mock
-- Phase 5 推进: M-C1（vibe-coder 基础能力）已完成，M-C2+ 待继续推进
+- Phase 5 推进: M-C1（vibe-coder 基础能力）已完成（后续 M-C2~M-C4 见增量更新）
 
 ## 增量更新（2026-02-12）
 - `bash scripts/test_phase5c.sh`
@@ -71,3 +71,29 @@
   - M-C2（项目感知）已完成
   - M-C3（迭代修复循环）已完成
   - M-C4（端到端）已完成 mock 基线验证，真实代码执行链路仍在进行中
+
+## 增量更新（2026-02-13）
+- `node tests/orchestrator/vibe-coder.test.mjs`
+  - 结果: PASS
+- `bash scripts/test_phase5c.sh`
+  - 结果: PASS
+  - 汇总: PASS 7 / FAIL 0
+- `bash scripts/test_phase4b.sh`
+  - 结果: PASS
+  - 汇总: PASS 23 / FAIL 0
+- Phase 5c 推进:
+  - M-C4（端到端）真实链路完成：生成可运行小项目 + `node --test` 校验 + 自动修复重试
+  - 当前 `Phase 5c` 里程碑状态：M-C1~M-C4 全部完成
+
+## 增量更新（2026-02-13，Phase 5 全量收尾）
+- `bash scripts/test_phase5d.sh`
+  - 结果: PASS
+  - 汇总: PASS 18 / FAIL 0
+- `bash scripts/test_phase5e.sh`
+  - 结果: PASS
+  - 汇总: PASS 14 / WARN 1 / FAIL 0（live smoke 默认关闭）
+- `bash scripts/test_phase5.sh`
+  - 结果: PASS
+- 结论:
+  - Phase 5d（实时语音）M-D1~M-D5 已完成（mock 闭环）
+  - Phase 5e（视觉能力）M-E1~M-E5 已完成（mock 主验收 + 可选 OpenAI live）

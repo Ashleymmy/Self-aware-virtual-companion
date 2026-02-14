@@ -89,6 +89,11 @@ try {
   assert.equal(run.projectContext.packageManager, 'pnpm');
   assert.equal(run.repair.withinThreeRounds, true);
   assert.equal(run.plan.targetFiles.length > 0, true);
+  assert.equal(run.execution.mode, 'real');
+  assert.equal(run.execution.outputRoot, 'vibe-output');
+  assert.equal(run.generatedFiles.includes('vibe-output/src/app.js'), true);
+  await fs.access(path.join(workspaceDir, 'vibe-output', 'src', 'app.js'));
+  await fs.access(path.join(workspaceDir, 'vibe-output', 'tests', 'app.test.js'));
 } finally {
   await fs.rm(workspaceDir, { recursive: true, force: true });
 }

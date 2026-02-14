@@ -15,6 +15,16 @@ const INTENT_RULES = [
     regex: /(从零搭建|脚手架|自动修复|迭代修复|生成项目|vibe|scaffold|boilerplate|project skeleton|create .*project)/i,
   },
   {
+    intent: 'vision_analysis',
+    agent: 'vision',
+    regex: /(截图|图片|图像|照片|设计稿|图表|ui|界面|logo|<media:image>|screenshot|image)/i,
+  },
+  {
+    intent: 'voice_conversation',
+    agent: 'voice',
+    regex: /(语音|通话|打电话|电话|voice call|voice|tts|stt)/i,
+  },
+  {
     intent: 'technical_explanation',
     agent: 'technical',
     regex: /(sql|查询|优化|慢|索引|数据库|bug|报错|代码|debug|排障|架构|实现)/i,

@@ -12,6 +12,15 @@ import {
 } from '../../savc-core/orchestrator/vibe-coder.mjs';
 import { resetExecutor, spawnAgent, waitForAgent } from '../../savc-core/orchestrator/lifecycle.mjs';
 
+async function exists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function createWorkspace() {
   const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'savc_phase5c_'));
   await fs.mkdir(path.join(workspaceDir, 'src'), { recursive: true });
@@ -87,10 +96,23 @@ async function main() {
     assert.equal(runResult.repair.withinThreeRounds, true);
     assert.equal(runResult.repair.attempts.length <= 3, true);
     assert.equal(runResult.plan.targetFiles.length > 0, true);
+    assert.equal(runResult.execution.mode, 'real');
+    assert.equal(runResult.execution.outputRoot, 'vibe-output');
+    assert.equal(runResult.generatedFiles.includes('vibe-output/src/app.js'), true);
+    assert.equal(
+      await exists(path.join(workspaceDir, 'vibe-output', 'src', 'app.js')),
+      true,
+    );
+    assert.equal(
+      await exists(path.join(workspaceDir, 'vibe-output', 'tests', 'app.test.js')),
+      true,
+    );
 
     const report = formatVibeCodingReport(runResult);
     assert.equal(report.includes('status=completed'), true);
     assert.equal(report.includes('iterations=2/3'), true);
+    assert.equal(report.includes('executionMode=real'), true);
+    assert.equal(report.includes('outputRoot=vibe-output'), true);
 
     resetExecutor();
     const runId = await spawnAgent(
@@ -105,6 +127,7 @@ async function main() {
     assert.equal(done.status, 'completed');
     assert.equal(String(done.output || '').includes('[vibe-coder]'), true);
     assert.equal(String(done.output || '').includes('status=completed'), true);
+    assert.equal(String(done.output || '').includes('executionMode=real'), true);
 
     console.log('[PASS] orchestrator vibe-coder');
   } finally {

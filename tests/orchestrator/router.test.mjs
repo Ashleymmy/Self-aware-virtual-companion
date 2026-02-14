@@ -21,6 +21,16 @@ async function main() {
   assert.equal(case4.agent, 'vibe-coder');
   assert.ok([1, 2].includes(case4.level));
 
+  const case5 = await routeMessage('帮我看看这个报错截图', {
+    agentsDir: 'savc-core/agents',
+  });
+  assert.equal(case5.agent, 'vision');
+
+  const case6 = await routeMessage('帮我发起一个语音通话', {
+    agentsDir: 'savc-core/agents',
+  });
+  assert.equal(case6.agent, 'voice');
+
   console.log('[PASS] orchestrator router');
 }
 

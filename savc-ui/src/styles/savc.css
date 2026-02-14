@@ -1,0 +1,594 @@
+/* ===========================================
+   SAVC Custom Styles
+   Chinese Typography + Enhanced Animations
+   =========================================== */
+
+/* Chinese typography adjustments */
+body {
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+/* Tighter letter-spacing for CJK text */
+.page-title,
+.card-title,
+.brand-title,
+.stat-value,
+.nav-item__text,
+.nav-label__text {
+  letter-spacing: 0;
+}
+
+/* ===========================================
+   SAVC Branded Colors for Panels
+   =========================================== */
+
+.savc-memory {
+  --panel-accent: var(--savc-memory);
+  --panel-accent-subtle: var(--savc-memory-subtle);
+}
+
+.savc-persona {
+  --panel-accent: var(--savc-persona);
+  --panel-accent-subtle: var(--savc-persona-subtle);
+}
+
+.savc-orchestrator {
+  --panel-accent: var(--savc-orchestrator);
+  --panel-accent-subtle: var(--savc-orchestrator-subtle);
+}
+
+.savc-companion {
+  --panel-accent: var(--savc-companion);
+  --panel-accent-subtle: var(--savc-companion-subtle);
+}
+
+/* Panel accent border */
+.card[data-accent] {
+  border-top: 2px solid var(--panel-accent, var(--accent));
+}
+
+/* ===========================================
+   Enhanced Card Hover Effects
+   =========================================== */
+
+.card-lift {
+  transition:
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ===========================================
+   Number Counter Animation
+   =========================================== */
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-value-animate {
+  animation: count-up 0.5s var(--ease-out) backwards;
+}
+
+/* ===========================================
+   View Transition Animations
+   =========================================== */
+
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes view-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.view-enter {
+  animation: view-enter 0.35s var(--ease-out) backwards;
+}
+
+/* Staggered list entrance */
+@keyframes list-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.list-stagger > * {
+  animation: list-enter 0.3s var(--ease-out) backwards;
+}
+
+.list-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.list-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.list-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.list-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.list-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.list-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.list-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.list-stagger > *:nth-child(8) { animation-delay: 280ms; }
+.list-stagger > *:nth-child(9) { animation-delay: 320ms; }
+.list-stagger > *:nth-child(10) { animation-delay: 360ms; }
+
+/* ===========================================
+   Memory Importance Visualization
+   =========================================== */
+
+.importance-bar {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.importance-bar__fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--savc-memory);
+  transition: width 0.6s var(--ease-out);
+}
+
+.importance-bar__fill.high {
+  background: var(--accent);
+}
+
+.importance-bar__fill.medium {
+  background: var(--warn);
+}
+
+.importance-bar__fill.low {
+  background: var(--savc-memory);
+}
+
+/* ===========================================
+   Persona Trait Slider
+   =========================================== */
+
+.trait-slider {
+  display: grid;
+  gap: 8px;
+}
+
+.trait-slider__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trait-slider__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.trait-slider__value {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--muted);
+}
+
+.trait-slider__track {
+  position: relative;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  cursor: pointer;
+}
+
+.trait-slider__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--savc-persona);
+  transition: width 0.3s var(--ease-out);
+}
+
+.trait-slider__thumb {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--text-strong);
+  border: 2px solid var(--savc-persona);
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  transition: box-shadow var(--duration-fast) ease;
+}
+
+.trait-slider__thumb:hover {
+  box-shadow: 0 0 0 4px var(--savc-persona-subtle);
+}
+
+/* ===========================================
+   Orchestrator Topology
+   =========================================== */
+
+.topology-svg {
+  width: 100%;
+  max-height: 400px;
+}
+
+.topology-node {
+  cursor: pointer;
+  transition: filter var(--duration-fast) ease;
+}
+
+.topology-node:hover {
+  filter: brightness(1.15);
+}
+
+.topology-edge {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.topology-edge.active {
+  stroke: var(--savc-orchestrator);
+  stroke-width: 2;
+  animation: edge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes edge-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ===========================================
+   Toast Notifications
+   =========================================== */
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+}
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: grid;
+  gap: 8px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  animation: toast-enter 0.3s var(--ease-out);
+  min-width: 280px;
+  max-width: 400px;
+}
+
+.toast.exit {
+  animation: toast-exit 0.2s var(--ease-out) forwards;
+}
+
+.toast.success {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.toast.error {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.toast.info {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* ===========================================
+   Loading Skeleton
+   =========================================== */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--border) 25%,
+    var(--bg-hover) 50%,
+    var(--border) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-text {
+  height: 14px;
+  width: 80%;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 60%;
+}
+
+.skeleton-stat {
+  height: 32px;
+  width: 100px;
+}
+
+/* ===========================================
+   Tab Indicator Animation
+   =========================================== */
+
+.tab-group {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.tab-item {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
+}
+
+.tab-item:hover {
+  color: var(--text);
+}
+
+.tab-item.active {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+/* ===========================================
+   Interactive States
+   =========================================== */
+
+/* Clickable list items */
+.list-item-clickable {
+  transition:
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
+}
+
+.list-item-clickable:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.list-item-clickable:active {
+  transform: scale(0.995);
+}
+
+/* Chip hover */
+.filters .chip {
+  transition:
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
+}
+
+/* Code block selection */
+.code-block::selection {
+  background: var(--savc-persona-subtle);
+}
+
+/* Table row hover */
+.table-row {
+  transition: background var(--duration-fast) ease;
+}
+
+.table-row:hover {
+  background: var(--bg-hover);
+}
+
+/* Status list items */
+.status-list > div {
+  transition: background var(--duration-fast) ease;
+  padding: 4px 8px;
+  margin: 0 -8px;
+  border-radius: var(--radius-sm);
+}
+
+.status-list > div:hover {
+  background: var(--bg-hover);
+}
+
+/* ===========================================
+   Responsive Adjustments for Chinese Text
+   =========================================== */
+
+/* Tablet: Topology SVG + Grid */
+@media (max-width: 1100px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .topology-svg {
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-title {
+    font-size: 20px;
+  }
+
+  .brand-title {
+    font-size: 14px;
+  }
+
+  /* Chinese text needs slightly more padding */
+  .nav-item {
+    padding: 8px 12px;
+  }
+
+  /* Tab group: scrollable on mobile */
+  .tab-group {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .tab-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-item {
+    padding: 6px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Trait slider thumb larger for touch */
+  .trait-slider__thumb {
+    width: 20px;
+    height: 20px;
+  }
+
+  .trait-slider__track {
+    height: 10px;
+  }
+
+  /* Topology: stack vertically, larger tap targets */
+  .topology-svg {
+    max-height: 250px;
+  }
+
+  /* Importance bar wider on mobile */
+  .importance-bar {
+    height: 6px;
+    max-width: 100% !important;
+  }
+
+  /* Toast on mobile: full width at bottom */
+  .toast-container {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .toast {
+    min-width: unset;
+    max-width: unset;
+    width: 100%;
+  }
+
+  /* Filters wrap on mobile */
+  .filters {
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  /* Even smaller tab items */
+  .tab-item {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  /* Topology very compact */
+  .topology-svg {
+    max-height: 200px;
+  }
+
+  /* Trait slider description hidden */
+  .trait-slider > div:last-child {
+    font-size: 10px;
+  }
+}
+
+/* ===========================================
+   Reduced Motion
+   =========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .card-lift:hover {
+    transform: none;
+  }
+
+  .stat-value-animate,
+  .view-enter,
+  .list-stagger > *,
+  .toast,
+  .toast.exit {
+    animation: none !important;
+  }
+
+  .importance-bar__fill,
+  .trait-slider__fill {
+    transition: none;
+  }
+
+  .topology-edge.active {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -8,7 +8,7 @@ SAVC 是一套完整的 AI 虚拟伴侣解决方案，通过多 Agent 协同编�
 
 ### 核心特性
 
-- **多 Agent 协同编排** — 6 个专业化 Agent 组成的智能体集群，通过意图路由和任务分解实现高效协作
+- **多 Agent 协同编排** — 9 个专业化 Agent 组成的智能体集群，通过意图路由和任务分解实现高效协作
 - **混合记忆系统** — Markdown 文件 + LanceDB 向量数据库双层架构，支持关键词/语义/混合检索
 - **主动式交互引擎** — 基于 cron 调度的自主消息推送，集成 Google 日历与天气服务
 - **自我反思与工具学习** — 自主分析对话模式、学习新工具、持续优化行为策略
@@ -45,6 +45,9 @@ SAVC 是一套完整的 AI 虚拟伴侣解决方案，通过多 Agent 协同编�
 | **Creative** | 文案创作、头脑风暴、命名建议 | Claude Sonnet 4 |
 | **Tooling** | 天气查询、日历管理、外部 API | Claude Sonnet 4 |
 | **Memory** | 长期记忆管理与召回 | Claude Opus 4.5 |
+| **Vibe-Coder** | 自然语言编程、项目生成、自动修复循环 | Claude Opus 4.5 |
+| **Voice** | 语音会话编排、通话控制、情绪语调映射 | Claude Sonnet 4 |
+| **Vision** | 图像理解、截图排障、UI 审查、图像生成编排 | Claude Opus 4.5 |
 
 ## 项目结构
 
@@ -123,9 +126,9 @@ cp config/.env.example config/.env.local
 | Phase 3 | 工具学习与自我反思 | ✅ 完成 |
 | Phase 4a | 语义记忆检索 (LanceDB) | ✅ 完成 |
 | Phase 4b | 多 Agent 协同编排 | ✅ 完成 |
-| Phase 5c | Vibe Coding (自然语言编程) | 🟡 进行中 |
-| Phase 5d | 实时语音交互 | ⏳ 计划中 |
-| Phase 5e | 视觉能力 | ⏳ 计划中 |
+| Phase 5c | Vibe Coding (自然语言编程) | ✅ 完成 |
+| Phase 5d | 实时语音交互 | ✅ 完成 |
+| Phase 5e | 视觉能力 | ✅ 完成 |
 | Phase 6 | Live2D 虚拟形象 | ⏳ 计划中 |
 
 ## 记忆系统

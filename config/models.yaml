@@ -4,7 +4,7 @@
 routing:
   casual_chat:
     primary: "ollama/llama3"
-    fallback: "anthropic/claude-3-haiku"
+    fallback: "anthropic/claude-opus-4-6"
     max_tokens: 500
 
   complex_reasoning:
@@ -12,49 +12,49 @@ routing:
     max_tokens: 4000
 
   tool_learning:
-    primary: "anthropic/claude-sonnet-4"
+    primary: "anthropic/claude-opus-4-6"
     max_tokens: 2000
 
   memory_summarization:
-    primary: "anthropic/claude-3-haiku"
+    primary: "anthropic/claude-opus-4-6"
     max_tokens: 1000
 
   default:
-    primary: "anthropic/claude-sonnet-4"
+    primary: "anthropic/claude-opus-4-6"
     max_tokens: 2000
 
 agents:
   orchestrator:
-    primary: "anthropic/claude-opus-4-5"
-    fallback: "anthropic/claude-sonnet-4"
+    primary: "anthropic/claude-opus-4-6"
+    fallback: "anthropic/claude-opus-4-6"
     max_tokens: 4000
 
   companion:
-    primary: "anthropic/claude-sonnet-4"
-    fallback: "anthropic/claude-3-haiku"
+    primary: "anthropic/claude-opus-4-6"
+    fallback: "anthropic/claude-opus-4-6"
     max_tokens: 1200
 
   technical:
-    primary: "anthropic/claude-opus-4-5"
-    fallback: "anthropic/claude-sonnet-4"
+    primary: "anthropic/claude-opus-4-6"
+    fallback: "anthropic/claude-opus-4-6"
     max_tokens: 4000
 
   vibe-coder:
-    primary: "anthropic/claude-opus-4-5"
-    fallback: "anthropic/claude-sonnet-4"
+    primary: "anthropic/claude-opus-4-6"
+    fallback: "anthropic/claude-opus-4-6"
     max_tokens: 6000
 
   creative:
-    primary: "anthropic/claude-sonnet-4"
-    fallback: "anthropic/claude-3-haiku"
+    primary: "anthropic/claude-opus-4-6"
+    fallback: "anthropic/claude-opus-4-6"
     max_tokens: 2400
 
   tooling:
-    primary: "anthropic/claude-3-haiku"
-    fallback: "anthropic/claude-sonnet-4"
+    primary: "anthropic/claude-opus-4-6"
+    fallback: "anthropic/claude-opus-4-6"
     max_tokens: 1500
 
   memory:
-    primary: "anthropic/claude-3-haiku"
-    fallback: "anthropic/claude-sonnet-4"
+    primary: "anthropic/claude-opus-4-6"
+    fallback: "anthropic/claude-opus-4-6"
     max_tokens: 1200

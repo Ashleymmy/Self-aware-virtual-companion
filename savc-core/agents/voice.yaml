@@ -1,0 +1,37 @@
+name: voice
+label: "语音 Agent"
+description: "负责语音通话控制、语音会话编排、情绪语调映射"
+
+model:
+  provider: anthropic
+  name: claude-sonnet-4-20250514
+
+persona:
+  inherit: ../SOUL.md
+  override:
+    mode: companion
+    sweetness: medium
+
+triggers:
+  intents:
+    - voice_conversation
+    - voice_call_control
+  keywords:
+    - "语音"
+    - "通话"
+    - "打电话"
+    - "voice call"
+    - "电话"
+
+tools:
+  allowed:
+    - savc_voice_call
+    - memory_recall
+  denied:
+    - sessions_spawn
+    - file_write
+
+limits:
+  max_turns: 30
+  timeout_seconds: 180
+  max_tokens_per_turn: 1800

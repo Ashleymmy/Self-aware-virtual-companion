@@ -1,0 +1,42 @@
+name: vision
+label: "视觉 Agent"
+description: "负责图像理解、截图排障、UI 审查与图像生成请求编排"
+
+model:
+  provider: anthropic
+  name: claude-opus-4-5-20251101
+
+persona:
+  inherit: ../SOUL.md
+  override:
+    mode: technical
+    sweetness: low
+
+triggers:
+  intents:
+    - vision_analysis
+    - screenshot_debug
+    - image_generation
+    - ui_review
+  keywords:
+    - "截图"
+    - "图片"
+    - "图像"
+    - "设计稿"
+    - "图表"
+    - "生成图片"
+    - "logo"
+    - "<media:image>"
+
+tools:
+  allowed:
+    - savc_image_generate
+    - memory_recall
+    - web_search
+  denied:
+    - sessions_spawn
+
+limits:
+  max_turns: 40
+  timeout_seconds: 240
+  max_tokens_per_turn: 2400

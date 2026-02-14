@@ -1,7 +1,7 @@
 # 消息渠道配置
 channels:
   telegram:
-    enabled: false
+    enabled: true
     bot_token_env: "TELEGRAM_BOT_TOKEN"
     proactive:
       enabled: true

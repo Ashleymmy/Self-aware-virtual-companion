@@ -61,6 +61,14 @@ function shouldForceMemory(task) {
   return /(记住|记得|存储|回忆|记忆)/i.test(task);
 }
 
+function hasVisionSignal(task) {
+  return /(截图|图片|图像|照片|设计稿|图表|ui|界面|<media:image>|screenshot|image)/i.test(task);
+}
+
+function hasTechnicalSignal(task) {
+  return /(报错|错误|异常|bug|debug|排障|代码|编译|traceback|stack)/i.test(task);
+}
+
 async function detectTaskAgent(task, options = {}) {
   if (shouldForceMemory(task)) {
     return 'memory';
@@ -86,6 +94,17 @@ export async function analyze(message, context = {}) {
       type: 'simple',
       tasks: [buildTask('task-1', 'orchestrator', '', 1, [])],
       execution: 'parallel',
+    };
+  }
+
+  if (hasVisionSignal(text) && hasTechnicalSignal(text)) {
+    return {
+      type: 'compound',
+      tasks: [
+        buildTask('task-1', 'vision', text, 1, []),
+        buildTask('task-2', 'technical', text, 2, ['task-1']),
+      ],
+      execution: 'sequential',
     };
   }
 

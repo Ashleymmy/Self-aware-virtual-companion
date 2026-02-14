@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 const DEFAULT_MAX_SCAN_FILES = 800;
 const DEFAULT_MAX_SCAN_DEPTH = 5;
 const DEFAULT_MAX_FIX_ROUNDS = 3;
+const DEFAULT_COMMAND_TIMEOUT_MS = 20_000;
+const DEFAULT_OUTPUT_DIR = 'vibe-output';
 
 const IGNORED_DIRS = new Set([
   '.git',
@@ -83,6 +86,20 @@ function toPositiveInt(value, fallback, { min = 1, max = 10_000 } = {}) {
   if (parsed < min) return fallback;
   if (parsed > max) return max;
   return parsed;
+}
+
+function toExecutionMode(value, fallback = 'real') {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (normalized === 'mock' || normalized === 'real') {
+    return normalized;
+  }
+  return fallback;
+}
+
+function normalizePath(inputPath) {
+  return String(inputPath || '').split(path.sep).join('/');
 }
 
 async function scanWorkspace(workspaceDir, options = {}) {
@@ -362,10 +379,443 @@ export function buildImplementationPlan(task, projectContext) {
   };
 }
 
+function shouldInjectFirstFailure(task) {
+  return /(自动修复|迭代修复|修复|fix|测试失败|test fail)/i.test(String(task || ''));
+}
+
+function hasForcedFailure(task) {
+  return /\[(always-fail|force-fail)\]/i.test(String(task || ''));
+}
+
+async function writeTextFile(filePath, content) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, content, 'utf8');
+}
+
+function joinRelative(baseRelative, targetRelative) {
+  if (!baseRelative || baseRelative === '.') return normalizePath(targetRelative);
+  return normalizePath(path.join(baseRelative, targetRelative));
+}
+
+async function resolveOutputRoot(workspaceDir, options = {}) {
+  const rawOutputDir =
+    typeof options.outputDir === 'string' && options.outputDir.trim()
+      ? options.outputDir.trim()
+      : DEFAULT_OUTPUT_DIR;
+  const absolute = path.isAbsolute(rawOutputDir)
+    ? path.resolve(rawOutputDir)
+    : path.resolve(workspaceDir, rawOutputDir);
+  const relative = path.relative(workspaceDir, absolute) || '.';
+  return {
+    absolute,
+    relative,
+  };
+}
+
+function pickRuntimeModuleSystem(projectContext) {
+  return projectContext?.moduleSystem === 'commonjs' ? 'commonjs' : 'esm';
+}
+
+function buildAppSource(moduleSystem, { unhealthyHealth = false } = {}) {
+  const healthStatus = unhealthyHealth ? 500 : 200;
+  const healthOkLiteral = unhealthyHealth ? 'false' : 'true';
+  const createAppSignature = moduleSystem === 'commonjs' ? 'function createApp()' : 'export function createApp()';
+
+  return [
+    'const users = new Map();',
+    '',
+    'async function readJsonBody(req) {',
+    "  let raw = '';",
+    '  for await (const chunk of req) {',
+    '    raw += chunk;',
+    '    if (raw.length > 1_000_000) {',
+    "      throw new Error('payload too large');",
+    '    }',
+    '  }',
+    '  if (!raw) return {};',
+    '  return JSON.parse(raw);',
+    '}',
+    '',
+    'function sendJson(res, status, payload) {',
+    '  res.statusCode = status;',
+    "  res.setHeader('content-type', 'application/json; charset=utf-8');",
+    '  res.end(JSON.stringify(payload));',
+    '}',
+    '',
+    `${createAppSignature} {`,
+    '  return async function app(req, res) {',
+    "    const method = String(req.method || 'GET').toUpperCase();",
+    "    const pathname = String(req.url || '/').split('?')[0] || '/';",
+    '',
+    '    try {',
+    "      if (method === 'GET' && pathname === '/health') {",
+    `        sendJson(res, ${healthStatus}, { ok: ${healthOkLiteral}, source: 'vibe-coder' });`,
+    '        return;',
+    '      }',
+    '',
+    "      if (method === 'POST' && pathname === '/register') {",
+    '        const payload = await readJsonBody(req);',
+    "        const username = String(payload.username || '').trim();",
+    "        const password = String(payload.password || '').trim();",
+    '        if (!username || !password) {',
+    "          sendJson(res, 400, { ok: false, error: 'invalid_payload' });",
+    '          return;',
+    '        }',
+    '        if (users.has(username)) {',
+    "          sendJson(res, 409, { ok: false, error: 'user_exists' });",
+    '          return;',
+    '        }',
+    '        users.set(username, password);',
+    '        sendJson(res, 201, { ok: true, user: { username } });',
+    '        return;',
+    '      }',
+    '',
+    "      if (method === 'POST' && pathname === '/login') {",
+    '        const payload = await readJsonBody(req);',
+    "        const username = String(payload.username || '').trim();",
+    "        const password = String(payload.password || '').trim();",
+    '        if (!username || !password) {',
+    "          sendJson(res, 400, { ok: false, error: 'invalid_payload' });",
+    '          return;',
+    '        }',
+    '        if (!users.has(username) || users.get(username) !== password) {',
+    "          sendJson(res, 401, { ok: false, error: 'invalid_credentials' });",
+    '          return;',
+    '        }',
+    '        sendJson(res, 200, { ok: true, token: `mock-token-${username}` });',
+    '        return;',
+    '      }',
+    '',
+    "      sendJson(res, 404, { ok: false, error: 'not_found' });",
+    '    } catch (error) {',
+    "      const message = error instanceof Error ? error.message : String(error);",
+    "      sendJson(res, 500, { ok: false, error: message });",
+    '    }',
+    '  };',
+    '}',
+    moduleSystem === 'commonjs' ? '\nmodule.exports = { createApp };' : '',
+    '',
+  ].join('\n');
+}
+
+function buildServerSource(moduleSystem) {
+  if (moduleSystem === 'commonjs') {
+    return [
+      "const http = require('node:http');",
+      "const { createApp } = require('./app.js');",
+      '',
+      'function createServer() {',
+      '  return http.createServer(createApp());',
+      '}',
+      '',
+      'module.exports = { createServer };',
+      '',
+    ].join('\n');
+  }
+
+  return [
+    "import http from 'node:http';",
+    "import { createApp } from './app.js';",
+    '',
+    'export function createServer() {',
+    '  return http.createServer(createApp());',
+    '}',
+    '',
+  ].join('\n');
+}
+
+function buildTestSource(moduleSystem) {
+  const importLines =
+    moduleSystem === 'commonjs'
+      ? [
+          "const assert = require('node:assert/strict');",
+          "const { after, before, test } = require('node:test');",
+          "const { createServer } = require('../src/server.js');",
+        ]
+      : [
+          "import assert from 'node:assert/strict';",
+          "import { after, before, test } from 'node:test';",
+          "import { createServer } from '../src/server.js';",
+        ];
+
+  return [
+    ...importLines,
+    '',
+    'let server = null;',
+    "let baseUrl = '';",
+    '',
+    'before(async () => {',
+    '  server = createServer();',
+    "  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));",
+    '  const address = server.address();',
+    "  const port = typeof address === 'object' && address ? address.port : 0;",
+    '  baseUrl = `http://127.0.0.1:${port}`;',
+    '});',
+    '',
+    'after(async () => {',
+    '  if (!server) return;',
+    '  await new Promise((resolve) => server.close(() => resolve()));',
+    '});',
+    '',
+    'async function request(method, pathname, payload) {',
+    '  const response = await fetch(`${baseUrl}${pathname}`, {',
+    '    method,',
+    "    headers: { 'content-type': 'application/json' },",
+    '    body: payload === undefined ? undefined : JSON.stringify(payload),',
+    '  });',
+    '  const raw = await response.text();',
+    '  return {',
+    '    status: response.status,',
+    '    body: raw ? JSON.parse(raw) : null,',
+    '  };',
+    '}',
+    '',
+    "test('health endpoint should return ok=true', async () => {",
+    "  const response = await request('GET', '/health');",
+    '  assert.equal(response.status, 200);',
+    '  assert.equal(Boolean(response.body?.ok), true);',
+    '});',
+    '',
+    "test('register and login flow should work', async () => {",
+    "  const username = 'savc-user';",
+    "  const password = 'savc-password';",
+    '',
+    "  const register = await request('POST', '/register', { username, password });",
+    '  assert.equal(register.status, 201);',
+    '  assert.equal(Boolean(register.body?.ok), true);',
+    '',
+    "  const login = await request('POST', '/login', { username, password });",
+    '  assert.equal(login.status, 200);',
+    '  assert.equal(Boolean(login.body?.ok), true);',
+    "  assert.equal(typeof login.body?.token, 'string');",
+    '});',
+    '',
+  ].join('\n');
+}
+
+function buildGeneratedReadme(task, outputRootRelative) {
+  return [
+    '# Generated by vibe-coder',
+    '',
+    `- task: ${String(task || '').trim() || '(empty)'}`,
+    `- output_root: ${normalizePath(outputRootRelative || '.')}`,
+    '- runtime: node --test',
+    '',
+  ].join('\n');
+}
+
+async function materializeRunnableProject({
+  workspaceDir,
+  outputRootAbsolute,
+  outputRootRelative,
+  moduleSystem,
+  attempt,
+  task,
+}) {
+  const relativeApp = 'src/app.js';
+  const relativeServer = 'src/server.js';
+  const relativeTest = 'tests/app.test.js';
+  const relativeReadme = 'README.generated.md';
+  const shouldBeUnhealthy = attempt === 1 && shouldInjectFirstFailure(task);
+
+  const appAbsolute = path.join(outputRootAbsolute, relativeApp);
+  const serverAbsolute = path.join(outputRootAbsolute, relativeServer);
+  const testAbsolute = path.join(outputRootAbsolute, relativeTest);
+  const readmeAbsolute = path.join(outputRootAbsolute, relativeReadme);
+
+  await writeTextFile(appAbsolute, buildAppSource(moduleSystem, { unhealthyHealth: shouldBeUnhealthy }));
+  await writeTextFile(serverAbsolute, buildServerSource(moduleSystem));
+  await writeTextFile(testAbsolute, buildTestSource(moduleSystem));
+  await writeTextFile(readmeAbsolute, buildGeneratedReadme(task, outputRootRelative));
+
+  return {
+    changedFiles: [
+      joinRelative(outputRootRelative, relativeApp),
+      joinRelative(outputRootRelative, relativeServer),
+      joinRelative(outputRootRelative, relativeTest),
+      joinRelative(outputRootRelative, relativeReadme),
+    ],
+    testFileRelative: joinRelative(outputRootRelative, relativeTest),
+  };
+}
+
+function truncateText(input, maxLength = 2000) {
+  const text = String(input || '');
+  if (text.length <= maxLength) return text;
+  return text.slice(text.length - maxLength);
+}
+
+async function runNodeTest({ workspaceDir, testFileRelative, timeoutMs }) {
+  const startedAt = Date.now();
+  const timeout = toPositiveInt(timeoutMs, DEFAULT_COMMAND_TIMEOUT_MS, {
+    min: 500,
+    max: 300_000,
+  });
+
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let finished = false;
+    let timedOut = false;
+
+    const child = spawn(process.execPath, ['--test', testFileRelative], {
+      cwd: workspaceDir,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, timeout);
+
+    const finalize = (payload) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      resolve(payload);
+    };
+
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk || '');
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk || '');
+    });
+
+    child.on('error', (error) => {
+      const durationMs = Date.now() - startedAt;
+      finalize({
+        ok: false,
+        command: `node --test ${normalizePath(testFileRelative)}`,
+        exitCode: null,
+        timedOut: false,
+        durationMs,
+        stdout: truncateText(stdout),
+        stderr: truncateText(stderr),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    child.on('close', (exitCode) => {
+      const durationMs = Date.now() - startedAt;
+      const ok = !timedOut && exitCode === 0;
+      finalize({
+        ok,
+        command: `node --test ${normalizePath(testFileRelative)}`,
+        exitCode,
+        timedOut,
+        durationMs,
+        stdout: truncateText(stdout),
+        stderr: truncateText(stderr),
+        error: timedOut ? `timeout after ${timeout}ms` : null,
+      });
+    });
+  });
+}
+
+function summarizeCheckFailure(checkResult) {
+  if (checkResult.error) return String(checkResult.error);
+  const merged = [checkResult.stderr, checkResult.stdout]
+    .filter(Boolean)
+    .join('\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (merged.length > 0) return merged[0];
+  if (checkResult.exitCode !== null && checkResult.exitCode !== undefined) {
+    return `test command exited with code ${checkResult.exitCode}`;
+  }
+  return 'test command failed';
+}
+
+async function createRealRunner(task, projectContext, options = {}) {
+  const workspaceDir = path.resolve(options.workspaceDir || process.cwd());
+  const outputRoot = await resolveOutputRoot(workspaceDir, options);
+  const moduleSystem = pickRuntimeModuleSystem(projectContext);
+  const commandTimeoutMs = toPositiveInt(options.commandTimeoutMs, DEFAULT_COMMAND_TIMEOUT_MS, {
+    min: 500,
+    max: 300_000,
+  });
+  const validationCommand = `node --test ${joinRelative(outputRoot.relative, 'tests/app.test.js')}`;
+
+  return {
+    runtime: {
+      moduleSystem,
+      outputRootRelative: normalizePath(outputRoot.relative),
+      validationCommand: normalizePath(validationCommand),
+    },
+    runner: async ({ attempt, maxRounds, previousError }) => {
+      if (hasForcedFailure(task)) {
+        return {
+          ok: false,
+          error: 'forced failure marker',
+          notes: '任务包含强制失败标记，停止自动修复。',
+          changedFiles: [],
+        };
+      }
+
+      const materialized = await materializeRunnableProject({
+        workspaceDir,
+        outputRootAbsolute: outputRoot.absolute,
+        outputRootRelative: outputRoot.relative,
+        moduleSystem,
+        attempt,
+        task,
+      });
+
+      const check = await runNodeTest({
+        workspaceDir,
+        testFileRelative: materialized.testFileRelative,
+        timeoutMs: commandTimeoutMs,
+      });
+
+      if (check.ok) {
+        const message =
+          attempt === 1
+            ? '首轮生成并通过可运行项目校验。'
+            : `第 ${attempt}/${maxRounds} 轮修复后通过校验（上一轮错误: ${previousError || 'unknown'}）。`;
+        return {
+          ok: true,
+          notes: message,
+          changedFiles: materialized.changedFiles,
+          check,
+        };
+      }
+
+      return {
+        ok: false,
+        error: summarizeCheckFailure(check),
+        notes: `第 ${attempt}/${maxRounds} 轮校验失败，继续自动修复。`,
+        changedFiles: materialized.changedFiles,
+        check,
+      };
+    },
+  };
+}
+
 function normalizeLoopItem(attempt, result) {
   const changedFiles = Array.isArray(result?.changedFiles)
     ? result.changedFiles.map((item) => String(item).trim()).filter(Boolean)
     : [];
+  const check =
+    result?.check && typeof result.check === 'object'
+      ? {
+          ok: Boolean(result.check.ok),
+          command: result.check.command ? String(result.check.command) : null,
+          exitCode:
+            typeof result.check.exitCode === 'number' && Number.isFinite(result.check.exitCode)
+              ? result.check.exitCode
+              : null,
+          timedOut: Boolean(result.check.timedOut),
+          durationMs:
+            typeof result.check.durationMs === 'number' && Number.isFinite(result.check.durationMs)
+              ? result.check.durationMs
+              : null,
+          stdout: truncateText(result.check.stdout || '', 1200),
+          stderr: truncateText(result.check.stderr || '', 1200),
+        }
+      : null;
 
   return {
     attempt,
@@ -373,13 +823,13 @@ function normalizeLoopItem(attempt, result) {
     notes: typeof result?.notes === 'string' ? result.notes.trim() : '',
     error: result?.error ? String(result.error) : null,
     changedFiles,
+    check,
   };
 }
 
 function createDefaultRunner(task, plan) {
-  const text = String(task || '');
-  const shouldFailFirstRound = /(自动修复|迭代修复|修复|fix|测试失败|test fail)/i.test(text);
-  const forcedFailure = /\[(always-fail|force-fail)\]/i.test(text);
+  const shouldFailFirstRound = shouldInjectFirstFailure(task);
+  const forcedFailure = hasForcedFailure(task);
   const changedFiles = plan.targetFiles.slice(0, 4);
 
   return async ({ attempt, previousError }) => {
@@ -460,20 +910,36 @@ export async function runIterativeFixLoop({
     completedIn,
     withinThreeRounds: passed && completedIn <= 3,
     passRate: passed ? 1 : 0,
+    finalCheck: attempts.length > 0 ? attempts[attempts.length - 1].check : null,
   };
 }
 
 export async function runVibeCodingTask(task, options = {}) {
   const workspaceDir = path.resolve(options.workspaceDir || process.cwd());
+  const executionMode = toExecutionMode(options.executionMode, 'real');
   const projectContext = options.projectContext || (await buildProjectContext(workspaceDir, options));
   const plan = buildImplementationPlan(task, projectContext);
+  const hasCustomRunner = typeof options.runner === 'function';
+
+  let runner = hasCustomRunner ? options.runner : null;
+  let runtime = null;
+  if (!runner && executionMode === 'real') {
+    const real = await createRealRunner(task, projectContext, {
+      ...options,
+      workspaceDir,
+    });
+    runner = real.runner;
+    runtime = real.runtime;
+  }
+
   const repair = await runIterativeFixLoop({
     task,
     projectContext,
     plan,
     maxRounds: options.maxRounds,
-    runner: options.runner,
+    runner: runner || undefined,
   });
+  const generatedFiles = unique(repair.attempts.flatMap((item) => item.changedFiles || []));
 
   return {
     task: String(task || '').trim(),
@@ -481,6 +947,12 @@ export async function runVibeCodingTask(task, options = {}) {
     projectContext,
     plan,
     repair,
+    generatedFiles,
+    execution: {
+      mode: hasCustomRunner ? 'custom' : executionMode,
+      outputRoot: runtime?.outputRootRelative || null,
+      validationCommand: runtime?.validationCommand || null,
+    },
     status: repair.passed ? 'completed' : 'failed',
   };
 }
@@ -493,6 +965,8 @@ export function formatVibeCodingReport(result) {
   const checks = [result.projectContext.commands.test, result.projectContext.commands.lint]
     .filter(Boolean)
     .join(' && ') || 'none';
+  const generatedFiles = Array.isArray(result.generatedFiles) ? result.generatedFiles.join(',') : '';
+  const finalCheck = result.repair?.finalCheck?.command || result.execution?.validationCommand || 'none';
 
   return [
     '[vibe-coder]',
@@ -502,7 +976,11 @@ export function formatVibeCodingReport(result) {
     `moduleSystem=${result.projectContext.moduleSystem}`,
     `frameworks=${frameworks}`,
     `targetFiles=${files}`,
+    `generatedFiles=${generatedFiles || 'none'}`,
     `checks=${checks}`,
+    `executionMode=${result.execution?.mode || 'unknown'}`,
+    `outputRoot=${result.execution?.outputRoot || 'none'}`,
+    `verification=${finalCheck}`,
     `iterations=${result.repair.attempts.length}/${result.repair.maxRounds}`,
     `status=${result.status}`,
   ].join('\n');
@@ -531,9 +1009,12 @@ async function runCli() {
   const task = args.task || args._[1] || '';
   const result = await runVibeCodingTask(task, {
     workspaceDir,
+    executionMode: args.mode,
+    outputDir: args['output-dir'],
     maxRounds: args['max-rounds'],
     maxScanFiles: args['max-scan-files'],
     maxScanDepth: args['max-scan-depth'],
+    commandTimeoutMs: args['command-timeout-ms'],
   });
 
   if (args.json) {

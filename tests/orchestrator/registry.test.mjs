@@ -40,8 +40,12 @@ async function main() {
   await fs.rm(tempDir, { recursive: true, force: true });
   await copyDir(sourceDir, tempDir);
 
+  const expectedAgentCount = (await fs.readdir(sourceDir, { withFileTypes: true })).filter(
+    (entry) => entry.isFile() && /\.ya?ml$/i.test(entry.name),
+  ).length;
+
   const agents = await discoverAgents(tempDir, { watch: true, forceReload: true });
-  assert.equal(agents.length, 7);
+  assert.equal(agents.length, expectedAgentCount);
 
   const names = listAgents();
   assert.ok(names.includes('companion'));

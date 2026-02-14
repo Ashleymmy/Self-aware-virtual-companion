@@ -87,7 +87,7 @@ assert entry["config"]["spawnMode"] == "mock"
 
 assert cfg["tools"]["agentToAgent"]["enabled"] is True
 allow = cfg["tools"]["agentToAgent"]["allow"]
-for agent in ["main", "orchestrator", "companion", "technical", "creative", "tooling", "memory", "vibe-coder"]:
+for agent in ["main", "orchestrator", "companion", "technical", "creative", "tooling", "memory", "vibe-coder", "voice", "vision"]:
     assert agent in allow
 
 also_allow = cfg["tools"]["alsoAllow"]
@@ -102,12 +102,12 @@ for key in [
 
 agents_list = cfg.get("agents", {}).get("list", [])
 ids = {item.get("id") for item in agents_list if isinstance(item, dict)}
-for agent in ["main", "orchestrator", "companion", "technical", "creative", "tooling", "memory", "vibe-coder"]:
+for agent in ["main", "orchestrator", "companion", "technical", "creative", "tooling", "memory", "vibe-coder", "voice", "vision"]:
     assert agent in ids
 
 main = next(item for item in agents_list if isinstance(item, dict) and item.get("id") == "main")
 allow_agents = main.get("subagents", {}).get("allowAgents", [])
-for agent in ["orchestrator", "companion", "technical", "creative", "tooling", "memory", "vibe-coder"]:
+for agent in ["orchestrator", "companion", "technical", "creative", "tooling", "memory", "vibe-coder", "voice", "vision"]:
     assert agent in allow_agents
 
 print("ok")
