@@ -50,6 +50,7 @@ TMP_SPEAK="${TMP_ROOT}/voice_speak.json"
 TMP_CONTINUE="${TMP_ROOT}/voice_continue.json"
 TMP_STATUS="${TMP_ROOT}/voice_status.json"
 TMP_END="${TMP_ROOT}/voice_end.json"
+TMP_VOICE_STORE="${TMP_ROOT}/voice-store"
 PORT="${PHASE5D_GATEWAY_PORT:-18805}"
 VOICE_WEBHOOK_PORT="${PHASE5D_VOICE_WEBHOOK_PORT:-3334}"
 TOKEN="phase5d-token"
@@ -86,24 +87,26 @@ else
   fail "phase5 enable script failed (see /tmp/phase5d_enable.log)"
 fi
 
-if python3 - "${TMP_CONFIG}" "${VOICE_WEBHOOK_PORT}" <<'PY'
+if python3 - "${TMP_CONFIG}" "${VOICE_WEBHOOK_PORT}" "${TMP_VOICE_STORE}" <<'PY'
 from __future__ import annotations
 import json
 import sys
 
 path = sys.argv[1]
 port = int(sys.argv[2])
+store_path = sys.argv[3]
 cfg = json.load(open(path, "r", encoding="utf-8"))
 voice = cfg.setdefault("plugins", {}).setdefault("entries", {}).setdefault("voice-call", {})
 voice["enabled"] = True
 vcfg = voice.setdefault("config", {})
 vcfg.setdefault("provider", "mock")
 vcfg["serve"] = {"port": port, "bind": "127.0.0.1", "path": "/voice/webhook"}
+vcfg["store"] = store_path
 open(path, "w", encoding="utf-8").write(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
 print("ok")
 PY
 then
-  pass "temp config patched with voice webhook port"
+  pass "temp config patched with voice webhook/store"
 else
   fail "failed to patch temp config for voice webhook"
 fi
@@ -136,7 +139,50 @@ invoke_tool() {
     --data "${payload}" >"${output_file}"
 }
 
-if invoke_tool "${TMP_INIT}" '{"tool":"savc_voice_call","sessionKey":"main","args":{"action":"initiate","to":"+15550001234","message":"你好，我们开始语音会话","mode":"conversation","emotion":"empathetic"}}'; then
+invoke_tool_retry() {
+  local output_file="$1"
+  local payload="$2"
+  local attempts="${3:-20}"
+  local i=0
+  while (( i < attempts )); do
+    if invoke_tool "${output_file}" "${payload}"; then
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+  return 1
+}
+
+invoke_tool_ok_retry() {
+  local output_file="$1"
+  local payload="$2"
+  local attempts="${3:-20}"
+  local i=0
+  while (( i < attempts )); do
+    if invoke_tool "${output_file}" "${payload}"; then
+      if python3 - "${output_file}" <<'PY'
+from __future__ import annotations
+import json
+import sys
+
+payload = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+details = ((payload.get("result") or {}).get("details") or {})
+assert payload.get("ok") is True
+assert details.get("ok") is True
+print("ok")
+PY
+      then
+        return 0
+      fi
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+  return 1
+}
+
+if invoke_tool_ok_retry "${TMP_INIT}" '{"tool":"savc_voice_call","sessionKey":"main","args":{"action":"initiate","to":"+15550001234","message":"你好，我们开始语音会话","mode":"conversation","emotion":"empathetic"}}' 20; then
   pass "savc_voice_call initiate succeeded"
 else
   fail "savc_voice_call initiate failed"
@@ -160,7 +206,7 @@ PY
 )"
 pass "voice call initiated callId=${CALL_ID}"
 
-if invoke_tool "${TMP_SPEAK}" "{\"tool\":\"savc_voice_call\",\"sessionKey\":\"main\",\"args\":{\"action\":\"speak\",\"callId\":\"${CALL_ID}\",\"message\":\"我先说一句欢迎词\"}}"; then
+if invoke_tool_ok_retry "${TMP_SPEAK}" "{\"tool\":\"savc_voice_call\",\"sessionKey\":\"main\",\"args\":{\"action\":\"speak\",\"callId\":\"${CALL_ID}\",\"message\":\"我先说一句欢迎词\"}}" 20; then
   pass "savc_voice_call speak succeeded"
 else
   fail "savc_voice_call speak failed"
@@ -174,19 +220,19 @@ fi
     >/tmp/phase5d_voice_webhook.log 2>&1 || true
 ) &
 
-if invoke_tool "${TMP_CONTINUE}" "{\"tool\":\"savc_voice_call\",\"sessionKey\":\"main\",\"args\":{\"action\":\"continue\",\"callId\":\"${CALL_ID}\",\"message\":\"继续说说你的问题\"}}"; then
+if invoke_tool_ok_retry "${TMP_CONTINUE}" "{\"tool\":\"savc_voice_call\",\"sessionKey\":\"main\",\"args\":{\"action\":\"continue\",\"callId\":\"${CALL_ID}\",\"message\":\"继续说说你的问题\"}}" 20; then
   pass "savc_voice_call continue succeeded"
 else
   fail "savc_voice_call continue failed"
 fi
 
-if invoke_tool "${TMP_STATUS}" "{\"tool\":\"savc_voice_call\",\"sessionKey\":\"main\",\"args\":{\"action\":\"status\",\"callId\":\"${CALL_ID}\"}}"; then
+if invoke_tool_ok_retry "${TMP_STATUS}" "{\"tool\":\"savc_voice_call\",\"sessionKey\":\"main\",\"args\":{\"action\":\"status\",\"callId\":\"${CALL_ID}\"}}" 20; then
   pass "savc_voice_call status succeeded"
 else
   fail "savc_voice_call status failed"
 fi
 
-if invoke_tool "${TMP_END}" "{\"tool\":\"savc_voice_call\",\"sessionKey\":\"main\",\"args\":{\"action\":\"end\",\"callId\":\"${CALL_ID}\"}}"; then
+if invoke_tool_ok_retry "${TMP_END}" "{\"tool\":\"savc_voice_call\",\"sessionKey\":\"main\",\"args\":{\"action\":\"end\",\"callId\":\"${CALL_ID}\"}}" 20; then
   pass "savc_voice_call end succeeded"
 else
   fail "savc_voice_call end failed"

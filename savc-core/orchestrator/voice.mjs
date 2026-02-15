@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildLive2DSignal } from './live2d.mjs';
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -85,11 +86,38 @@ export function mapEmotionToVoiceStyle(emotion) {
   }
 }
 
+function inferLive2DSource(action, text) {
+  if (!text) return 'text';
+  if (['initiate', 'continue', 'speak'].includes(String(action || '').trim().toLowerCase())) {
+    return 'voice';
+  }
+  return 'text';
+}
+
+export function buildVoiceLive2DSignal(message, options = {}) {
+  const text = normalizeText(message);
+  const action = normalizeText(options.action) || inferVoiceAction(text, { defaultAction: 'initiate' });
+  const emotion = normalizeText(options.emotion) || inferVoiceEmotion(text);
+  return buildLive2DSignal({
+    source: inferLive2DSource(action, text),
+    message: text,
+    emotion,
+    energy: options.lipSyncEnergy,
+    intensity: options.expressionIntensity,
+  });
+}
+
 export function buildVoiceExecutionPlan(message, options = {}) {
   const text = normalizeText(message);
   const action = inferVoiceAction(text, { defaultAction: options.defaultAction || 'initiate' });
   const emotion = normalizeText(options.emotion) || inferVoiceEmotion(text);
   const style = mapEmotionToVoiceStyle(emotion);
+  const live2dSignal = buildVoiceLive2DSignal(text, {
+    action,
+    emotion,
+    lipSyncEnergy: options.lipSyncEnergy,
+    expressionIntensity: options.expressionIntensity,
+  });
 
   const reason = [];
   if (/语音|通话|电话|voice/i.test(text)) {
@@ -106,18 +134,23 @@ export function buildVoiceExecutionPlan(message, options = {}) {
     action,
     emotion,
     style,
+    live2dSignal,
     sourceText: text,
     reasoning: reason.join('+'),
   };
 }
 
 export function formatVoicePlan(plan) {
+  const live2dEmotion = String(plan?.live2dSignal?.emotion || 'neutral');
+  const lipSyncFrames = Array.isArray(plan?.live2dSignal?.lipSync) ? plan.live2dSignal.lipSync.length : 0;
   return [
     '[voice]',
     `action=${plan.action}`,
     `emotion=${plan.emotion}`,
     `ttsStyle=${plan.style?.ttsStyle || 'neutral'}`,
     `pacing=${plan.style?.pacing || 'medium'}`,
+    `live2dEmotion=${live2dEmotion}`,
+    `lipSyncFrames=${lipSyncFrames}`,
     `reason=${plan.reasoning || 'n/a'}`,
   ].join(' ');
 }

@@ -111,6 +111,36 @@ export type VisionModule = {
   }) => Promise<VisionImageResult>;
 };
 
+export type Live2DSignalResult = {
+  version?: string;
+  source?: string;
+  createdAt?: number;
+  emotion?: string;
+  motion?: string;
+  transitionMs?: number;
+  expression?: Record<string, unknown> | null;
+  lipSync?: Array<{ tMs?: number; mouthOpen?: number }>;
+  interaction?: Record<string, unknown> | null;
+};
+
+export type Live2DModule = {
+  normalizeEmotionTag?: (emotion: unknown) => string;
+  mapEmotionToExpression?: (
+    emotion: unknown,
+    options?: Record<string, unknown>,
+  ) => Record<string, unknown>;
+  buildLipSyncFrames?: (
+    text: unknown,
+    options?: Record<string, unknown>,
+  ) => Array<{ tMs?: number; mouthOpen?: number }>;
+  buildInteractionReaction?: (
+    interactionType: unknown,
+    options?: Record<string, unknown>,
+  ) => Record<string, unknown>;
+  buildLive2DSignal: (input?: Record<string, unknown>) => Live2DSignalResult;
+  formatLive2DSignal?: (signal: unknown) => string;
+};
+
 export type RegistryModule = {
   discoverAgents: (agentsDir?: string, options?: { forceReload?: boolean }) => Promise<unknown>;
   getAgent: (name: string) => Record<string, unknown> | null;

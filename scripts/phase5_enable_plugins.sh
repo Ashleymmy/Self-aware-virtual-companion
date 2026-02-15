@@ -116,7 +116,7 @@ config_path = Path(sys.argv[1])
 emit_stdout = sys.argv[2] == "1"
 voice_provider = sys.argv[3]
 
-TOOL_ADDITIONS = ["savc_voice_call", "savc_image_generate"]
+TOOL_ADDITIONS = ["savc_voice_call", "savc_image_generate", "savc_live2d_signal"]
 
 def load_json(path: Path) -> dict:
     raw = path.read_text(encoding="utf-8") if path.exists() else "{}"

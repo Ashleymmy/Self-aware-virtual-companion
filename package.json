@@ -25,6 +25,7 @@
     "test:phase5d": "bash scripts/test_phase5d.sh",
     "test:phase5e": "bash scripts/test_phase5e.sh",
     "test:phase5": "bash scripts/test_phase5.sh",
+    "test:phase6": "bash scripts/test_phase6.sh",
     "test:status": "bash scripts/test_phase_status.sh",
     "test:all": "bash scripts/test_phase1.sh && bash scripts/test_phase2.sh && bash scripts/test_phase3.sh",
     "phase2:run": "bash scripts/phase2_run_once.sh auto",

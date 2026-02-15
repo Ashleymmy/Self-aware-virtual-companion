@@ -14,6 +14,8 @@ const builtInExecutor = async ({ agentDef, task, options = {} }) => {
     const plan = buildVoiceExecutionPlan(task, {
       defaultAction: 'initiate',
       emotion: options.voiceEmotion,
+      lipSyncEnergy: options.voiceLipSyncEnergy,
+      expressionIntensity: options.voiceExpressionIntensity,
     });
     if (typeof options.voiceRunner === 'function') {
       const runnerResult = await options.voiceRunner(plan, { agentDef, task, options });

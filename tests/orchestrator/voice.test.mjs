@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnAgent, waitForAgent } from '../../savc-core/orchestrator/lifecycle.mjs';
 import {
   buildVoiceExecutionPlan,
+  buildVoiceLive2DSignal,
   inferVoiceAction,
   inferVoiceEmotion,
   mapEmotionToVoiceStyle,
@@ -21,6 +22,15 @@ async function main() {
   const plan = buildVoiceExecutionPlan('请发起语音通话并语气温柔一点');
   assert.equal(plan.action, 'initiate');
   assert.equal(typeof plan.style.ttsStyle, 'string');
+  assert.equal(String(plan.live2dSignal?.emotion || '').length > 0, true);
+  assert.equal(Array.isArray(plan.live2dSignal?.lipSync), true);
+
+  const voiceSignal = buildVoiceLive2DSignal('继续语音播报这段文字', {
+    action: 'continue',
+    emotion: 'empathetic',
+  });
+  assert.equal(voiceSignal.source, 'voice');
+  assert.equal(Array.isArray(voiceSignal.lipSync) && voiceSignal.lipSync.length > 0, true);
 
   const runId = await spawnAgent(
     {
@@ -33,6 +43,8 @@ async function main() {
   const done = await waitForAgent(runId, 5000);
   assert.equal(done.status, 'completed');
   assert.equal(String(done.output || '').includes('[voice]'), true);
+  assert.equal(String(done.output || '').includes('live2dEmotion='), true);
+  assert.equal(String(done.output || '').includes('lipSyncFrames='), true);
 
   console.log('[PASS] orchestrator voice');
 }

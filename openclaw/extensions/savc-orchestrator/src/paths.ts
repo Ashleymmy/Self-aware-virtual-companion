@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type {
   DecomposerModule,
+  Live2DModule,
   LifecycleModule,
   MemorySemanticModule,
   RegistryModule,
@@ -188,6 +189,16 @@ export async function loadVisionModule(ctx: ResolvedRuntimeContext): Promise<Vis
   const mod = await importModule<VisionModule>(modulePath);
   if (typeof mod.generateImage !== "function") {
     throw new Error(`invalid vision module export: ${modulePath}`);
+  }
+  return mod;
+}
+
+export async function loadLive2DModule(ctx: ResolvedRuntimeContext): Promise<Live2DModule> {
+  const modulePath = path.join(ctx.orchestratorDir, "live2d.mjs");
+  ensurePathExists(modulePath, "live2d module");
+  const mod = await importModule<Live2DModule>(modulePath);
+  if (typeof mod.buildLive2DSignal !== "function") {
+    throw new Error(`invalid live2d module export: ${modulePath}`);
   }
   return mod;
 }

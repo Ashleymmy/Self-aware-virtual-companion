@@ -31,6 +31,11 @@ async function main() {
   });
   assert.equal(case6.agent, 'voice');
 
+  const case7 = await routeMessage('请给我一套 live2d 口型同步信号', {
+    agentsDir: 'savc-core/agents',
+  });
+  assert.equal(case7.agent, 'live2d');
+
   console.log('[PASS] orchestrator router');
 }
 

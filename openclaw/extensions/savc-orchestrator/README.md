@@ -8,6 +8,7 @@ Bundled OpenClaw extension that exposes SAVC orchestration tools:
 - `savc_agent_status`
 - `savc_voice_call` (bridge to `voicecall.*` gateway methods)
 - `savc_image_generate` (mock/real image generation via `vision.mjs`)
+- `savc_live2d_signal` (Live2D emotion/expression/lipsync/interaction signal builder)
 
 ## Config
 
@@ -32,3 +33,4 @@ All config lives under `plugins.entries.savc-orchestrator.config`:
 - Real mode requires a valid caller session context (`sessionKey`/`agentId`) and proper `tools.agentToAgent` + `subagents.allowAgents` policy.
 - `savc_voice_call` requires the `voice-call` plugin to be enabled.
 - `savc_image_generate` defaults to `mode=mock`; `mode=real` requires `OPENAI_API_KEY`.
+- `savc_live2d_signal` is mock/offline only and generates deterministic signal payloads for Phase 6 UI integration.

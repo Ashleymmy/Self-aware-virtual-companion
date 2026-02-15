@@ -1,7 +1,7 @@
 {
   "id": "savc-orchestrator",
   "name": "SAVC Orchestrator",
-  "description": "SAVC orchestration tools for routing, decomposition, expert spawning, voice-call bridge, and image generation.",
+  "description": "SAVC orchestration tools for routing, decomposition, expert spawning, voice-call bridge, image generation, and Live2D signaling.",
   "uiHints": {
     "savcCorePath": {
       "label": "SAVC Core Path",

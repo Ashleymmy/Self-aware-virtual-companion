@@ -25,6 +25,11 @@ const INTENT_RULES = [
     regex: /(语音|通话|打电话|电话|voice call|voice|tts|stt)/i,
   },
   {
+    intent: 'live2d_interaction',
+    agent: 'live2d',
+    regex: /(live2d|虚拟形象|表情联动|口型同步|动作触发|点击模型|avatar animation|lip sync)/i,
+  },
+  {
     intent: 'technical_explanation',
     agent: 'technical',
     regex: /(sql|查询|优化|慢|索引|数据库|bug|报错|代码|debug|排障|架构|实现)/i,

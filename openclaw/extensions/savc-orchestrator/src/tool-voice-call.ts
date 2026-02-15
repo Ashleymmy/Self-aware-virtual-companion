@@ -1,6 +1,7 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { Type } from "@sinclair/typebox";
-import type { PluginToolContext, ToolDetails } from "./types.js";
+import type { Live2DModule, PluginToolContext, ToolDetails } from "./types.js";
+import { loadLive2DModule, resolveRuntimeContext } from "./paths.js";
 
 type CallGatewayFn = <T = Record<string, unknown>>(opts: {
   method: string;
@@ -57,9 +58,9 @@ async function loadCallGateway(): Promise<CallGatewayFn> {
 }
 
 export function createVoiceCallTool(
-  _api: OpenClawPluginApi,
+  api: OpenClawPluginApi,
   _toolCtx?: PluginToolContext,
-  deps: { callGateway?: CallGatewayFn } = {},
+  deps: { callGateway?: CallGatewayFn; buildLive2DSignal?: Live2DModule["buildLive2DSignal"] } = {},
 ) {
   return {
     name: "savc_voice_call",
@@ -180,6 +181,18 @@ export function createVoiceCallTool(
 
       try {
         const callGateway = deps.callGateway ?? (await loadCallGateway());
+        let live2dSignal: unknown = null;
+        const canBuildLive2D = message && ["initiate", "continue", "speak"].includes(action);
+        if (canBuildLive2D) {
+          const buildLive2DSignal = deps.buildLive2DSignal
+            ? deps.buildLive2DSignal
+            : (await loadLive2DModule(resolveRuntimeContext(api))).buildLive2DSignal;
+          live2dSignal = buildLive2DSignal({
+            source: "voice",
+            message,
+            emotion: emotion || "neutral",
+          });
+        }
         const result = await callGateway({
           method,
           params: gatewayParams,
@@ -190,6 +203,7 @@ export function createVoiceCallTool(
           action,
           method,
           backend: "voice-call",
+          live2dSignal,
           result,
         });
         return {

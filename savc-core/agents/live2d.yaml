@@ -1,0 +1,39 @@
+name: live2d
+label: "Live2D Agent"
+description: "负责 Live2D 表情、口型、动作信号编排（Phase 6 非 UI 基础层）"
+
+model:
+  provider: anthropic
+  name: claude-sonnet-4-20250514
+
+persona:
+  inherit: ../SOUL.md
+  override:
+    mode: companion
+    sweetness: medium
+
+triggers:
+  intents:
+    - live2d_expression
+    - live2d_lipsync
+    - live2d_interaction
+  keywords:
+    - "live2d"
+    - "虚拟形象"
+    - "表情联动"
+    - "口型同步"
+    - "动作触发"
+    - "点击模型"
+
+tools:
+  allowed:
+    - savc_live2d_signal
+    - memory_recall
+  denied:
+    - sessions_spawn
+    - file_write
+
+limits:
+  max_turns: 20
+  timeout_seconds: 120
+  max_tokens_per_turn: 1600

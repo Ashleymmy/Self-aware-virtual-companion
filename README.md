@@ -48,6 +48,7 @@ SAVC 是一套完整的 AI 虚拟伴侣解决方案，通过多 Agent 协同编�
 | **Vibe-Coder** | 自然语言编程、项目生成、自动修复循环 | Claude Opus 4.5 |
 | **Voice** | 语音会话编排、通话控制、情绪语调映射 | Claude Sonnet 4 |
 | **Vision** | 图像理解、截图排障、UI 审查、图像生成编排 | Claude Opus 4.5 |
+| **Live2D** | 表情/口型/动作信号编排（Phase 6 基础层） | Claude Sonnet 4 |
 
 ## 项目结构
 
@@ -130,7 +131,7 @@ cp config/.env.example config/.env.local
 | Phase 5c | Vibe Coding (自然语言编程) | ✅ 完成 |
 | Phase 5d | 实时语音交互 | ✅ 完成 |
 | Phase 5e | 视觉能力 | ✅ 完成 |
-| Phase 6 | Live2D 虚拟形象 | ⏳ 计划中 |
+| Phase 6 | Live2D 虚拟形象 | 🚧 进行中（基础信号层） |
 
 ## 记忆系统
 

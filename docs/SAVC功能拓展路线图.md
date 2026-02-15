@@ -2,7 +2,7 @@
 
 > 版本: 1.0
 > 日期: 2026-02-09
-> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5 全量完成：5c/5d/5e）
+> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5 全量完成：5c/5d/5e；Phase 6 基础信号层已启动）
 
 ---
 
@@ -375,6 +375,16 @@ const EMOTION_MAP = {
 | M-F3 | 口型同步 | TTS 播放时口型动画同步 |
 | M-F4 | 交互响应 | 点击模型触发反应动作 |
 | M-F5 | 完整集成 | 语音对话 + Live2D + 文本界面统一体验 |
+
+### 6.7 当前进展（2026-02-15）
+
+- ✅ 已完成（非 UI 基础层）：
+  - `savc-core/orchestrator/live2d.mjs`：情绪→表情参数映射、mock 口型帧生成、交互动作信号生成。
+  - `openclaw/extensions/savc-orchestrator/src/tool-live2d-signal.ts`：新增 `savc_live2d_signal` 工具，统一输出 `phase6-v1` 信号结构。
+  - `tests/orchestrator/live2d.test.mjs`、`openclaw/extensions/savc-orchestrator/src/tool-live2d-signal.test.ts`：基础能力与工具链路自动化验证。
+- ⏳ 待完成：
+  - M-F1（UI 侧模型加载渲染）
+  - M-F5（语音+Live2D+文本完整端到端集成）
 
 ---
 
