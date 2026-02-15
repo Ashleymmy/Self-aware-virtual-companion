@@ -115,6 +115,7 @@ cp config/.env.example config/.env.local
 2. **消息通道** — 在 `config/channels.yaml` 中启用/禁用 Discord、Telegram、Web 通道
 3. **模型选择** — 在 `config/models.yaml` 中配置模型供应商和回退链
 4. **主动引擎** — 在 `config/proactive.yaml` 中设置定时任务和安静时段
+5. **会话隔离（默认已开启）** — `scripts/setup.sh`/`scripts/llm_enable_failover.sh` 会写入 `session.dmScope=per-channel-peer` 与 `agents.defaults.heartbeat.session=heartbeat-main`，避免心跳与私聊串会话
 
 ## 开发进度
 

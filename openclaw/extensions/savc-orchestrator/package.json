@@ -1,0 +1,14 @@
+{
+  "name": "@openclaw/savc-orchestrator",
+  "version": "2026.2.4",
+  "description": "SAVC multi-agent orchestrator plugin for OpenClaw",
+  "type": "module",
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

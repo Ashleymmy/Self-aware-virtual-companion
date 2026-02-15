@@ -1,0 +1,93 @@
+{
+  "id": "savc-orchestrator",
+  "name": "SAVC Orchestrator",
+  "description": "SAVC orchestration tools for routing, decomposition, expert spawning, voice-call bridge, and image generation.",
+  "uiHints": {
+    "savcCorePath": {
+      "label": "SAVC Core Path",
+      "help": "Absolute or relative path to savc-core directory."
+    },
+    "agentsDir": {
+      "label": "Agents Dir",
+      "help": "Optional override for agent YAML directory.",
+      "advanced": true
+    },
+    "spawnMode": {
+      "label": "Spawn Mode",
+      "help": "Execution backend for savc_spawn_expert. Default is mock; set to real to use OpenClaw session tools."
+    },
+    "defaultWait": {
+      "label": "Wait By Default",
+      "help": "Whether savc_spawn_expert waits for completion by default."
+    },
+    "defaultTimeoutMs": {
+      "label": "Default Timeout (ms)",
+      "help": "Default timeout used by spawn/wait operations.",
+      "advanced": true
+    },
+    "memoryRecallEnabled": {
+      "label": "Enable Memory Recall",
+      "help": "Recall semantic memories before expert execution."
+    },
+    "memoryRecallTopK": {
+      "label": "Recall TopK",
+      "help": "Maximum number of recalled memories injected into task.",
+      "advanced": true
+    },
+    "memoryMinScore": {
+      "label": "Recall Min Score",
+      "help": "Minimum semantic similarity threshold for recalled memories.",
+      "advanced": true
+    },
+    "memoryPersistEnabled": {
+      "label": "Enable Memory Persist",
+      "help": "Allow memory agent branch to persist semantic memory."
+    },
+    "logFile": {
+      "label": "Orchestrator Log File",
+      "help": "Path for plugin operation logs.",
+      "advanced": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "savcCorePath": {
+        "type": "string"
+      },
+      "agentsDir": {
+        "type": "string"
+      },
+      "spawnMode": {
+        "type": "string",
+        "enum": ["mock", "real"]
+      },
+      "defaultWait": {
+        "type": "boolean"
+      },
+      "defaultTimeoutMs": {
+        "type": "number",
+        "minimum": 1
+      },
+      "memoryRecallEnabled": {
+        "type": "boolean"
+      },
+      "memoryRecallTopK": {
+        "type": "number",
+        "minimum": 1
+      },
+      "memoryMinScore": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "memoryPersistEnabled": {
+        "type": "boolean"
+      },
+      "logFile": {
+        "type": "string"
+      }
+    }
+  }
+}

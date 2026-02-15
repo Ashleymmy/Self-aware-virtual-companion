@@ -210,9 +210,15 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
       }
     }
   },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
   "agents": {
     "defaults": {
       "workspace": "${WORKSPACE_DIR_ABS}",
+      "heartbeat": {
+        "session": "heartbeat-main"
+      },
       "model": {
         "primary": "anyrouter/claude-opus-4-6",
         "fallbacks": [

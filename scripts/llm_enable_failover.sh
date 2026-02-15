@@ -174,6 +174,12 @@ cfg = load_json(config_path)
 agents = ensure_obj(cfg, "agents")
 defaults = ensure_obj(agents, "defaults")
 
+heartbeat = defaults.get("heartbeat")
+if not isinstance(heartbeat, dict):
+    heartbeat = {}
+heartbeat["session"] = "heartbeat-main"
+defaults["heartbeat"] = heartbeat
+
 model = defaults.get("model")
 if isinstance(model, str):
     model = {"primary": model}
@@ -210,6 +216,9 @@ providers["wzw"] = build_provider(
     api="anthropic-messages",
     models=WZW_MODELS,
 )
+
+session_cfg = ensure_obj(cfg, "session")
+session_cfg["dmScope"] = "per-channel-peer"
 
 output = json.dumps(cfg, ensure_ascii=False, indent=2) + "\n"
 if dry_run:
