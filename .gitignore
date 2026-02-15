@@ -47,3 +47,6 @@ savc-core/memory/**
 !savc-core/memory/tools/available.md
 !savc-core/memory/tools/learning-queue.md
 !savc-core/memory/growth/milestones.md
+
+# Git bundle backup (local-only)
+*.bundle
