@@ -380,10 +380,16 @@ const EMOTION_MAP = {
 
 - ✅ 已完成（非 UI 基础层）：
   - `savc-core/orchestrator/live2d.mjs`：情绪→表情参数映射、mock 口型帧生成、交互动作信号生成。
+  - `savc-core/orchestrator/live2d.mjs`：新增任务级推断与计划能力（`classifyLive2DSource` / `inferEmotionFromMessage` / `buildLive2DPlan`）。
+  - `savc-core/orchestrator/lifecycle.mjs`：`live2d` 内建执行分支落地，输出标准化 `live2d*` 标记，支持后续前端直接消费。
   - `openclaw/extensions/savc-orchestrator/src/tool-live2d-signal.ts`：新增 `savc_live2d_signal` 工具，统一输出 `phase6-v1` 信号结构。
-  - `tests/orchestrator/live2d.test.mjs`、`openclaw/extensions/savc-orchestrator/src/tool-live2d-signal.test.ts`：基础能力与工具链路自动化验证。
+  - `tests/orchestrator/live2d.test.mjs`、`tests/orchestrator/lifecycle.test.mjs`、`scripts/test_phase6.sh`：覆盖情绪联动/口型同步/交互信号与 lifecycle 链路自动化验证。
+- ✅ 里程碑状态（后端信号层）：
+  - M-F2（情绪表情联动）已完成：文本/语音任务可稳定产出 emotion->expression/motion 信号。
+  - M-F3（口型同步）已完成：语音任务稳定产出 lipSync 帧序列（mock）。
 - ⏳ 待完成：
   - M-F1（UI 侧模型加载渲染）
+  - M-F4（前端点击/触摸事件接入与动画驱动；后端交互信号已就绪）
   - M-F5（语音+Live2D+文本完整端到端集成）
 
 ---

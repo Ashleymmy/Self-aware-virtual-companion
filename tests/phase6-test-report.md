@@ -7,6 +7,7 @@
 
 ```bash
 node tests/orchestrator/live2d.test.mjs
+node tests/orchestrator/lifecycle.test.mjs
 cd openclaw && pnpm exec vitest run extensions/savc-orchestrator/src/*.test.ts
 bash scripts/test_phase6.sh
 ```
@@ -14,6 +15,7 @@ bash scripts/test_phase6.sh
 ## 结果摘要
 
 - [x] `live2d.mjs` 基础信号能力通过单测
+- [x] `lifecycle.mjs` 的 `live2d` 执行分支可输出标准化信号标记
 - [x] `savc_live2d_signal` 工具通过 Vitest
 - [x] 网关下工具调用通过（voice + interaction 两类信号）
 

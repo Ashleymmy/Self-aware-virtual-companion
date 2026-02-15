@@ -142,6 +142,28 @@ const INTERACTION_PRESETS = {
   },
 };
 
+const LIVE2D_SOURCE_SET = new Set(['text', 'voice', 'interaction']);
+const SOURCE_INTERACTION_REGEX = /(点击|点一下|触摸|双击|长按|拖动|悬停|interaction|动作触发|tap|double[_ -]?tap|long[_ -]?press|drag|hover)/i;
+const SOURCE_VOICE_REGEX = /(口型|唇形|lip[_ -]?sync|语音|播报|朗读|tts|speak)/i;
+
+const INTERACTION_TYPE_RULES = [
+  { type: 'double_tap', regex: /(双击|连点|double[_ -]?tap)/i },
+  { type: 'long_press', regex: /(长按|按住|long[_ -]?press)/i },
+  { type: 'drag', regex: /(拖动|拖拽|drag)/i },
+  { type: 'hover', regex: /(悬停|靠近|hover)/i },
+  { type: 'tap', regex: /(点击|点一下|触摸|tap)/i },
+];
+
+const EMOTION_INFER_RULES = [
+  { emotion: 'excited', regex: /(激动|兴奋|冲呀|太棒|wow|耶|热血|燃)/i },
+  { emotion: 'happy', regex: /(开心|高兴|愉快|太好了|真好|笑一笑|不错)/i },
+  { emotion: 'comfort', regex: /(抱抱|安慰|别怕|没事|陪你|理解你|辛苦了)/i },
+  { emotion: 'sad', regex: /(难过|低落|伤心|委屈|沮丧)/i },
+  { emotion: 'thinking', regex: /(思考|想想|推测|分析|让我看看|我建议)/i },
+  { emotion: 'focused', regex: /(排查|修复|步骤|首先|其次|执行|命令|问题定位)/i },
+  { emotion: 'calm', regex: /(冷静|平静|慢慢来|稳住)/i },
+];
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -154,6 +176,16 @@ function toNumber(input, fallback) {
   const parsed =
     typeof input === 'number' ? input : typeof input === 'string' ? Number.parseFloat(input) : NaN;
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeSource(value) {
+  const text = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (LIVE2D_SOURCE_SET.has(text)) {
+    return text;
+  }
+  return 'text';
 }
 
 export function normalizeEmotionTag(emotion) {
@@ -171,6 +203,51 @@ export function normalizeEmotionTag(emotion) {
   if (/(冷静|平静|稳住)/i.test(text)) return 'calm';
   if (/(严肃|正式|专注|专业)/i.test(text)) return 'focused';
   return 'neutral';
+}
+
+export function inferEmotionFromMessage(message, fallback = 'neutral') {
+  const text = String(message || '').trim();
+  if (!text) {
+    return normalizeEmotionTag(fallback);
+  }
+  for (const rule of EMOTION_INFER_RULES) {
+    if (rule.regex.test(text)) {
+      return rule.emotion;
+    }
+  }
+  return normalizeEmotionTag(fallback);
+}
+
+export function inferInteractionType(taskText, fallback = 'tap') {
+  const text = String(taskText || '').trim();
+  if (!text) {
+    return fallback;
+  }
+  for (const rule of INTERACTION_TYPE_RULES) {
+    if (rule.regex.test(text)) {
+      return rule.type;
+    }
+  }
+  return fallback;
+}
+
+export function classifyLive2DSource(taskText, options = {}) {
+  const explicit = normalizeSource(options.source);
+  if (explicit !== 'text' || String(options.source || '').trim().toLowerCase() === 'text') {
+    return explicit;
+  }
+
+  const text = String(taskText || '').trim();
+  if (!text) {
+    return 'text';
+  }
+  if (SOURCE_INTERACTION_REGEX.test(text)) {
+    return 'interaction';
+  }
+  if (SOURCE_VOICE_REGEX.test(text)) {
+    return 'voice';
+  }
+  return 'text';
 }
 
 export function mapEmotionToExpression(emotion, options = {}) {
@@ -243,9 +320,7 @@ export function buildInteractionReaction(interactionType, options = {}) {
 }
 
 export function buildLive2DSignal(input = {}) {
-  const source = ['text', 'voice', 'interaction'].includes(String(input.source || '').trim())
-    ? String(input.source).trim()
-    : 'text';
+  const source = normalizeSource(input.source);
 
   if (source === 'interaction') {
     const reaction = buildInteractionReaction(input.interactionType, {
@@ -285,12 +360,64 @@ export function buildLive2DSignal(input = {}) {
   };
 }
 
+export function buildLive2DPlan(task, options = {}) {
+  const taskText = String(task || '').trim();
+  const source = classifyLive2DSource(taskText, {
+    source: options.source,
+  });
+  const message =
+    typeof options.message === 'string' && options.message.trim() ? options.message.trim() : taskText;
+  const fallbackEmotion = source === 'interaction' ? 'happy' : source === 'voice' ? 'comfort' : 'neutral';
+  const emotion = normalizeEmotionTag(
+    options.emotion || inferEmotionFromMessage(message, fallbackEmotion),
+  );
+  const interactionType =
+    source === 'interaction'
+      ? inferInteractionType(options.interactionType || taskText || message, 'tap')
+      : null;
+
+  const signal = buildLive2DSignal({
+    source,
+    message,
+    emotion,
+    interactionType: interactionType || undefined,
+    intensity: options.intensity,
+    energy: options.energy,
+    durationMs: options.durationMs,
+  });
+
+  return {
+    source,
+    emotion,
+    message,
+    interactionType,
+    signal,
+  };
+}
+
 export function formatLive2DSignal(signal) {
   const source = String(signal?.source || 'text');
   const emotion = String(signal?.emotion || 'neutral');
   const motion = String(signal?.motion || 'idle_neutral');
   const frames = Array.isArray(signal?.lipSync) ? signal.lipSync.length : 0;
   return `[live2d] source=${source} emotion=${emotion} motion=${motion} lipSyncFrames=${frames}`;
+}
+
+export function formatLive2DPlan(plan) {
+  const signal = plan?.signal || {};
+  const interactionType = String(signal?.interaction?.type || plan?.interactionType || 'none');
+  const source = String(signal?.source || plan?.source || 'text');
+  const emotion = String(signal?.emotion || plan?.emotion || 'neutral');
+  const motion = String(signal?.motion || 'idle_neutral');
+  const frameCount = Array.isArray(signal?.lipSync) ? signal.lipSync.length : 0;
+  return [
+    formatLive2DSignal(signal),
+    `live2dSource=${source}`,
+    `live2dEmotion=${emotion}`,
+    `live2dMotion=${motion}`,
+    `live2dInteractionType=${interactionType}`,
+    `lipSyncFrames=${frameCount}`,
+  ].join('\n');
 }
 
 async function runCli() {

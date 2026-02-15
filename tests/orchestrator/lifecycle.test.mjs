@@ -7,6 +7,7 @@ import {
   cancelAgent,
   getStatus,
   setExecutor,
+  resetExecutor,
 } from '../../savc-core/orchestrator/lifecycle.mjs';
 
 const defaultExecutor = async ({ agentDef, task }) => `${agentDef?.name || 'agent'}: ${task}`;
@@ -44,6 +45,18 @@ async function main() {
   const all = await waitForAll([id1, id2]);
   assert.equal(all.length, 2);
   assert.equal(all.every((item) => item.status === 'completed'), true);
+
+  resetExecutor();
+  const live2dRunId = await spawnAgent(
+    { name: 'live2d', limits: { timeout_seconds: 3 } },
+    '点击模型并开心挥手',
+    {},
+  );
+  const live2dDone = await waitForAgent(live2dRunId, 5000);
+  assert.equal(live2dDone.status, 'completed');
+  assert.equal(String(live2dDone.output || '').includes('live2dEmotion='), true);
+  assert.equal(String(live2dDone.output || '').includes('source=interaction'), true);
+  setExecutor(defaultExecutor);
 
   console.log('[PASS] orchestrator lifecycle');
 }

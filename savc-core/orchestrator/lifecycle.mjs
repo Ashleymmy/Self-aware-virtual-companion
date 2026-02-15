@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { buildLive2DPlan, formatLive2DPlan } from './live2d.mjs';
 import { formatVisionReport, analyzeVisionTask } from './vision.mjs';
 import { buildVoiceExecutionPlan, formatVoicePlan } from './voice.mjs';
 import { formatVibeCodingReport, runVibeCodingTask } from './vibe-coder.mjs';
@@ -37,6 +38,25 @@ const builtInExecutor = async ({ agentDef, task, options = {} }) => {
       }
     }
     return formatVisionReport(analysis);
+  }
+
+  if (String(agentDef?.name || '').trim() === 'live2d') {
+    const plan = buildLive2DPlan(task, {
+      source: options.live2dSource,
+      message: options.live2dMessage,
+      emotion: options.live2dEmotion,
+      interactionType: options.live2dInteractionType,
+      intensity: options.live2dIntensity,
+      energy: options.live2dEnergy,
+      durationMs: options.live2dDurationMs,
+    });
+    if (typeof options.live2dRunner === 'function') {
+      const runnerResult = await options.live2dRunner(plan, { agentDef, task, options });
+      if (typeof runnerResult === 'string' && runnerResult.trim()) {
+        return runnerResult;
+      }
+    }
+    return formatLive2DPlan(plan);
   }
 
   if (String(agentDef?.name || '').trim() === 'vibe-coder') {

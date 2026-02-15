@@ -59,6 +59,29 @@ else
   fail "voice lifecycle live2d marker check failed"
 fi
 
+if node - <<'NODE'
+import assert from 'node:assert/strict';
+import { spawnAgent, waitForAgent } from './savc-core/orchestrator/lifecycle.mjs';
+
+const runId = await spawnAgent(
+  { name: 'live2d', limits: { timeout_seconds: 3 } },
+  '点击模型并开心挥手',
+  {},
+);
+const done = await waitForAgent(runId, 5000);
+assert.equal(done.status, 'completed');
+const output = String(done.output || '');
+assert.equal(output.includes('source=interaction'), true);
+assert.equal(output.includes('live2dInteractionType='), true);
+assert.equal(output.includes('live2dEmotion='), true);
+console.log('ok');
+NODE
+then
+  pass "live2d lifecycle emits interaction signal markers"
+else
+  fail "live2d lifecycle marker check failed"
+fi
+
 if (cd "${REPO_ROOT}/openclaw" && pnpm exec vitest run extensions/savc-orchestrator/src/*.test.ts) >/tmp/phase6_plugin_vitest.log 2>&1; then
   pass "plugin vitest suite passed"
 else
