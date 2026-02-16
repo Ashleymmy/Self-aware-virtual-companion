@@ -131,7 +131,7 @@ cp config/.env.example config/.env.local
 | Phase 5c | Vibe Coding (自然语言编程) | ✅ 完成 |
 | Phase 5d | 实时语音交互 | ✅ 完成 |
 | Phase 5e | 视觉能力 | ✅ 完成 |
-| Phase 6 | Live2D 虚拟形象 | 🚧 进行中（M-F1/M-F2/M-F3/M-F4 已落地，M-F5 进入统一通道集成阶段） |
+| Phase 6 | Live2D 虚拟形象 | 🚧 进行中（M-F1~M-F5 管理界面闭环已落地，生产级通道联调中） |
 
 ## 记忆系统
 

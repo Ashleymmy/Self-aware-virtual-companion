@@ -24,13 +24,22 @@ for file in \
   "tests/orchestrator/live2d-voice-chain.test.mjs" \
   "openclaw/extensions/savc-orchestrator/src/tool-live2d-signal.ts" \
   "openclaw/extensions/savc-orchestrator/src/tool-live2d-signal.test.ts" \
-  "openclaw/extensions/savc-orchestrator/src/tool-voice-call.ts"; do
+  "openclaw/extensions/savc-orchestrator/src/tool-voice-call.ts" \
+  "savc-ui/src/ui/live2d-runtime.ts" \
+  "savc-ui/src/ui/live2d-channel.ts" \
+  "savc-ui/src/ui/views/chat.ts"; do
   if [[ -f "${REPO_ROOT}/${file}" ]]; then
     pass "file exists: ${file}"
   else
     fail "missing file: ${file}"
   fi
 done
+
+if (cd "${REPO_ROOT}" && pnpm --dir savc-ui build) >/tmp/phase6_savc_ui_build.log 2>&1; then
+  pass "savc-ui build passed"
+else
+  fail "savc-ui build failed (see /tmp/phase6_savc_ui_build.log)"
+fi
 
 if node "${REPO_ROOT}/tests/orchestrator/live2d.test.mjs" >/tmp/phase6_live2d.log 2>&1; then
   pass "live2d orchestrator test passed"

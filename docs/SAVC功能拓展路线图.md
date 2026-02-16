@@ -2,7 +2,7 @@
 
 > 版本: 1.0
 > 日期: 2026-02-09
-> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5 全量完成：5c/5d/5e；Phase 6 已完成 M-F1~M-F4，M-F5 集成中）
+> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5 全量完成：5c/5d/5e；Phase 6 已完成 M-F1~M-F5 管理界面闭环）
 
 ---
 
@@ -393,11 +393,12 @@ const EMOTION_MAP = {
     - `savc-ui/public/live2d/yuanyuan-lite.model.json`：提供默认模型清单。
   - M-F4（交互响应）：
     - `savc-ui/src/ui/views/orchestrator.ts`：接入点击/双击/长按/拖动/悬停事件，触发 `savc_live2d_signal` 并实时驱动 runtime。
-  - M-F5（pre-integration）：
+  - M-F5（管理界面闭环）：
     - `savc-ui/src/ui/live2d-channel.ts`：新增统一信号通道，聚合 `interaction + voice` 事件。
     - `savc-ui/src/ui/views/orchestrator.ts`：新增语音信号入口，交互/语音统一入通道并回显时间线。
-- ⏳ 待完成：
-  - M-F5（full）：将真实语音播放链路与聊天主界面事件统一接入同一通道，形成完整端到端体验。
+    - `savc-ui/src/ui/views/chat.ts`：实现对话页文本发送、浏览器语音播报与 text/voice 信号统一发布到 Live2D 通道。
+- ⏳ 待完成（生产化）：
+  - 将管理界面闭环迁移到主聊天前端与真实语音播放链路，补齐跨端一致体验。
 
 ---
 

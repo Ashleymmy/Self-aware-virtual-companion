@@ -7,6 +7,7 @@ import { type ThemeMode, resolveTheme, applyTheme } from "./theme.js";
 import { loadSettings, saveSettings } from "./storage.js";
 import { t } from "./i18n/index.js";
 import { renderDashboard } from "./views/dashboard.js";
+import { renderChat } from "./views/chat.js";
 import { renderMemory } from "./views/memory.js";
 import { renderPersona } from "./views/persona.js";
 import { renderOrchestrator } from "./views/orchestrator.js";
@@ -98,6 +99,8 @@ export class SavcApp extends LitElement {
     switch (tab) {
       case "dashboard":
         return renderDashboard(this._requestUpdate);
+      case "chat":
+        return renderChat(this._requestUpdate);
       case "memory":
         return renderMemory(this._requestUpdate);
       case "persona":
