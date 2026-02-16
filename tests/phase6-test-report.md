@@ -20,6 +20,7 @@ bash scripts/test_phase6.sh
 - [x] `decomposer + lifecycle + aggregator` 的 Live2D+Voice 串行链路通过端到端脚本验证
 - [x] `savc_live2d_signal` 工具通过 Vitest
 - [x] 网关下工具调用通过（voice + interaction + task 推断三类信号）
+- [x] `savc_spawn_expert` 返回包含 `live2d` 信号桥接字段（可供前端直接消费）
 
 ## 验收要点映射（基础层）
 
@@ -27,6 +28,7 @@ bash scripts/test_phase6.sh
 - [x] 口型同步信号：`voice text -> lipSync frames`（mock）
 - [x] 交互响应信号：`interactionType -> motion`
 - [x] 任务文本推断：`task -> source/emotion/interaction`（`savc_live2d_signal`）
+- [x] 专家执行桥接：`savc_spawn_expert.result -> live2d.signal`
 
 ## 备注
 

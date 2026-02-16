@@ -35,6 +35,19 @@ const mocked = vi.hoisted(() => {
   const search = vi.fn(async () => ({ matches: [{ text: "用户偏好: requests 库", score: 0.91 }] }));
   const store = vi.fn(async () => ({ stored: true }));
   const autoCapture = vi.fn(async () => ({ stored: 1 }));
+  const buildLive2DPlan = vi.fn((task: string, options?: Record<string, unknown>) => ({
+    source: (options?.source as string | undefined) ?? "text",
+    emotion: "neutral",
+    interactionType: null,
+    signal: {
+      version: "phase6-v1",
+      source: (options?.source as string | undefined) ?? "text",
+      emotion: "neutral",
+      motion: "idle_neutral",
+      lipSync: [],
+    },
+    task,
+  }));
   const spawnRealAgent = vi.fn(async () => ({
     ok: true,
     runId: "run-real-1",
@@ -67,6 +80,7 @@ const mocked = vi.hoisted(() => {
     search,
     store,
     autoCapture,
+    buildLive2DPlan,
     spawnRealAgent,
     sendRealAgentMessage,
     waitForRealAgentRun,
@@ -95,6 +109,7 @@ const mocked = vi.hoisted(() => {
     loadRegistryModule: vi.fn(async () => ({ discoverAgents, getAgent })),
     loadLifecycleModule: vi.fn(async () => ({ spawnAgent, waitForAgent, getStatus })),
     loadMemorySemanticModule: vi.fn(async () => ({ search, store, autoCapture })),
+    loadLive2DModule: vi.fn(async () => ({ buildLive2DPlan })),
   };
 });
 
@@ -103,6 +118,7 @@ vi.mock("./paths.js", () => ({
   loadRegistryModule: mocked.loadRegistryModule,
   loadLifecycleModule: mocked.loadLifecycleModule,
   loadMemorySemanticModule: mocked.loadMemorySemanticModule,
+  loadLive2DModule: mocked.loadLive2DModule,
 }));
 
 vi.mock("./real-session-adapter.js", () => ({
@@ -166,6 +182,7 @@ describe("savc_spawn_expert tool", () => {
     });
     mocked.readLatestAssistantReply.mockResolvedValue("real output");
     mocked.autoCapture.mockResolvedValue({ stored: 1 });
+    mocked.loadLive2DModule.mockResolvedValue({ buildLive2DPlan: mocked.buildLive2DPlan });
   });
 
   it("spawns technical expert with semantic recall context", async () => {
@@ -188,6 +205,10 @@ describe("savc_spawn_expert tool", () => {
     expect(result.details).toMatchObject({ ok: true, code: "ok", error: null });
     // oxlint-disable-next-line typescript/no-explicit-any
     expect((result.details as any).data.result.status).toBe("completed");
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.attempted).toBe(true);
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.signal.version).toBe("phase6-v1");
   });
 
   it("persists memory when agent=memory and persistMemory=true", async () => {
@@ -245,6 +266,23 @@ describe("savc_spawn_expert tool", () => {
     expect((result.details as any).data.spawn.mode).toBe("real");
     // oxlint-disable-next-line typescript/no-explicit-any
     expect((result.details as any).data.spawn.childSessionKey).toContain("subagent");
+  });
+
+  it("keeps spawn success even if live2d module loading fails", async () => {
+    mocked.loadLive2DModule.mockRejectedValueOnce(new Error("live2d unavailable"));
+    const tool = createSpawnExpertTool(fakeApi());
+
+    const result = await tool.execute("id", {
+      agent: "technical",
+      task: "继续方案",
+      wait: true,
+    });
+
+    expect(result.details).toMatchObject({ ok: true, code: "ok", error: null });
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.attempted).toBe(true);
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.error).toContain("live2d unavailable");
   });
 
   it("requires session context for real spawn mode", async () => {

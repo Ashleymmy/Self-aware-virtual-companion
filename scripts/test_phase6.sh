@@ -122,6 +122,7 @@ TMP_CONFIG="${TMP_ROOT}/openclaw.json"
 TMP_VOICE="${TMP_ROOT}/live2d_voice.json"
 TMP_INTERACTION="${TMP_ROOT}/live2d_interaction.json"
 TMP_TASK_SIGNAL="${TMP_ROOT}/live2d_task.json"
+TMP_SPAWN_SIGNAL="${TMP_ROOT}/live2d_spawn.json"
 TMP_VOICECALL="${TMP_ROOT}/voicecall_live2d.json"
 TMP_VOICECALL_END="${TMP_ROOT}/voicecall_end.json"
 TMP_VOICE_STORE="${TMP_ROOT}/voice-store"
@@ -274,6 +275,12 @@ else
   fail "savc_live2d_signal task inference invoke failed"
 fi
 
+if invoke_tool_ok_retry "${TMP_SPAWN_SIGNAL}" '{"tool":"savc_spawn_expert","sessionKey":"main","args":{"agent":"technical","task":"请语音播报一句欢迎回来","wait":true}}' 20; then
+  pass "savc_spawn_expert live2d bridge invoke succeeded"
+else
+  fail "savc_spawn_expert live2d bridge invoke failed"
+fi
+
 if invoke_tool_ok_retry "${TMP_VOICECALL}" '{"tool":"savc_voice_call","sessionKey":"main","args":{"action":"initiate","to":"+15550001234","message":"你好，我们开始通话","mode":"conversation","emotion":"empathetic"}}' 20; then
   pass "savc_voice_call invoke succeeded"
 else
@@ -304,7 +311,7 @@ else
   fail "savc_voice_call end failed"
 fi
 
-if python3 - "${TMP_VOICE}" "${TMP_INTERACTION}" "${TMP_TASK_SIGNAL}" "${TMP_VOICECALL}" "${TMP_VOICECALL_END}" <<'PY'
+if python3 - "${TMP_VOICE}" "${TMP_INTERACTION}" "${TMP_TASK_SIGNAL}" "${TMP_SPAWN_SIGNAL}" "${TMP_VOICECALL}" "${TMP_VOICECALL_END}" <<'PY'
 from __future__ import annotations
 import json
 import sys
@@ -312,8 +319,9 @@ import sys
 voice = json.load(open(sys.argv[1], "r", encoding="utf-8"))
 interaction = json.load(open(sys.argv[2], "r", encoding="utf-8"))
 task_signal = json.load(open(sys.argv[3], "r", encoding="utf-8"))
-voicecall = json.load(open(sys.argv[4], "r", encoding="utf-8"))
-voicecall_end = json.load(open(sys.argv[5], "r", encoding="utf-8"))
+spawn_signal = json.load(open(sys.argv[4], "r", encoding="utf-8"))
+voicecall = json.load(open(sys.argv[5], "r", encoding="utf-8"))
+voicecall_end = json.load(open(sys.argv[6], "r", encoding="utf-8"))
 
 for payload in [voice, interaction, task_signal]:
     assert payload.get("ok") is True
@@ -337,6 +345,16 @@ task_out = task_data.get("signal") or {}
 assert task_data.get("source") == "voice"
 assert task_out.get("source") == "voice"
 assert isinstance(task_out.get("lipSync"), list) and len(task_out.get("lipSync")) > 0
+
+assert spawn_signal.get("ok") is True
+spawn_details = ((spawn_signal.get("result") or {}).get("details") or {})
+assert spawn_details.get("ok") is True
+spawn_data = spawn_details.get("data") or {}
+spawn_live2d = spawn_data.get("live2d") or {}
+assert spawn_live2d.get("attempted") is True
+spawn_live2d_signal = spawn_live2d.get("signal") or {}
+assert spawn_live2d_signal.get("version") == "phase6-v1"
+assert spawn_live2d_signal.get("source") == "voice"
 
 assert voicecall.get("ok") is True
 voicecall_details = ((voicecall.get("result") or {}).get("details") or {})

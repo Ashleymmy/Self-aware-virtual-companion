@@ -12,6 +12,7 @@ import type {
 } from "./types.js";
 import {
   loadLifecycleModule,
+  loadLive2DModule,
   loadMemorySemanticModule,
   loadRegistryModule,
   resolveRuntimeContext,
@@ -109,6 +110,20 @@ function buildTaskWithMemory(task: string, recall: SemanticSearchResult): string
   }
 
   return `[相关记忆]\n${lines.join("\n")}\n\n[用户请求]\n${task}`;
+}
+
+function toOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function inferLive2DSourceFromAgent(agentName: string): "voice" | "interaction" | null {
+  if (agentName === "voice") {
+    return "voice";
+  }
+  if (agentName === "live2d") {
+    return "interaction";
+  }
+  return null;
 }
 
 function resolveRealSpawnContext(toolCtx?: PluginToolContext): {
@@ -259,6 +274,14 @@ export function createSpawnExpertTool(api: OpenClawPluginApi, toolCtx?: PluginTo
         const autoCapture = {
           attempted: false,
           stored: 0,
+          error: null as string | null,
+        };
+        const live2d = {
+          attempted: false,
+          source: null as string | null,
+          emotion: null as string | null,
+          interactionType: null as string | null,
+          signal: null as Record<string, unknown> | null,
           error: null as string | null,
         };
 
@@ -448,13 +471,54 @@ export function createSpawnExpertTool(api: OpenClawPluginApi, toolCtx?: PluginTo
           }
         }
 
+        if (runResult.status === "completed") {
+          live2d.attempted = true;
+          try {
+            const live2dModule = await loadLive2DModule(ctx);
+            const outputText = toOptionalString(runResult.output) ?? "";
+            const preferredSource = inferLive2DSourceFromAgent(agentName);
+            if (typeof live2dModule.buildLive2DPlan === "function") {
+              const plan = live2dModule.buildLive2DPlan(task, {
+                ...(preferredSource ? { source: preferredSource } : {}),
+                ...(outputText ? { message: outputText } : {}),
+              });
+              const planSignal =
+                plan && typeof plan === "object" && plan.signal && typeof plan.signal === "object"
+                  ? (plan.signal as Record<string, unknown>)
+                  : null;
+              live2d.signal = planSignal;
+              live2d.source = toOptionalString(plan?.source) ?? toOptionalString(planSignal?.source);
+              live2d.emotion = toOptionalString(plan?.emotion) ?? toOptionalString(planSignal?.emotion);
+              live2d.interactionType =
+                toOptionalString(plan?.interactionType) ??
+                toOptionalString((planSignal?.interaction as Record<string, unknown> | undefined)?.type);
+            } else {
+              const signal = live2dModule.buildLive2DSignal({
+                source: preferredSource ?? "text",
+                message: outputText || task,
+              });
+              const signalData =
+                signal && typeof signal === "object" ? (signal as Record<string, unknown>) : null;
+              live2d.signal = signalData;
+              live2d.source = toOptionalString(signalData?.source);
+              live2d.emotion = toOptionalString(signalData?.emotion);
+              live2d.interactionType = toOptionalString(
+                (signalData?.interaction as Record<string, unknown> | undefined)?.type,
+              );
+            }
+          } catch (error) {
+            live2d.error = error instanceof Error ? error.message : String(error);
+          }
+        }
+
         await appendPluginLog(
           ctx,
-          `spawn agent=${agentName} runId=${runResult.runId} status=${runResult.status} mode=${ctx.config.spawnMode} recallCount=${recallCount} persisted=${persisted} autoCapture=${autoCapture.stored} sessionsSend=${sessionsSend.attempted ? sessionsSend.status : "skipped"}`,
+          `spawn agent=${agentName} runId=${runResult.runId} status=${runResult.status} mode=${ctx.config.spawnMode} recallCount=${recallCount} persisted=${persisted} autoCapture=${autoCapture.stored} live2d=${live2d.attempted ? "on" : "off"} sessionsSend=${sessionsSend.attempted ? sessionsSend.status : "skipped"}`,
         );
 
         const details = success({
           result: runResult,
+          live2d,
           memory: {
             recallEnabled: ctx.config.memoryRecallEnabled,
             recallCount,

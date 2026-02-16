@@ -35,3 +35,4 @@ All config lives under `plugins.entries.savc-orchestrator.config`:
 - `savc_image_generate` defaults to `mode=mock`; `mode=real` requires `OPENAI_API_KEY`.
 - `savc_live2d_signal` is mock/offline only and generates deterministic signal payloads for Phase 6 UI integration.
 - `savc_live2d_signal` supports `task` input for automatic source/emotion/interaction inference (via `buildLive2DPlan` when available).
+- `savc_spawn_expert` now includes a `live2d` field in `details.data` for completed runs, bridging agent output to `phase6-v1` signal payloads.
