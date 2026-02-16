@@ -1,12 +1,12 @@
 export type Live2DInteractionType = "tap" | "double_tap" | "long_press" | "drag" | "hover";
+export type Live2DSignalSource = "text" | "voice" | "interaction";
 
-type Live2DSource = "text" | "voice" | "interaction";
 type Live2DBridgeMode = "auto" | "gateway" | "mock";
 type BridgeBackend = "gateway" | "mock";
 
 export interface Live2DSignal {
   version: string;
-  source: Live2DSource;
+  source: Live2DSignalSource;
   emotion: string;
   motion: string;
   expression: {
@@ -24,10 +24,26 @@ export interface Live2DSignal {
   meta: Record<string, unknown>;
 }
 
+export interface InvokeLive2DSignalParams {
+  source: Live2DSignalSource;
+  message?: string;
+  task?: string;
+  interactionType?: Live2DInteractionType;
+  intensity?: number;
+  emotion?: string;
+  energy?: number;
+}
+
 export interface InvokeLive2DInteractionParams {
   interactionType: Live2DInteractionType;
   intensity?: number;
   emotion?: string;
+}
+
+export interface InvokeLive2DVoiceParams {
+  message: string;
+  emotion?: string;
+  energy?: number;
 }
 
 export interface InvokeLive2DInteractionResult {
@@ -99,31 +115,72 @@ function asNumber(value: unknown, fallback: number): number {
   return fallback;
 }
 
-function buildMockSignal(params: InvokeLive2DInteractionParams): Live2DSignal {
-  const preset = INTERACTION_PRESET[params.interactionType];
-  const baseEmotion = params.emotion?.trim().toLowerCase() || preset.emotion;
+function toLipSyncFrames(message: string, energy: number): number[] {
+  const text = message.trim();
+  if (!text) return [];
+  const frameCount = Math.min(24, Math.max(8, Math.floor(text.length * 1.1)));
+  return Array.from({ length: frameCount }, (_, index) => {
+    const base = 0.15 + Math.sin(index * 0.75) * 0.22;
+    const mod = 0.1 + ((index % 3) * 0.08);
+    return clamp(base + mod * energy, 0, 1);
+  });
+}
+
+function buildMockSignal(params: InvokeLive2DSignalParams): Live2DSignal {
+  const source = params.source;
+
+  if (source === "interaction") {
+    const interactionType = params.interactionType || "tap";
+    const preset = INTERACTION_PRESET[interactionType];
+    const baseEmotion = params.emotion?.trim().toLowerCase() || preset.emotion;
+    const expression = EXPRESSION_PRESET[baseEmotion] || EXPRESSION_PRESET.neutral;
+    const intensity = clamp(params.intensity ?? preset.intensity, 0.6, 2.0);
+    return {
+      version: "phase6-v1",
+      source: "interaction",
+      emotion: baseEmotion,
+      motion: preset.motion,
+      expression: {
+        eyeSmile: clamp(expression.eyeSmile * intensity, 0, 1),
+        mouthSmile: clamp(expression.mouthSmile * intensity, 0, 1),
+        browTilt: clamp(expression.browTilt * intensity, -1, 1),
+        bodyAngle: clamp(expression.bodyAngle * intensity, -12, 12),
+      },
+      lipSync: [],
+      interaction: {
+        type: interactionType,
+        intensity,
+        durationMs: preset.durationMs,
+      },
+      meta: {
+        backend: "savc-ui-mock",
+        generatedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  const baseEmotion = params.emotion?.trim().toLowerCase() || (source === "voice" ? "comfort" : "neutral");
   const expression = EXPRESSION_PRESET[baseEmotion] || EXPRESSION_PRESET.neutral;
-  const intensity = clamp(params.intensity ?? preset.intensity, 0.6, 2.0);
+  const energy = clamp(params.energy ?? 0.9, 0.4, 1.6);
+  const voiceText = String(params.message || params.task || "").trim();
+  const motion = source === "voice" ? "speak_soft" : "idle_listen";
   return {
     version: "phase6-v1",
-    source: "interaction",
+    source,
     emotion: baseEmotion,
-    motion: preset.motion,
+    motion,
     expression: {
-      eyeSmile: clamp(expression.eyeSmile * intensity, 0, 1),
-      mouthSmile: clamp(expression.mouthSmile * intensity, 0, 1),
-      browTilt: clamp(expression.browTilt * intensity, -1, 1),
-      bodyAngle: clamp(expression.bodyAngle * intensity, -12, 12),
+      eyeSmile: clamp(expression.eyeSmile, 0, 1),
+      mouthSmile: clamp(expression.mouthSmile, 0, 1),
+      browTilt: clamp(expression.browTilt, -1, 1),
+      bodyAngle: clamp(expression.bodyAngle, -12, 12),
     },
-    lipSync: [],
-    interaction: {
-      type: params.interactionType,
-      intensity,
-      durationMs: preset.durationMs,
-    },
+    lipSync: source === "voice" ? toLipSyncFrames(voiceText, energy) : [],
+    interaction: null,
     meta: {
       backend: "savc-ui-mock",
       generatedAt: new Date().toISOString(),
+      voiceText,
     },
   };
 }
@@ -137,7 +194,7 @@ function parseSignalFromGateway(payload: unknown): Live2DSignal | null {
   if (!signal) return null;
 
   const sourceRaw = String(signal.source || "interaction").toLowerCase();
-  const source: Live2DSource =
+  const source: Live2DSignalSource =
     sourceRaw === "voice" || sourceRaw === "text" || sourceRaw === "interaction"
       ? sourceRaw
       : "interaction";
@@ -172,10 +229,25 @@ function parseSignalFromGateway(payload: unknown): Live2DSignal | null {
   };
 }
 
-async function invokeGateway(params: InvokeLive2DInteractionParams): Promise<Live2DSignal> {
+async function invokeGateway(params: InvokeLive2DSignalParams): Promise<Live2DSignal> {
   const gatewayBaseUrl = normalizeGatewayUrl(readEnv("VITE_SAVC_GATEWAY_URL"));
   const token = readEnv("VITE_SAVC_GATEWAY_TOKEN");
   const sessionKey = readEnv("VITE_SAVC_SESSION_KEY") || DEFAULT_SESSION_KEY;
+
+  const args: Record<string, unknown> = {
+    source: params.source,
+    ...(params.emotion ? { emotion: params.emotion } : {}),
+    ...(typeof params.energy === "number" ? { energy: params.energy } : {}),
+    ...(params.task ? { task: params.task } : {}),
+    ...(params.message ? { message: params.message } : {}),
+  };
+  if (params.source === "interaction") {
+    args.interactionType = params.interactionType || "tap";
+    if (typeof params.intensity === "number") {
+      args.intensity = params.intensity;
+    }
+  }
+
   const response = await fetch(`${gatewayBaseUrl}/tools/invoke`, {
     method: "POST",
     headers: {
@@ -185,12 +257,7 @@ async function invokeGateway(params: InvokeLive2DInteractionParams): Promise<Liv
     body: JSON.stringify({
       tool: "savc_live2d_signal",
       sessionKey,
-      args: {
-        source: "interaction",
-        interactionType: params.interactionType,
-        intensity: params.intensity,
-        ...(params.emotion ? { emotion: params.emotion } : {}),
-      },
+      args,
     }),
   });
 
@@ -206,8 +273,8 @@ async function invokeGateway(params: InvokeLive2DInteractionParams): Promise<Liv
   return signal;
 }
 
-export async function invokeLive2DInteraction(
-  params: InvokeLive2DInteractionParams,
+export async function invokeLive2DSignal(
+  params: InvokeLive2DSignalParams,
 ): Promise<InvokeLive2DInteractionResult> {
   const mode = normalizeMode(readEnv("VITE_SAVC_UI_LIVE2D_MODE"));
   if (mode === "mock") {
@@ -229,4 +296,26 @@ export async function invokeLive2DInteraction(
     }
     return { ok: true, backend: "mock", signal: fallback, error: message };
   }
+}
+
+export async function invokeLive2DInteraction(
+  params: InvokeLive2DInteractionParams,
+): Promise<InvokeLive2DInteractionResult> {
+  return invokeLive2DSignal({
+    source: "interaction",
+    interactionType: params.interactionType,
+    intensity: params.intensity,
+    emotion: params.emotion,
+  });
+}
+
+export async function invokeLive2DVoice(
+  params: InvokeLive2DVoiceParams,
+): Promise<InvokeLive2DInteractionResult> {
+  return invokeLive2DSignal({
+    source: "voice",
+    message: params.message,
+    emotion: params.emotion,
+    energy: params.energy,
+  });
 }

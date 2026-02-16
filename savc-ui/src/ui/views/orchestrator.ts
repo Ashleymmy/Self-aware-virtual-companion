@@ -1,9 +1,17 @@
 import { html, svg, type TemplateResult } from "lit";
 import {
   invokeLive2DInteraction,
+  invokeLive2DVoice,
   type InvokeLive2DInteractionResult,
   type Live2DInteractionType,
 } from "../live2d-bridge.js";
+import {
+  getLive2DChannelSnapshot,
+  publishLive2DSignal,
+  subscribeLive2DChannel,
+  type Live2DChannelEvent,
+  type Live2DChannelSource,
+} from "../live2d-channel.js";
 import { Live2DRuntime, type Live2DRuntimeStatus } from "../live2d-runtime.js";
 import { gateway, type AgentNode, type RoutingRule, type DispatchRecord } from "../mock/index.js";
 
@@ -13,17 +21,6 @@ let _dispatches: DispatchRecord[] = [];
 let _loaded = false;
 
 type BridgeStatus = "idle" | "sending" | "ok" | "error";
-
-interface InteractionLogItem {
-  id: string;
-  time: string;
-  type: Live2DInteractionType;
-  motion: string;
-  emotion: string;
-  backend: string;
-  status: "ok" | "error";
-  message: string;
-}
 
 const INTERACTION_BUTTONS: Array<{
   type: Live2DInteractionType;
@@ -52,7 +49,9 @@ const DRAG_THRESHOLD_PX = 18;
 let _bridgeStatus: BridgeStatus = "idle";
 let _bridgeMessage = "等待交互事件";
 let _bridgeLastResult: InvokeLive2DInteractionResult | null = null;
-let _bridgeLogs: InteractionLogItem[] = [];
+let _voiceDraft = "欢迎回来，我们继续今天的计划。";
+let _voiceEmotion = "comfort";
+let _voiceEnergy = 0.9;
 
 let _runtime: Live2DRuntime | null = null;
 let _runtimeBootstrapping = false;
@@ -65,6 +64,11 @@ let _runtimeStatus: Live2DRuntimeStatus = {
   motion: "idle",
   updatedAt: new Date().toISOString(),
 };
+let _channelSubscribed = false;
+let _channelUnsubscribe: (() => void) | null = null;
+let _channelActive: Live2DChannelEvent | null = null;
+let _channelEvents: Live2DChannelEvent[] = [];
+let _lastAppliedEventId = "";
 
 let _activePointerId: number | null = null;
 let _pointerStartX = 0;
@@ -110,8 +114,50 @@ function resetPointerState() {
   clearLongPressTimer();
 }
 
-function pushInteractionLog(item: InteractionLogItem) {
-  _bridgeLogs = [item, ..._bridgeLogs].slice(0, 8);
+function sourceLabel(source: Live2DChannelSource): string {
+  if (source === "voice") return "语音";
+  if (source === "interaction") return "交互";
+  if (source === "text") return "文本";
+  return "系统";
+}
+
+function ensureChannelSubscription(requestUpdate: () => void) {
+  if (_channelSubscribed) return;
+  _channelSubscribed = true;
+  _channelUnsubscribe = subscribeLive2DChannel((snapshot) => {
+    _channelActive = snapshot.active;
+    _channelEvents = snapshot.events;
+    if (
+      _runtime &&
+      !_runtime.isDestroyed() &&
+      snapshot.active &&
+      snapshot.active.id !== _lastAppliedEventId
+    ) {
+      _runtime.applySignal(snapshot.active.signal);
+      _lastAppliedEventId = snapshot.active.id;
+    }
+    requestUpdate();
+  });
+}
+
+function publishResult(
+  source: Live2DChannelSource,
+  result: InvokeLive2DInteractionResult,
+  note: string,
+  requestUpdate: () => void,
+) {
+  const backend = result.backend === "gateway" ? "gateway" : "mock";
+  publishLive2DSignal({
+    source,
+    backend,
+    ok: result.ok,
+    note,
+    signal: result.signal,
+  });
+  _bridgeLastResult = result;
+  _bridgeStatus = result.ok ? "ok" : "error";
+  _bridgeMessage = result.error || `${sourceLabel(source)}信号已入通道（${backend}）`;
+  requestUpdate();
 }
 
 async function triggerInteraction(
@@ -129,30 +175,28 @@ async function triggerInteraction(
     interactionType,
     intensity,
   });
+  publishResult("interaction", result, `type=${interactionType}`, requestUpdate);
+}
 
-  _bridgeLastResult = result;
-  _bridgeStatus = result.ok ? "ok" : "error";
-  const motion = String(result.signal.motion || "idle");
-  const emotion = String(result.signal.emotion || "neutral");
-  const backend = result.backend === "gateway" ? "gateway" : "mock";
-  const summary = result.ok
-    ? `${INTERACTION_LABELS[interactionType]} 已触发（${backend}）`
-    : `${INTERACTION_LABELS[interactionType]} 触发失败，已回退 mock`;
-  _bridgeMessage = summary;
-
-  _runtime?.applySignal(result.signal);
-
-  pushInteractionLog({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    time: nowLabel(),
-    type: interactionType,
-    motion,
-    emotion,
-    backend,
-    status: result.ok ? "ok" : "error",
-    message: result.error || summary,
-  });
+async function triggerVoice(requestUpdate: () => void) {
+  if (_bridgeStatus === "sending") return;
+  const message = _voiceDraft.trim();
+  if (!message) {
+    _bridgeStatus = "error";
+    _bridgeMessage = "请输入语音文本后再触发";
+    requestUpdate();
+    return;
+  }
+  _bridgeStatus = "sending";
+  _bridgeMessage = "发送语音信号...";
   requestUpdate();
+
+  const result = await invokeLive2DVoice({
+    message,
+    emotion: _voiceEmotion,
+    energy: _voiceEnergy,
+  });
+  publishResult("voice", result, message, requestUpdate);
 }
 
 function ensureRuntime(requestUpdate: () => void) {
@@ -176,6 +220,11 @@ function ensureRuntime(requestUpdate: () => void) {
         },
       });
       _runtimeStatus = _runtime.getStatus();
+      const latest = getLive2DChannelSnapshot().active;
+      if (latest && latest.id !== _lastAppliedEventId) {
+        _runtime.applySignal(latest.signal);
+        _lastAppliedEventId = latest.id;
+      }
     } catch (error) {
       _bridgeStatus = "error";
       _bridgeMessage = `Live2D runtime 初始化失败: ${error instanceof Error ? error.message : String(error)}`;
@@ -298,7 +347,7 @@ function renderTopology(): TemplateResult {
 }
 
 function renderLive2DBridge(requestUpdate: () => void): TemplateResult {
-  const signal = _bridgeLastResult?.signal;
+  const signal = _channelActive?.signal || _bridgeLastResult?.signal;
   const interactionType = String(signal?.interaction?.type || "none");
   const interactionIntensity = signal?.interaction?.intensity;
   const statusColor =
@@ -309,14 +358,13 @@ function renderLive2DBridge(requestUpdate: () => void): TemplateResult {
         : _bridgeStatus === "sending"
           ? "var(--warn)"
           : "var(--muted)";
-  const backendLabel =
-    _bridgeLastResult?.backend === "gateway" ? "gateway" : _bridgeLastResult?.backend === "mock" ? "mock" : "-";
+  const backendLabel = _channelActive?.backend || (_bridgeLastResult ? _bridgeLastResult.backend : "-");
 
   return html`
     <div class="card savc-orchestrator" data-accent style="animation: rise 0.35s var(--ease-out) 0.08s backwards;">
-      <div class="card-title">Live2D 交互桥接（M-F4）</div>
+      <div class="card-title">Live2D 信号桥接（M-F4/M-F5）</div>
       <div class="card-sub">
-        点击/双击/长按/拖动/悬停测试区会触发 <span class="mono">savc_live2d_signal</span>。默认为 auto 模式：网关失败自动回退 mock。
+        交互与语音信号统一进入同一前端通道并驱动 runtime。默认 auto 模式：网关失败自动回退 mock。
       </div>
 
       <div style="margin-top: 14px; display: grid; gap: 12px;">
@@ -353,6 +401,51 @@ function renderLive2DBridge(requestUpdate: () => void): TemplateResult {
           )}
         </div>
 
+        <div style="display: grid; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px;">
+          <div style="font-size: 12px; color: var(--muted);">语音信号（统一通道）</div>
+          <textarea
+            rows="2"
+            placeholder="输入想让媛媛播报的文本..."
+            .value=${_voiceDraft}
+            @input=${(event: Event) => {
+              _voiceDraft = (event.target as HTMLTextAreaElement).value;
+              requestUpdate();
+            }}
+          ></textarea>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <input
+              type="text"
+              placeholder="emotion (comfort/happy/thinking...)"
+              .value=${_voiceEmotion}
+              @input=${(event: Event) => {
+                _voiceEmotion = (event.target as HTMLInputElement).value;
+                requestUpdate();
+              }}
+              style="min-width: 180px;"
+            />
+            <input
+              type="number"
+              min="0.4"
+              max="1.6"
+              step="0.1"
+              .value=${String(_voiceEnergy)}
+              @input=${(event: Event) => {
+                const value = Number.parseFloat((event.target as HTMLInputElement).value);
+                _voiceEnergy = Number.isFinite(value) ? Math.max(0.4, Math.min(1.6, value)) : 0.9;
+                requestUpdate();
+              }}
+              style="width: 110px;"
+            />
+            <button
+              class="btn btn--sm primary"
+              ?disabled=${_bridgeStatus === "sending"}
+              @click=${() => void triggerVoice(requestUpdate)}
+            >
+              发送语音信号
+            </button>
+          </div>
+        </div>
+
         <div class="table">
           <div class="table-head" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;">
             <span>source</span>
@@ -373,26 +466,29 @@ function renderLive2DBridge(requestUpdate: () => void): TemplateResult {
         </div>
 
         <div class="list">
-          ${_bridgeLogs.length === 0
+          ${_channelEvents.length === 0
             ? html`
                 <div class="list-item" style="grid-template-columns: 1fr;">
-                  <div class="list-sub">暂无交互日志</div>
+                  <div class="list-sub">暂无通道事件</div>
                 </div>
               `
-            : _bridgeLogs.map(
+            : _channelEvents.map(
                 (item) => html`
                   <div class="list-item" style="grid-template-columns: 1fr auto;">
                     <div class="list-main">
                       <div class="list-title">
-                        <span class="chip" style="padding: 1px 7px; font-size: 10px;">${INTERACTION_LABELS[item.type]}</span>
-                        <span class="mono" style="margin-left: 8px;">${item.motion} · ${item.emotion}</span>
+                        <span class="chip" style="padding: 1px 7px; font-size: 10px;">${sourceLabel(item.source)}</span>
+                        <span class="mono" style="margin-left: 8px;">
+                          ${item.signal.motion} · ${item.signal.emotion}
+                          ${item.signal.interaction?.type ? ` · ${item.signal.interaction.type}` : ""}
+                        </span>
                       </div>
                       <div class="list-sub">
-                        ${item.time} · ${item.backend} · ${item.message}
+                        ${new Date(item.at).toLocaleTimeString("zh-CN", { hour12: false })} · ${item.backend} · ${item.note}
                       </div>
                     </div>
-                    <span class="chip ${item.status === "ok" ? "chip-ok" : "chip-warn"}" style="padding: 2px 8px; font-size: 10px;">
-                      ${item.status === "ok" ? "成功" : "降级"}
+                    <span class="chip ${item.ok ? "chip-ok" : "chip-warn"}" style="padding: 2px 8px; font-size: 10px;">
+                      ${item.ok ? "成功" : "降级"}
                     </span>
                   </div>
                 `,
@@ -509,6 +605,7 @@ export function renderOrchestrator(requestUpdate: () => void): TemplateResult {
     `;
   }
 
+  ensureChannelSubscription(requestUpdate);
   ensureRuntime(requestUpdate);
 
   return html`

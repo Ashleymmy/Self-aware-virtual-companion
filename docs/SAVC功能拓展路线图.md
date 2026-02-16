@@ -2,7 +2,7 @@
 
 > 版本: 1.0
 > 日期: 2026-02-09
-> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5 全量完成：5c/5d/5e；Phase 6 基础信号层已启动）
+> 状态: 执行中（Phase 4 收尾完成：Auto-Recall/Auto-Capture/时间衰减/本地 Embedding/real+sessions_send+性能压测；Phase 5 全量完成：5c/5d/5e；Phase 6 已完成 M-F1~M-F4，M-F5 集成中）
 
 ---
 
@@ -376,7 +376,7 @@ const EMOTION_MAP = {
 | M-F4 | 交互响应 | 点击模型触发反应动作 |
 | M-F5 | 完整集成 | 语音对话 + Live2D + 文本界面统一体验 |
 
-### 6.7 当前进展（2026-02-15）
+### 6.7 当前进展（2026-02-16）
 
 - ✅ 已完成（非 UI 基础层）：
   - `savc-core/orchestrator/live2d.mjs`：情绪→表情参数映射、mock 口型帧生成、交互动作信号生成。
@@ -387,10 +387,17 @@ const EMOTION_MAP = {
 - ✅ 里程碑状态（后端信号层）：
   - M-F2（情绪表情联动）已完成：文本/语音任务可稳定产出 emotion->expression/motion 信号。
   - M-F3（口型同步）已完成：语音任务稳定产出 lipSync 帧序列（mock）。
+- ✅ 已完成（UI 侧基础）：
+  - M-F1（模型加载与渲染）：
+    - `savc-ui/src/ui/live2d-runtime.ts`：新增前端 runtime，支持模型清单加载（manifest）+ 待机动画渲染。
+    - `savc-ui/public/live2d/yuanyuan-lite.model.json`：提供默认模型清单。
+  - M-F4（交互响应）：
+    - `savc-ui/src/ui/views/orchestrator.ts`：接入点击/双击/长按/拖动/悬停事件，触发 `savc_live2d_signal` 并实时驱动 runtime。
+  - M-F5（pre-integration）：
+    - `savc-ui/src/ui/live2d-channel.ts`：新增统一信号通道，聚合 `interaction + voice` 事件。
+    - `savc-ui/src/ui/views/orchestrator.ts`：新增语音信号入口，交互/语音统一入通道并回显时间线。
 - ⏳ 待完成：
-  - M-F1（UI 侧模型加载渲染）
-  - M-F4（已完成“前端点击/触摸事件接入 + `savc_live2d_signal` 桥接 + 信号回显”，待补齐真实 Live2D runtime 动画驱动）
-  - M-F5（语音+Live2D+文本完整端到端集成）
+  - M-F5（full）：将真实语音播放链路与聊天主界面事件统一接入同一通道，形成完整端到端体验。
 
 ---
 
