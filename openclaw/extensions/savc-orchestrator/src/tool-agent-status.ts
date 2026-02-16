@@ -1,7 +1,7 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { Type } from "@sinclair/typebox";
 import type { AgentRunResult, PluginToolContext, ToolDetails } from "./types.js";
-import { loadLifecycleModule, resolveRuntimeContext } from "./paths.js";
+import { loadLifecycleModule, loadLive2DModule, resolveRuntimeContext } from "./paths.js";
 import { readLatestAssistantReply, waitForRealAgentRun } from "./real-session-adapter.js";
 import {
   getRunRecord,
@@ -37,6 +37,20 @@ function toResult(snapshot: {
         : null,
     error: snapshot.error === undefined || snapshot.error === null ? null : String(snapshot.error),
   };
+}
+
+function toOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function inferLive2DSourceFromAgent(agentName: string): "voice" | "interaction" | null {
+  if (agentName === "voice") {
+    return "voice";
+  }
+  if (agentName === "live2d") {
+    return "interaction";
+  }
+  return null;
 }
 
 export function createAgentStatusTool(api: OpenClawPluginApi, _toolCtx?: PluginToolContext) {
@@ -119,7 +133,58 @@ export function createAgentStatusTool(api: OpenClawPluginApi, _toolCtx?: PluginT
               };
         }
 
-        const details = success(result);
+        const live2d = {
+          attempted: false,
+          source: null as string | null,
+          emotion: null as string | null,
+          interactionType: null as string | null,
+          signal: null as Record<string, unknown> | null,
+          error: null as string | null,
+        };
+        if (result.status === "completed") {
+          live2d.attempted = true;
+          try {
+            const live2dModule = await loadLive2DModule(ctx);
+            const preferredSource = inferLive2DSourceFromAgent(result.agent);
+            const outputText = toOptionalString(result.output) ?? `${result.agent} completed`;
+            if (typeof live2dModule.buildLive2DPlan === "function") {
+              const plan = live2dModule.buildLive2DPlan(outputText, {
+                ...(preferredSource ? { source: preferredSource } : {}),
+                message: outputText,
+              });
+              const planSignal =
+                plan && typeof plan === "object" && plan.signal && typeof plan.signal === "object"
+                  ? (plan.signal as Record<string, unknown>)
+                  : null;
+              live2d.signal = planSignal;
+              live2d.source = toOptionalString(plan?.source) ?? toOptionalString(planSignal?.source);
+              live2d.emotion = toOptionalString(plan?.emotion) ?? toOptionalString(planSignal?.emotion);
+              live2d.interactionType =
+                toOptionalString(plan?.interactionType) ??
+                toOptionalString((planSignal?.interaction as Record<string, unknown> | undefined)?.type);
+            } else {
+              const signal = live2dModule.buildLive2DSignal({
+                source: preferredSource ?? "text",
+                message: outputText,
+              });
+              const signalData =
+                signal && typeof signal === "object" ? (signal as Record<string, unknown>) : null;
+              live2d.signal = signalData;
+              live2d.source = toOptionalString(signalData?.source);
+              live2d.emotion = toOptionalString(signalData?.emotion);
+              live2d.interactionType = toOptionalString(
+                (signalData?.interaction as Record<string, unknown> | undefined)?.type,
+              );
+            }
+          } catch (error) {
+            live2d.error = error instanceof Error ? error.message : String(error);
+          }
+        }
+
+        const details = success({
+          ...result,
+          live2d,
+        });
         return {
           content: [
             {

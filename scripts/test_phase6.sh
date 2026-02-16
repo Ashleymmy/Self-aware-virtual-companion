@@ -123,6 +123,7 @@ TMP_VOICE="${TMP_ROOT}/live2d_voice.json"
 TMP_INTERACTION="${TMP_ROOT}/live2d_interaction.json"
 TMP_TASK_SIGNAL="${TMP_ROOT}/live2d_task.json"
 TMP_SPAWN_SIGNAL="${TMP_ROOT}/live2d_spawn.json"
+TMP_AGENT_STATUS="${TMP_ROOT}/live2d_agent_status.json"
 TMP_VOICECALL="${TMP_ROOT}/voicecall_live2d.json"
 TMP_VOICECALL_END="${TMP_ROOT}/voicecall_end.json"
 TMP_VOICE_STORE="${TMP_ROOT}/voice-store"
@@ -281,6 +282,30 @@ else
   fail "savc_spawn_expert live2d bridge invoke failed"
 fi
 
+SPAWN_RUN_ID="$(python3 - "${TMP_SPAWN_SIGNAL}" <<'PY'
+from __future__ import annotations
+import json
+import sys
+
+payload = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+assert payload.get("ok") is True
+details = ((payload.get("result") or {}).get("details") or {})
+assert details.get("ok") is True
+data = details.get("data") or {}
+result = data.get("result") or {}
+run_id = result.get("runId")
+assert isinstance(run_id, str) and run_id
+print(run_id)
+PY
+)"
+pass "spawn runId captured=${SPAWN_RUN_ID}"
+
+if invoke_tool_ok_retry "${TMP_AGENT_STATUS}" "{\"tool\":\"savc_agent_status\",\"sessionKey\":\"main\",\"args\":{\"runId\":\"${SPAWN_RUN_ID}\"}}" 20; then
+  pass "savc_agent_status live2d bridge invoke succeeded"
+else
+  fail "savc_agent_status live2d bridge invoke failed"
+fi
+
 if invoke_tool_ok_retry "${TMP_VOICECALL}" '{"tool":"savc_voice_call","sessionKey":"main","args":{"action":"initiate","to":"+15550001234","message":"你好，我们开始通话","mode":"conversation","emotion":"empathetic"}}' 20; then
   pass "savc_voice_call invoke succeeded"
 else
@@ -311,7 +336,7 @@ else
   fail "savc_voice_call end failed"
 fi
 
-if python3 - "${TMP_VOICE}" "${TMP_INTERACTION}" "${TMP_TASK_SIGNAL}" "${TMP_SPAWN_SIGNAL}" "${TMP_VOICECALL}" "${TMP_VOICECALL_END}" <<'PY'
+if python3 - "${TMP_VOICE}" "${TMP_INTERACTION}" "${TMP_TASK_SIGNAL}" "${TMP_SPAWN_SIGNAL}" "${TMP_AGENT_STATUS}" "${TMP_VOICECALL}" "${TMP_VOICECALL_END}" <<'PY'
 from __future__ import annotations
 import json
 import sys
@@ -320,8 +345,9 @@ voice = json.load(open(sys.argv[1], "r", encoding="utf-8"))
 interaction = json.load(open(sys.argv[2], "r", encoding="utf-8"))
 task_signal = json.load(open(sys.argv[3], "r", encoding="utf-8"))
 spawn_signal = json.load(open(sys.argv[4], "r", encoding="utf-8"))
-voicecall = json.load(open(sys.argv[5], "r", encoding="utf-8"))
-voicecall_end = json.load(open(sys.argv[6], "r", encoding="utf-8"))
+agent_status = json.load(open(sys.argv[5], "r", encoding="utf-8"))
+voicecall = json.load(open(sys.argv[6], "r", encoding="utf-8"))
+voicecall_end = json.load(open(sys.argv[7], "r", encoding="utf-8"))
 
 for payload in [voice, interaction, task_signal]:
     assert payload.get("ok") is True
@@ -355,6 +381,16 @@ assert spawn_live2d.get("attempted") is True
 spawn_live2d_signal = spawn_live2d.get("signal") or {}
 assert spawn_live2d_signal.get("version") == "phase6-v1"
 assert spawn_live2d_signal.get("source") == "voice"
+
+assert agent_status.get("ok") is True
+status_details = ((agent_status.get("result") or {}).get("details") or {})
+assert status_details.get("ok") is True
+status_data = status_details.get("data") or {}
+assert status_data.get("status") == "completed"
+status_live2d = status_data.get("live2d") or {}
+assert status_live2d.get("attempted") is True
+status_live2d_signal = status_live2d.get("signal") or {}
+assert status_live2d_signal.get("version") == "phase6-v1"
 
 assert voicecall.get("ok") is True
 voicecall_details = ((voicecall.get("result") or {}).get("details") or {})

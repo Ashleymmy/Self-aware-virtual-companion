@@ -25,11 +25,25 @@ const mocked = vi.hoisted(() => {
     durationMs: 10,
   }));
   const readLatestAssistantReply = vi.fn(async () => "real output");
+  const buildLive2DPlan = vi.fn((task: string, options?: Record<string, unknown>) => ({
+    source: (options?.source as string | undefined) ?? "text",
+    emotion: "neutral",
+    interactionType: null,
+    signal: {
+      version: "phase6-v1",
+      source: (options?.source as string | undefined) ?? "text",
+      emotion: "neutral",
+      motion: "idle_neutral",
+      lipSync: [],
+    },
+    task,
+  }));
 
   return {
     getStatus,
     waitForRealAgentRun,
     readLatestAssistantReply,
+    buildLive2DPlan,
     setSpawnMode: (next: "mock" | "real") => {
       spawnMode = next;
     },
@@ -56,12 +70,14 @@ const mocked = vi.hoisted(() => {
       waitForAgent: vi.fn(),
       getStatus,
     })),
+    loadLive2DModule: vi.fn(async () => ({ buildLive2DPlan })),
   };
 });
 
 vi.mock("./paths.js", () => ({
   resolveRuntimeContext: mocked.resolveRuntimeContext,
   loadLifecycleModule: mocked.loadLifecycleModule,
+  loadLive2DModule: mocked.loadLive2DModule,
 }));
 
 vi.mock("./real-session-adapter.js", () => ({
@@ -100,6 +116,7 @@ describe("savc_agent_status tool", () => {
       durationMs: 10,
     });
     mocked.readLatestAssistantReply.mockResolvedValue("real output");
+    mocked.loadLive2DModule.mockResolvedValue({ buildLive2DPlan: mocked.buildLive2DPlan });
   });
 
   it("returns status snapshot for valid runId", async () => {
@@ -109,6 +126,10 @@ describe("savc_agent_status tool", () => {
     expect(result.details).toMatchObject({ ok: true, code: "ok", error: null });
     // oxlint-disable-next-line typescript/no-explicit-any
     expect((result.details as any).data.status).toBe("completed");
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.attempted).toBe(true);
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.signal.version).toBe("phase6-v1");
   });
 
   it("returns not_found for unknown runId", async () => {
@@ -118,6 +139,8 @@ describe("savc_agent_status tool", () => {
     expect(result.details).toMatchObject({ ok: true, code: "ok", error: null });
     // oxlint-disable-next-line typescript/no-explicit-any
     expect((result.details as any).data.status).toBe("not_found");
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.attempted).toBe(false);
   });
 
   it("validates required runId", async () => {
@@ -144,6 +167,8 @@ describe("savc_agent_status tool", () => {
     // oxlint-disable-next-line typescript/no-explicit-any
     expect((result.details as any).data.status).toBe("completed");
     expect(mocked.waitForRealAgentRun).toHaveBeenCalledTimes(1);
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.attempted).toBe(true);
   });
 
   it("returns not_found in real mode for unknown runId", async () => {
@@ -153,5 +178,17 @@ describe("savc_agent_status tool", () => {
     expect(result.details).toMatchObject({ ok: true, code: "ok", error: null });
     // oxlint-disable-next-line typescript/no-explicit-any
     expect((result.details as any).data.status).toBe("not_found");
+  });
+
+  it("keeps status success even if live2d module loading fails", async () => {
+    mocked.loadLive2DModule.mockRejectedValueOnce(new Error("live2d missing"));
+    const tool = createAgentStatusTool(fakeApi());
+    const result = await tool.execute("id", { runId: "run-1" });
+
+    expect(result.details).toMatchObject({ ok: true, code: "ok", error: null });
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.attempted).toBe(true);
+    // oxlint-disable-next-line typescript/no-explicit-any
+    expect((result.details as any).data.live2d.error).toContain("live2d missing");
   });
 });
