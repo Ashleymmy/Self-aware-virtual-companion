@@ -1,10 +1,67 @@
 import { html, svg, type TemplateResult } from "lit";
+import {
+  invokeLive2DInteraction,
+  type InvokeLive2DInteractionResult,
+  type Live2DInteractionType,
+} from "../live2d-bridge.js";
 import { gateway, type AgentNode, type RoutingRule, type DispatchRecord } from "../mock/index.js";
 
 let _agents: AgentNode[] = [];
 let _rules: RoutingRule[] = [];
 let _dispatches: DispatchRecord[] = [];
 let _loaded = false;
+
+type BridgeStatus = "idle" | "sending" | "ok" | "error";
+
+interface InteractionLogItem {
+  id: string;
+  time: string;
+  type: Live2DInteractionType;
+  motion: string;
+  emotion: string;
+  backend: string;
+  status: "ok" | "error";
+  message: string;
+}
+
+const INTERACTION_BUTTONS: Array<{
+  type: Live2DInteractionType;
+  label: string;
+  intensity: number;
+}> = [
+  { type: "tap", label: "点击", intensity: 1.0 },
+  { type: "double_tap", label: "双击", intensity: 1.2 },
+  { type: "long_press", label: "长按", intensity: 1.1 },
+  { type: "drag", label: "拖动", intensity: 1.15 },
+  { type: "hover", label: "悬停", intensity: 0.85 },
+];
+
+const INTERACTION_LABELS: Record<Live2DInteractionType, string> = {
+  tap: "点击",
+  double_tap: "双击",
+  long_press: "长按",
+  drag: "拖动",
+  hover: "悬停",
+};
+
+const DOUBLE_TAP_WINDOW_MS = 280;
+const LONG_PRESS_MS = 520;
+const DRAG_THRESHOLD_PX = 18;
+
+let _bridgeStatus: BridgeStatus = "idle";
+let _bridgeMessage = "等待交互事件";
+let _bridgeLastResult: InvokeLive2DInteractionResult | null = null;
+let _bridgeLogs: InteractionLogItem[] = [];
+
+let _activePointerId: number | null = null;
+let _pointerStartX = 0;
+let _pointerStartY = 0;
+let _pointerDragging = false;
+let _longPressTriggered = false;
+let _longPressTimer: ReturnType<typeof setTimeout> | undefined;
+let _lastTapAt = 0;
+let _pendingTapTimer: ReturnType<typeof setTimeout> | undefined;
+let _lastHoverAt = 0;
 
 async function loadData() {
   [_agents, _rules, _dispatches] = await Promise.all([
@@ -13,6 +70,135 @@ async function loadData() {
     gateway.getRecentDispatches(),
   ]);
   _loaded = true;
+}
+
+function nowLabel(): string {
+  return new Date().toLocaleTimeString("zh-CN", { hour12: false });
+}
+
+function clearLongPressTimer() {
+  if (_longPressTimer) {
+    clearTimeout(_longPressTimer);
+    _longPressTimer = undefined;
+  }
+}
+
+function clearPendingTapTimer() {
+  if (_pendingTapTimer) {
+    clearTimeout(_pendingTapTimer);
+    _pendingTapTimer = undefined;
+  }
+}
+
+function resetPointerState() {
+  _activePointerId = null;
+  _pointerDragging = false;
+  _longPressTriggered = false;
+  clearLongPressTimer();
+}
+
+function pushInteractionLog(item: InteractionLogItem) {
+  _bridgeLogs = [item, ..._bridgeLogs].slice(0, 8);
+}
+
+async function triggerInteraction(
+  interactionType: Live2DInteractionType,
+  intensity: number,
+  requestUpdate: () => void,
+) {
+  if (_bridgeStatus === "sending") return;
+
+  _bridgeStatus = "sending";
+  _bridgeMessage = `发送 ${INTERACTION_LABELS[interactionType]} 事件...`;
+  requestUpdate();
+
+  const result = await invokeLive2DInteraction({
+    interactionType,
+    intensity,
+  });
+
+  _bridgeLastResult = result;
+  _bridgeStatus = result.ok ? "ok" : "error";
+  const motion = String(result.signal.motion || "idle");
+  const emotion = String(result.signal.emotion || "neutral");
+  const backend = result.backend === "gateway" ? "gateway" : "mock";
+  const summary = result.ok
+    ? `${INTERACTION_LABELS[interactionType]} 已触发（${backend}）`
+    : `${INTERACTION_LABELS[interactionType]} 触发失败，已回退 mock`;
+  _bridgeMessage = summary;
+
+  pushInteractionLog({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    time: nowLabel(),
+    type: interactionType,
+    motion,
+    emotion,
+    backend,
+    status: result.ok ? "ok" : "error",
+    message: result.error || summary,
+  });
+  requestUpdate();
+}
+
+function onPointerDown(event: PointerEvent, requestUpdate: () => void) {
+  if (!event.isPrimary) return;
+  _activePointerId = event.pointerId;
+  _pointerStartX = event.clientX;
+  _pointerStartY = event.clientY;
+  _pointerDragging = false;
+  _longPressTriggered = false;
+  clearLongPressTimer();
+  _longPressTimer = setTimeout(() => {
+    _longPressTriggered = true;
+    void triggerInteraction("long_press", 1.1, requestUpdate);
+  }, LONG_PRESS_MS);
+}
+
+function onPointerMove(event: PointerEvent, requestUpdate: () => void) {
+  if (!event.isPrimary || _activePointerId !== event.pointerId || _longPressTriggered) return;
+  const dx = event.clientX - _pointerStartX;
+  const dy = event.clientY - _pointerStartY;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  if (!_pointerDragging && distance >= DRAG_THRESHOLD_PX) {
+    _pointerDragging = true;
+    clearLongPressTimer();
+    const intensity = Math.max(0.8, Math.min(1.5, 1 + distance / 180));
+    void triggerInteraction("drag", intensity, requestUpdate);
+  }
+}
+
+function onPointerUp(event: PointerEvent, requestUpdate: () => void) {
+  if (!event.isPrimary || _activePointerId !== event.pointerId) return;
+  clearLongPressTimer();
+
+  if (!_pointerDragging && !_longPressTriggered) {
+    const now = Date.now();
+    if (_lastTapAt > 0 && now - _lastTapAt <= DOUBLE_TAP_WINDOW_MS) {
+      _lastTapAt = 0;
+      clearPendingTapTimer();
+      void triggerInteraction("double_tap", 1.2, requestUpdate);
+    } else {
+      _lastTapAt = now;
+      clearPendingTapTimer();
+      _pendingTapTimer = setTimeout(() => {
+        _pendingTapTimer = undefined;
+        void triggerInteraction("tap", 1.0, requestUpdate);
+      }, DOUBLE_TAP_WINDOW_MS);
+    }
+  }
+
+  resetPointerState();
+}
+
+function onPointerCancel() {
+  resetPointerState();
+}
+
+function onHover(requestUpdate: () => void) {
+  const now = Date.now();
+  if (now - _lastHoverAt < 1200) return;
+  _lastHoverAt = now;
+  void triggerInteraction("hover", 0.85, requestUpdate);
 }
 
 function renderTopology(): TemplateResult {
@@ -62,6 +248,112 @@ function renderTopology(): TemplateResult {
           `;
         })}
       </svg>
+    </div>
+  `;
+}
+
+function renderLive2DBridge(requestUpdate: () => void): TemplateResult {
+  const signal = _bridgeLastResult?.signal;
+  const interactionType = String(signal?.interaction?.type || "none");
+  const interactionIntensity = signal?.interaction?.intensity;
+  const statusColor =
+    _bridgeStatus === "ok"
+      ? "var(--ok)"
+      : _bridgeStatus === "error"
+        ? "var(--danger)"
+        : _bridgeStatus === "sending"
+          ? "var(--warn)"
+          : "var(--muted)";
+  const backendLabel =
+    _bridgeLastResult?.backend === "gateway" ? "gateway" : _bridgeLastResult?.backend === "mock" ? "mock" : "-";
+
+  return html`
+    <div class="card savc-orchestrator" data-accent style="animation: rise 0.35s var(--ease-out) 0.08s backwards;">
+      <div class="card-title">Live2D 交互桥接（M-F4）</div>
+      <div class="card-sub">
+        点击/双击/长按/拖动/悬停测试区会触发 <span class="mono">savc_live2d_signal</span>。默认为 auto 模式：网关失败自动回退 mock。
+      </div>
+
+      <div style="margin-top: 14px; display: grid; gap: 12px;">
+        <div
+          style="border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); padding: 14px; background: linear-gradient(135deg, var(--secondary), var(--card)); touch-action: none; user-select: none;"
+          @pointerdown=${(event: PointerEvent) => onPointerDown(event, requestUpdate)}
+          @pointermove=${(event: PointerEvent) => onPointerMove(event, requestUpdate)}
+          @pointerup=${(event: PointerEvent) => onPointerUp(event, requestUpdate)}
+          @pointercancel=${() => onPointerCancel()}
+          @mouseleave=${() => onPointerCancel()}
+          @mouseenter=${() => onHover(requestUpdate)}
+        >
+          <div style="display: grid; justify-items: center; gap: 8px; min-height: 150px; align-content: center;">
+            <div
+              style="width: 72px; height: 72px; border-radius: 999px; background: radial-gradient(circle at 35% 35%, rgba(20,184,166,0.45), rgba(20,184,166,0.06)); border: 1px solid rgba(20,184,166,0.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), 0 10px 20px rgba(0,0,0,0.22);"
+            ></div>
+            <div style="font-size: 13px; color: var(--text); font-weight: 500;">Live2D 交互测试区</div>
+            <div style="font-size: 12px; color: var(--muted);">支持：点击 / 双击 / 长按 / 拖动 / 悬停</div>
+            <div style="font-size: 12px; color: ${statusColor}; font-family: var(--mono);">${_bridgeMessage}</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          ${INTERACTION_BUTTONS.map(
+            (item) => html`
+              <button
+                class="btn btn--sm"
+                ?disabled=${_bridgeStatus === "sending"}
+                @click=${() => void triggerInteraction(item.type, item.intensity, requestUpdate)}
+              >
+                ${item.label}
+              </button>
+            `,
+          )}
+        </div>
+
+        <div class="table">
+          <div class="table-head" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;">
+            <span>source</span>
+            <span>emotion</span>
+            <span>motion</span>
+            <span>interaction</span>
+            <span>intensity</span>
+            <span>backend</span>
+          </div>
+          <div class="table-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;">
+            <span class="mono">${signal?.source ?? "-"}</span>
+            <span class="mono">${signal?.emotion ?? "-"}</span>
+            <span class="mono">${signal?.motion ?? "-"}</span>
+            <span class="mono">${interactionType}</span>
+            <span class="mono">${typeof interactionIntensity === "number" ? interactionIntensity.toFixed(2) : "-"}</span>
+            <span class="mono">${backendLabel}</span>
+          </div>
+        </div>
+
+        <div class="list">
+          ${_bridgeLogs.length === 0
+            ? html`
+                <div class="list-item" style="grid-template-columns: 1fr;">
+                  <div class="list-sub">暂无交互日志</div>
+                </div>
+              `
+            : _bridgeLogs.map(
+                (item) => html`
+                  <div class="list-item" style="grid-template-columns: 1fr auto;">
+                    <div class="list-main">
+                      <div class="list-title">
+                        <span class="chip" style="padding: 1px 7px; font-size: 10px;">${INTERACTION_LABELS[item.type]}</span>
+                        <span class="mono" style="margin-left: 8px;">${item.motion} · ${item.emotion}</span>
+                      </div>
+                      <div class="list-sub">
+                        ${item.time} · ${item.backend} · ${item.message}
+                      </div>
+                    </div>
+                    <span class="chip ${item.status === "ok" ? "chip-ok" : "chip-warn"}" style="padding: 2px 8px; font-size: 10px;">
+                      ${item.status === "ok" ? "成功" : "降级"}
+                    </span>
+                  </div>
+                `,
+              )}
+        </div>
+      </div>
     </div>
   `;
 }
@@ -139,6 +431,7 @@ export function renderOrchestrator(requestUpdate: () => void): TemplateResult {
 
   return html`
     ${renderTopology()}
+    ${renderLive2DBridge(requestUpdate)}
     ${renderRules()}
     ${renderDispatches()}
   `;
