@@ -77,4 +77,49 @@ describe("savc_live2d_signal tool", () => {
     });
     expect(result.details).toMatchObject({ ok: true, code: "ok" });
   });
+
+  it("infers signal plan from task text", async () => {
+    const buildLive2DPlan = vi.fn(() => ({
+      source: "voice",
+      emotion: "comfort",
+      interactionType: null,
+      signal: {
+        version: "phase6-v1",
+        source: "voice",
+        emotion: "comfort",
+        motion: "nod_soft",
+        lipSync: [{ tMs: 0, mouthOpen: 0.6 }],
+      },
+    }));
+    const buildLive2DSignal = vi.fn(() => ({
+      version: "phase6-v1",
+      source: "text",
+      emotion: "neutral",
+      motion: "idle_neutral",
+      expression: {},
+      lipSync: [],
+    }));
+    const tool = createLive2DSignalTool(fakeApi(), undefined, {
+      buildLive2DSignal,
+      buildLive2DPlan,
+    });
+    const result = await tool.execute("id", {
+      task: "请语音播报一句欢迎回来",
+    });
+
+    expect(buildLive2DPlan).toHaveBeenCalledWith("请语音播报一句欢迎回来", {
+      source: undefined,
+      message: undefined,
+      emotion: undefined,
+      interactionType: undefined,
+      intensity: undefined,
+      energy: undefined,
+    });
+    expect(buildLive2DSignal).not.toHaveBeenCalled();
+    expect(result.details).toMatchObject({
+      ok: true,
+      code: "ok",
+      data: { source: "voice", task: "请语音播报一句欢迎回来" },
+    });
+  });
 });

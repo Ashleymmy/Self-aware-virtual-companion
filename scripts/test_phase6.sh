@@ -114,6 +114,7 @@ TMP_ROOT="$(mktemp -d /tmp/savc_phase6.XXXXXX)"
 TMP_CONFIG="${TMP_ROOT}/openclaw.json"
 TMP_VOICE="${TMP_ROOT}/live2d_voice.json"
 TMP_INTERACTION="${TMP_ROOT}/live2d_interaction.json"
+TMP_TASK_SIGNAL="${TMP_ROOT}/live2d_task.json"
 TMP_VOICECALL="${TMP_ROOT}/voicecall_live2d.json"
 TMP_VOICECALL_END="${TMP_ROOT}/voicecall_end.json"
 TMP_VOICE_STORE="${TMP_ROOT}/voice-store"
@@ -260,6 +261,12 @@ else
   fail "savc_live2d_signal interaction invoke failed"
 fi
 
+if invoke_tool_retry "${TMP_TASK_SIGNAL}" '{"tool":"savc_live2d_signal","sessionKey":"main","args":{"task":"请语音播报一句欢迎回来","emotion":"comfort"}}' 20; then
+  pass "savc_live2d_signal task inference invoke succeeded"
+else
+  fail "savc_live2d_signal task inference invoke failed"
+fi
+
 if invoke_tool_ok_retry "${TMP_VOICECALL}" '{"tool":"savc_voice_call","sessionKey":"main","args":{"action":"initiate","to":"+15550001234","message":"你好，我们开始通话","mode":"conversation","emotion":"empathetic"}}' 20; then
   pass "savc_voice_call invoke succeeded"
 else
@@ -290,17 +297,18 @@ else
   fail "savc_voice_call end failed"
 fi
 
-if python3 - "${TMP_VOICE}" "${TMP_INTERACTION}" "${TMP_VOICECALL}" "${TMP_VOICECALL_END}" <<'PY'
+if python3 - "${TMP_VOICE}" "${TMP_INTERACTION}" "${TMP_TASK_SIGNAL}" "${TMP_VOICECALL}" "${TMP_VOICECALL_END}" <<'PY'
 from __future__ import annotations
 import json
 import sys
 
 voice = json.load(open(sys.argv[1], "r", encoding="utf-8"))
 interaction = json.load(open(sys.argv[2], "r", encoding="utf-8"))
-voicecall = json.load(open(sys.argv[3], "r", encoding="utf-8"))
-voicecall_end = json.load(open(sys.argv[4], "r", encoding="utf-8"))
+task_signal = json.load(open(sys.argv[3], "r", encoding="utf-8"))
+voicecall = json.load(open(sys.argv[4], "r", encoding="utf-8"))
+voicecall_end = json.load(open(sys.argv[5], "r", encoding="utf-8"))
 
-for payload in [voice, interaction]:
+for payload in [voice, interaction, task_signal]:
     assert payload.get("ok") is True
     details = ((payload.get("result") or {}).get("details") or {})
     assert details.get("ok") is True
@@ -316,6 +324,12 @@ assert isinstance(voice_signal.get("lipSync"), list) and len(voice_signal.get("l
 interaction_signal = ((((interaction.get("result") or {}).get("details") or {}).get("data") or {}).get("signal") or {})
 assert interaction_signal.get("source") == "interaction"
 assert interaction_signal.get("interaction", {}).get("type") == "tap"
+
+task_data = (((task_signal.get("result") or {}).get("details") or {}).get("data") or {})
+task_out = task_data.get("signal") or {}
+assert task_data.get("source") == "voice"
+assert task_out.get("source") == "voice"
+assert isinstance(task_out.get("lipSync"), list) and len(task_out.get("lipSync")) > 0
 
 assert voicecall.get("ok") is True
 voicecall_details = ((voicecall.get("result") or {}).get("details") or {})

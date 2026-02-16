@@ -17,13 +17,14 @@ bash scripts/test_phase6.sh
 - [x] `live2d.mjs` 基础信号能力通过单测
 - [x] `lifecycle.mjs` 的 `live2d` 执行分支可输出标准化信号标记
 - [x] `savc_live2d_signal` 工具通过 Vitest
-- [x] 网关下工具调用通过（voice + interaction 两类信号）
+- [x] 网关下工具调用通过（voice + interaction + task 推断三类信号）
 
 ## 验收要点映射（基础层）
 
 - [x] 情绪表情联动信号：`emotion -> expression/motion`
 - [x] 口型同步信号：`voice text -> lipSync frames`（mock）
 - [x] 交互响应信号：`interactionType -> motion`
+- [x] 任务文本推断：`task -> source/emotion/interaction`（`savc_live2d_signal`）
 
 ## 备注
 

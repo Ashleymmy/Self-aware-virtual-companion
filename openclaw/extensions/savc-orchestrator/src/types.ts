@@ -123,6 +123,14 @@ export type Live2DSignalResult = {
   interaction?: Record<string, unknown> | null;
 };
 
+export type Live2DPlanResult = {
+  source?: string;
+  emotion?: string;
+  message?: string;
+  interactionType?: string | null;
+  signal?: Live2DSignalResult;
+};
+
 export type Live2DModule = {
   normalizeEmotionTag?: (emotion: unknown) => string;
   mapEmotionToExpression?: (
@@ -139,6 +147,7 @@ export type Live2DModule = {
   ) => Record<string, unknown>;
   buildLive2DSignal: (input?: Record<string, unknown>) => Live2DSignalResult;
   formatLive2DSignal?: (signal: unknown) => string;
+  buildLive2DPlan?: (task: string, options?: Record<string, unknown>) => Live2DPlanResult;
 };
 
 export type RegistryModule = {

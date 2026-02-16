@@ -34,3 +34,4 @@ All config lives under `plugins.entries.savc-orchestrator.config`:
 - `savc_voice_call` requires the `voice-call` plugin to be enabled.
 - `savc_image_generate` defaults to `mode=mock`; `mode=real` requires `OPENAI_API_KEY`.
 - `savc_live2d_signal` is mock/offline only and generates deterministic signal payloads for Phase 6 UI integration.
+- `savc_live2d_signal` supports `task` input for automatic source/emotion/interaction inference (via `buildLive2DPlan` when available).

@@ -39,7 +39,10 @@ function readSource(value: unknown): "text" | "voice" | "interaction" {
 export function createLive2DSignalTool(
   api: OpenClawPluginApi,
   _toolCtx?: PluginToolContext,
-  deps: { buildLive2DSignal?: Live2DModule["buildLive2DSignal"] } = {},
+  deps: {
+    buildLive2DSignal?: Live2DModule["buildLive2DSignal"];
+    buildLive2DPlan?: Live2DModule["buildLive2DPlan"];
+  } = {},
 ) {
   return {
     name: "savc_live2d_signal",
@@ -49,6 +52,11 @@ export function createLive2DSignalTool(
         source: Type.Optional(
           Type.Union([Type.Literal("text"), Type.Literal("voice"), Type.Literal("interaction")], {
             description: "Signal source channel.",
+          }),
+        ),
+        task: Type.Optional(
+          Type.String({
+            description: "Natural-language task text. When provided, source/emotion/interaction can be inferred.",
           }),
         ),
         message: Type.Optional(
@@ -70,13 +78,14 @@ export function createLive2DSignalTool(
 
     async execute(_toolCallId: string, params: Record<string, unknown>) {
       const source = readSource(params.source);
+      const task = readString(params.task);
       const message = readString(params.message);
       const emotion = readString(params.emotion);
       const interactionType = readString(params.interactionType);
       const intensity = readNumber(params.intensity);
       const energy = readNumber(params.energy);
 
-      if (source === "voice" && !message) {
+      if (!task && source === "voice" && !message) {
         const details = failure("INVALID_PARAMS", "message is required when source=voice");
         return {
           content: [{ type: "text", text: "savc_live2d_signal: message is required for source=voice." }],
@@ -85,29 +94,65 @@ export function createLive2DSignalTool(
       }
 
       try {
-        const buildLive2DSignal = deps.buildLive2DSignal
-          ? deps.buildLive2DSignal
-          : (await loadLive2DModule(resolveRuntimeContext(api))).buildLive2DSignal;
+        const live2dModule =
+          deps.buildLive2DSignal || deps.buildLive2DPlan
+            ? {
+                buildLive2DSignal: deps.buildLive2DSignal,
+                buildLive2DPlan: deps.buildLive2DPlan,
+              }
+            : await loadLive2DModule(resolveRuntimeContext(api));
 
-        const signal = buildLive2DSignal({
-          source,
-          message,
-          emotion,
-          interactionType,
-          intensity,
-          energy,
-        });
+        const buildLive2DSignal = live2dModule.buildLive2DSignal;
+        if (typeof buildLive2DSignal !== "function") {
+          throw new Error("live2d module missing buildLive2DSignal");
+        }
+
+        let signal: ReturnType<Live2DModule["buildLive2DSignal"]>;
+        let resolvedSource = source;
+        if (task && typeof live2dModule.buildLive2DPlan === "function") {
+          const plan = live2dModule.buildLive2DPlan(task, {
+            source: typeof params.source === "string" && params.source.trim() ? source : undefined,
+            message: message || undefined,
+            emotion: emotion || undefined,
+            interactionType: interactionType || undefined,
+            intensity,
+            energy,
+          });
+          if (plan?.signal) {
+            signal = plan.signal;
+            resolvedSource = readSource(plan.source ?? source);
+          } else {
+            signal = buildLive2DSignal({
+              source,
+              message,
+              emotion,
+              interactionType,
+              intensity,
+              energy,
+            });
+          }
+        } else {
+          signal = buildLive2DSignal({
+            source,
+            message: source === "voice" && !message && task ? task : message,
+            emotion,
+            interactionType,
+            intensity,
+            energy,
+          });
+        }
 
         const details = success({
-          source,
+          source: resolvedSource,
           backend: "savc-live2d-signal",
+          ...(task ? { task } : {}),
           signal,
         });
         return {
           content: [
             {
               type: "text",
-              text: `savc_live2d_signal => source=${source}, emotion=${String(signal?.emotion || "neutral")}`,
+              text: `savc_live2d_signal => source=${resolvedSource}, emotion=${String(signal?.emotion || "neutral")}`,
             },
           ],
           details,
