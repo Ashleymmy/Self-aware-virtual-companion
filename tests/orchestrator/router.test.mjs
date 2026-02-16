@@ -36,6 +36,11 @@ async function main() {
   });
   assert.equal(case7.agent, 'live2d');
 
+  const case8 = await routeMessage('点击模型并语音播报一句欢迎回来', {
+    agentsDir: 'savc-core/agents',
+  });
+  assert.equal(case8.agent, 'live2d');
+
   console.log('[PASS] orchestrator router');
 }
 

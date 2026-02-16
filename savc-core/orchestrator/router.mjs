@@ -20,14 +20,14 @@ const INTENT_RULES = [
     regex: /(截图|图片|图像|照片|设计稿|图表|ui|界面|logo|<media:image>|screenshot|image)/i,
   },
   {
-    intent: 'voice_conversation',
-    agent: 'voice',
-    regex: /(语音|通话|打电话|电话|voice call|voice|tts|stt)/i,
-  },
-  {
     intent: 'live2d_interaction',
     agent: 'live2d',
     regex: /(live2d|虚拟形象|表情联动|口型同步|动作触发|点击模型|avatar animation|lip sync)/i,
+  },
+  {
+    intent: 'voice_conversation',
+    agent: 'voice',
+    regex: /(语音|通话|打电话|电话|voice call|voice|tts|stt)/i,
   },
   {
     intent: 'technical_explanation',

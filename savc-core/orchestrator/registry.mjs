@@ -244,7 +244,17 @@ export function matchByKeyword(text) {
   const includeMatches = registryState.keywordIndex.filter((entry) => lower.includes(entry.keywordLower));
   if (includeMatches.length === 0) return null;
 
-  const picked = includeMatches.sort((left, right) => left.keywordOrder - right.keywordOrder)[0];
+  const picked = includeMatches.sort((left, right) => {
+    const byLength = right.keywordLower.length - left.keywordLower.length;
+    if (byLength !== 0) {
+      return byLength;
+    }
+    const byOrder = left.keywordOrder - right.keywordOrder;
+    if (byOrder !== 0) {
+      return byOrder;
+    }
+    return left.agentName.localeCompare(right.agentName);
+  })[0];
   return registryState.byName.get(picked.agentName) || null;
 }
 

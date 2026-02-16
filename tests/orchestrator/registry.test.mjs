@@ -57,6 +57,9 @@ async function main() {
   const byKeyword = matchByKeyword('帮我看看这个 bug');
   assert.equal(byKeyword?.name, 'technical');
 
+  const mixedKeyword = matchByKeyword('点击模型并语音播报一句欢迎回来');
+  assert.equal(mixedKeyword?.name, 'live2d');
+
   await fs.writeFile(
     path.join(tempDir, 'new-agent.yaml'),
     [
