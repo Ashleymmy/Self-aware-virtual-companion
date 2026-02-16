@@ -7,6 +7,7 @@
 
 ```bash
 node tests/orchestrator/live2d.test.mjs
+node tests/orchestrator/live2d-voice-chain.test.mjs
 node tests/orchestrator/lifecycle.test.mjs
 cd openclaw && pnpm exec vitest run extensions/savc-orchestrator/src/*.test.ts
 bash scripts/test_phase6.sh
@@ -16,6 +17,7 @@ bash scripts/test_phase6.sh
 
 - [x] `live2d.mjs` 基础信号能力通过单测
 - [x] `lifecycle.mjs` 的 `live2d` 执行分支可输出标准化信号标记
+- [x] `decomposer + lifecycle + aggregator` 的 Live2D+Voice 串行链路通过端到端脚本验证
 - [x] `savc_live2d_signal` 工具通过 Vitest
 - [x] 网关下工具调用通过（voice + interaction + task 推断三类信号）
 

@@ -21,6 +21,7 @@ for file in \
   "savc-core/orchestrator/live2d.mjs" \
   "savc-core/orchestrator/voice.mjs" \
   "tests/orchestrator/live2d.test.mjs" \
+  "tests/orchestrator/live2d-voice-chain.test.mjs" \
   "openclaw/extensions/savc-orchestrator/src/tool-live2d-signal.ts" \
   "openclaw/extensions/savc-orchestrator/src/tool-live2d-signal.test.ts" \
   "openclaw/extensions/savc-orchestrator/src/tool-voice-call.ts"; do
@@ -35,6 +36,12 @@ if node "${REPO_ROOT}/tests/orchestrator/live2d.test.mjs" >/tmp/phase6_live2d.lo
   pass "live2d orchestrator test passed"
 else
   fail "live2d orchestrator test failed (see /tmp/phase6_live2d.log)"
+fi
+
+if node "${REPO_ROOT}/tests/orchestrator/live2d-voice-chain.test.mjs" >/tmp/phase6_live2d_chain.log 2>&1; then
+  pass "live2d+voice orchestration chain test passed"
+else
+  fail "live2d+voice orchestration chain test failed (see /tmp/phase6_live2d_chain.log)"
 fi
 
 if node - <<'NODE'
