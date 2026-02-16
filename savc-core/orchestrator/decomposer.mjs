@@ -69,6 +69,18 @@ function hasTechnicalSignal(task) {
   return /(报错|错误|异常|bug|debug|排障|代码|编译|traceback|stack)/i.test(task);
 }
 
+function hasLive2DSignal(task) {
+  return /(live2d|虚拟形象|avatar|表情联动|口型同步|动作触发|点击模型|lip[\s_-]?sync)/i.test(task);
+}
+
+function hasInteractionSignal(task) {
+  return /(点击|点一下|双击|长按|拖动|悬停|触摸|tap|double[\s_-]?tap|long[\s_-]?press|drag|hover|interaction)/i.test(task);
+}
+
+function hasVoiceSignal(task) {
+  return /(语音|播报|朗读|说出来|通话|voice|tts|speak)/i.test(task);
+}
+
 async function detectTaskAgent(task, options = {}) {
   if (shouldForceMemory(task)) {
     return 'memory';
@@ -103,6 +115,17 @@ export async function analyze(message, context = {}) {
       tasks: [
         buildTask('task-1', 'vision', text, 1, []),
         buildTask('task-2', 'technical', text, 2, ['task-1']),
+      ],
+      execution: 'sequential',
+    };
+  }
+
+  if (hasLive2DSignal(text) && hasInteractionSignal(text) && hasVoiceSignal(text)) {
+    return {
+      type: 'compound',
+      tasks: [
+        buildTask('task-1', 'live2d', text, 1, []),
+        buildTask('task-2', 'voice', text, 2, ['task-1']),
       ],
       execution: 'sequential',
     };

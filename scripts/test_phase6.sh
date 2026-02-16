@@ -82,6 +82,28 @@ else
   fail "live2d lifecycle marker check failed"
 fi
 
+if node - <<'NODE'
+import assert from 'node:assert/strict';
+import { analyze } from './savc-core/orchestrator/decomposer.mjs';
+
+const plan = await analyze('点击模型并语音播报一句欢迎回来', {
+  agentsDir: 'savc-core/agents',
+});
+assert.equal(plan.type, 'compound');
+assert.equal(plan.execution, 'sequential');
+assert.equal(plan.tasks.length, 2);
+assert.equal(plan.tasks[0].agent, 'live2d');
+assert.equal(plan.tasks[1].agent, 'voice');
+assert.equal(Array.isArray(plan.tasks[1].dependsOn), true);
+assert.equal(plan.tasks[1].dependsOn[0], 'task-1');
+console.log('ok');
+NODE
+then
+  pass "decomposer emits live2d->voice chain for interaction+voice task"
+else
+  fail "decomposer live2d->voice chain check failed"
+fi
+
 if (cd "${REPO_ROOT}/openclaw" && pnpm exec vitest run extensions/savc-orchestrator/src/*.test.ts) >/tmp/phase6_plugin_vitest.log 2>&1; then
   pass "plugin vitest suite passed"
 else

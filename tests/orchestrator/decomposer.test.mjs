@@ -49,6 +49,16 @@ async function main() {
   assert.equal(visionTechCase.tasks[1].agent, 'technical');
   assert.equal(visionTechCase.tasks[1].dependsOn[0], 'task-1');
 
+  const live2dVoiceCase = await analyze('点击模型并语音播报一句欢迎回来', {
+    agentsDir: 'savc-core/agents',
+  });
+  assert.equal(live2dVoiceCase.type, 'compound');
+  assert.equal(live2dVoiceCase.execution, 'sequential');
+  assert.equal(live2dVoiceCase.tasks.length, 2);
+  assert.equal(live2dVoiceCase.tasks[0].agent, 'live2d');
+  assert.equal(live2dVoiceCase.tasks[1].agent, 'voice');
+  assert.equal(live2dVoiceCase.tasks[1].dependsOn[0], 'task-1');
+
   console.log('[PASS] orchestrator decomposer');
 }
 
