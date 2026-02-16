@@ -1,0 +1,10 @@
+{
+  "name": "yuanyuan-lite",
+  "version": "phase6-ui-v1",
+  "palette": {
+    "accent": "#14b8a6",
+    "skin": "#f8d7c8",
+    "hair": "#1f2a44"
+  },
+  "notes": "Lightweight manifest for SAVC Phase 6 UI runtime fallback renderer."
+}

@@ -4,6 +4,7 @@ import {
   type InvokeLive2DInteractionResult,
   type Live2DInteractionType,
 } from "../live2d-bridge.js";
+import { Live2DRuntime, type Live2DRuntimeStatus } from "../live2d-runtime.js";
 import { gateway, type AgentNode, type RoutingRule, type DispatchRecord } from "../mock/index.js";
 
 let _agents: AgentNode[] = [];
@@ -52,6 +53,18 @@ let _bridgeStatus: BridgeStatus = "idle";
 let _bridgeMessage = "等待交互事件";
 let _bridgeLastResult: InvokeLive2DInteractionResult | null = null;
 let _bridgeLogs: InteractionLogItem[] = [];
+
+let _runtime: Live2DRuntime | null = null;
+let _runtimeBootstrapping = false;
+let _runtimeStatus: Live2DRuntimeStatus = {
+  ready: false,
+  mode: "fallback",
+  modelName: "yuanyuan-lite-fallback",
+  source: "idle",
+  emotion: "neutral",
+  motion: "idle",
+  updatedAt: new Date().toISOString(),
+};
 
 let _activePointerId: number | null = null;
 let _pointerStartX = 0;
@@ -127,6 +140,8 @@ async function triggerInteraction(
     : `${INTERACTION_LABELS[interactionType]} 触发失败，已回退 mock`;
   _bridgeMessage = summary;
 
+  _runtime?.applySignal(result.signal);
+
   pushInteractionLog({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     time: nowLabel(),
@@ -138,6 +153,36 @@ async function triggerInteraction(
     message: result.error || summary,
   });
   requestUpdate();
+}
+
+function ensureRuntime(requestUpdate: () => void) {
+  if (_runtime && !_runtime.isDestroyed()) {
+    return;
+  }
+  if (_runtimeBootstrapping) return;
+  _runtimeBootstrapping = true;
+
+  queueMicrotask(() => {
+    const canvas = document.getElementById("savc-live2d-stage");
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      _runtimeBootstrapping = false;
+      return;
+    }
+    try {
+      _runtime = new Live2DRuntime(canvas, {
+        onStatus: (status) => {
+          _runtimeStatus = status;
+          requestUpdate();
+        },
+      });
+      _runtimeStatus = _runtime.getStatus();
+    } catch (error) {
+      _bridgeStatus = "error";
+      _bridgeMessage = `Live2D runtime 初始化失败: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    _runtimeBootstrapping = false;
+    requestUpdate();
+  });
 }
 
 function onPointerDown(event: PointerEvent, requestUpdate: () => void) {
@@ -358,6 +403,41 @@ function renderLive2DBridge(requestUpdate: () => void): TemplateResult {
   `;
 }
 
+function renderLive2DRuntimeCard(): TemplateResult {
+  const runtimeUpdated = _runtimeStatus.updatedAt
+    ? new Date(_runtimeStatus.updatedAt).toLocaleTimeString("zh-CN", { hour12: false })
+    : "-";
+  return html`
+    <div class="card savc-orchestrator" data-accent style="animation: rise 0.32s var(--ease-out) 0.02s backwards;">
+      <div class="card-title">Live2D Runtime（M-F1）</div>
+      <div class="card-sub">
+        已接入前端运行时渲染：加载模型清单（manifest）并驱动待机动画。交互信号会直接驱动画布形象状态。
+      </div>
+      <div style="margin-top: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elevated);">
+        <canvas id="savc-live2d-stage" style="display: block; width: 100%; height: 270px;"></canvas>
+      </div>
+      <div class="table" style="margin-top: 12px;">
+        <div class="table-head" style="grid-template-columns: 0.9fr 0.8fr 1fr 0.8fr 0.8fr 0.9fr;">
+          <span>ready</span>
+          <span>mode</span>
+          <span>model</span>
+          <span>source</span>
+          <span>emotion</span>
+          <span>updated</span>
+        </div>
+        <div class="table-row" style="grid-template-columns: 0.9fr 0.8fr 1fr 0.8fr 0.8fr 0.9fr;">
+          <span class="mono">${_runtimeStatus.ready ? "yes" : "no"}</span>
+          <span class="mono">${_runtimeStatus.mode}</span>
+          <span class="mono">${_runtimeStatus.modelName}</span>
+          <span class="mono">${_runtimeStatus.source}</span>
+          <span class="mono">${_runtimeStatus.emotion}</span>
+          <span class="mono">${runtimeUpdated}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderRules(): TemplateResult {
   return html`
     <div class="card" style="animation: rise 0.35s var(--ease-out) 0.1s backwards">
@@ -429,7 +509,10 @@ export function renderOrchestrator(requestUpdate: () => void): TemplateResult {
     `;
   }
 
+  ensureRuntime(requestUpdate);
+
   return html`
+    ${renderLive2DRuntimeCard()}
     ${renderTopology()}
     ${renderLive2DBridge(requestUpdate)}
     ${renderRules()}
