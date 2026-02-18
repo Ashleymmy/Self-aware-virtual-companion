@@ -1,4 +1,6 @@
 import type { GatewayRequestHandlers } from "./types.js";
+import { readFile, stat } from "node:fs/promises";
+import path from "node:path";
 import { loadConfig } from "../../config/config.js";
 import {
   OPENAI_TTS_MODELS,
@@ -17,6 +19,31 @@ import {
 } from "../../tts/tts.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
+
+const DEFAULT_MAX_INLINE_AUDIO_BYTES = 2 * 1024 * 1024; // 2 MiB
+
+function asPositiveNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function audioMimeTypeByExt(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".mp3") return "audio/mpeg";
+  if (ext === ".opus") return "audio/ogg";
+  if (ext === ".wav") return "audio/wav";
+  if (ext === ".m4a") return "audio/mp4";
+  if (ext === ".ogg") return "audio/ogg";
+  return "application/octet-stream";
+}
 
 export const ttsHandlers: GatewayRequestHandlers = {
   "tts.status": async ({ respond }) => {
@@ -76,11 +103,44 @@ export const ttsHandlers: GatewayRequestHandlers = {
       );
       return;
     }
+    const inline = params.inline === true;
+    const maxInlineBytes =
+      asPositiveNumber(params.maxInlineBytes) ?? DEFAULT_MAX_INLINE_AUDIO_BYTES;
     try {
       const cfg = loadConfig();
       const channel = typeof params.channel === "string" ? params.channel.trim() : undefined;
       const result = await textToSpeech({ text, cfg, channel });
       if (result.success && result.audioPath) {
+        if (inline) {
+          const filePath = result.audioPath;
+          const fileStat = await stat(filePath);
+          if (fileStat.size > maxInlineBytes) {
+            respond(
+              false,
+              undefined,
+              errorShape(
+                ErrorCodes.INVALID_REQUEST,
+                `inline audio too large (${fileStat.size} bytes > ${maxInlineBytes} bytes)`,
+              ),
+            );
+            return;
+          }
+
+          const audioBytes = await readFile(filePath);
+          respond(true, {
+            audioPath: result.audioPath,
+            provider: result.provider,
+            outputFormat: result.outputFormat,
+            voiceCompatible: result.voiceCompatible,
+            audioInline: {
+              encoding: "base64",
+              mimeType: audioMimeTypeByExt(filePath),
+              bytes: fileStat.size,
+              data: audioBytes.toString("base64"),
+            },
+          });
+          return;
+        }
         respond(true, {
           audioPath: result.audioPath,
           provider: result.provider,
