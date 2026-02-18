@@ -1,19 +1,30 @@
 import { html, type TemplateResult } from "lit";
-import { gateway, type DashboardStats, type YuanyuanStatus, type RecentActivity } from "../mock/index.js";
+import { gateway, type DashboardStats, type YuanyuanStatus, type RecentActivity } from "../data/index.js";
 
 let _stats: DashboardStats | null = null;
 let _yuanyuan: YuanyuanStatus | null = null;
 let _activities: RecentActivity[] = [];
 let _loaded = false;
+let _loading = false;
+let _lastLoadedAt = "";
 
-async function ensureData() {
-  if (_loaded) return;
-  [_stats, _yuanyuan, _activities] = await Promise.all([
-    gateway.getDashboardStats(),
-    gateway.getYuanyuanStatus(),
-    gateway.getRecentActivities(),
-  ]);
-  _loaded = true;
+async function loadData(force = false) {
+  if (_loading) return;
+  _loading = true;
+  try {
+    if (force) {
+      gateway.invalidateCache();
+    }
+    [_stats, _yuanyuan, _activities] = await Promise.all([
+      gateway.getDashboardStats(),
+      gateway.getYuanyuanStatus(),
+      gateway.getRecentActivities(),
+    ]);
+    _loaded = true;
+    _lastLoadedAt = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  } finally {
+    _loading = false;
+  }
 }
 
 function activityIcon(type: RecentActivity["type"]): string {
@@ -27,7 +38,9 @@ function activityIcon(type: RecentActivity["type"]): string {
 
 export function renderDashboard(requestUpdate: () => void): TemplateResult {
   if (!_loaded) {
-    ensureData().then(() => requestUpdate());
+    if (!_loading) {
+      void loadData().then(() => requestUpdate());
+    }
     return html`
       <div class="config-loading" style="padding: 60px;">
         <div class="config-loading__spinner"></div>
@@ -40,6 +53,25 @@ export function renderDashboard(requestUpdate: () => void): TemplateResult {
   const yy = _yuanyuan!;
 
   return html`
+    <div class="card" style="margin-bottom: 14px; animation: rise 0.3s var(--ease-out) backwards;">
+      <div style="display: flex; gap: 12px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <div>
+          <div class="card-title">实时数据</div>
+          <div class="card-sub">上次刷新 ${_lastLoadedAt || "--"} · 网关优先，失败自动回退样例</div>
+        </div>
+        <button
+          class="btn btn--sm"
+          ?disabled=${_loading}
+          @click=${() => {
+            void loadData(true).then(() => requestUpdate());
+            requestUpdate();
+          }}
+        >
+          ${_loading ? "刷新中..." : "刷新"}
+        </button>
+      </div>
+    </div>
+
     <!-- 统计卡片 -->
     <div class="stat-grid">
       <div class="stat card-lift stagger-1" style="animation: rise 0.35s var(--ease-out) backwards">

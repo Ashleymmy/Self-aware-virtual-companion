@@ -2,6 +2,7 @@ import { html, type TemplateResult } from "lit";
 import { publishLive2DSignal, subscribeLive2DChannel, type Live2DChannelEvent } from "../live2d-channel.js";
 import { invokeLive2DSignal, invokeLive2DVoice, type InvokeLive2DInteractionResult } from "../live2d-bridge.js";
 import { Live2DRuntime, type Live2DRuntimeStatus } from "../live2d-runtime.js";
+import { gateway, type GatewayTtsInlineAudio, type GatewayTtsStatus, type TtsProviderId } from "../data/index.js";
 
 type ChatRole = "user" | "assistant";
 
@@ -19,6 +20,13 @@ let _sending = false;
 let _speaking = false;
 let _speakEnabled = true;
 let _statusMessage = "等待消息";
+let _ttsPlaybackMode: "gateway" | "browser" = "gateway";
+let _ttsStatus: GatewayTtsStatus | null = null;
+let _ttsStatusLoading = false;
+let _ttsStatusError = "";
+let _ttsProviderDraft: TtsProviderId = "openai";
+let _ttsProviderApplying = false;
+let _ttsCheckedAt = "";
 
 let _runtime: Live2DRuntime | null = null;
 let _runtimeBootstrapping = false;
@@ -46,6 +54,22 @@ function wait(ms: number) {
 
 function nowLabel(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
+}
+
+function toErrorText(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function decodeBase64Audio(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 function createMessage(role: ChatRole, text: string): ChatMessage {
@@ -98,6 +122,45 @@ function buildAssistantReply(input: string): { text: string; emotion: string } {
   };
 }
 
+async function refreshTtsStatus(requestUpdate: () => void): Promise<void> {
+  if (_ttsStatusLoading) return;
+  _ttsStatusLoading = true;
+  try {
+    const status = await gateway.getTtsStatus();
+    _ttsStatus = status;
+    _ttsProviderDraft = status.provider;
+    _ttsStatusError = "";
+    _ttsCheckedAt = nowLabel();
+  } catch (error) {
+    _ttsStatusError = toErrorText(error);
+  } finally {
+    _ttsStatusLoading = false;
+    requestUpdate();
+  }
+}
+
+function ensureTtsStatus(requestUpdate: () => void) {
+  if (_ttsStatus || _ttsStatusLoading) return;
+  void refreshTtsStatus(requestUpdate);
+}
+
+async function applyTtsProvider(requestUpdate: () => void): Promise<void> {
+  if (_ttsProviderApplying) return;
+  _ttsProviderApplying = true;
+  _statusMessage = `切换 TTS provider 到 ${_ttsProviderDraft}...`;
+  requestUpdate();
+  try {
+    await gateway.setTtsProvider(_ttsProviderDraft);
+    await refreshTtsStatus(requestUpdate);
+    _statusMessage = `TTS provider 已切换为 ${_ttsProviderDraft}`;
+  } catch (error) {
+    _statusMessage = `切换 TTS provider 失败：${toErrorText(error)}`;
+  } finally {
+    _ttsProviderApplying = false;
+    requestUpdate();
+  }
+}
+
 function applyVoiceStyle(utterance: SpeechSynthesisUtterance, emotion: string) {
   utterance.lang = "zh-CN";
   utterance.rate = emotion === "focused" ? 1.02 : emotion === "happy" ? 1.06 : 0.98;
@@ -138,6 +201,52 @@ async function speakReply(
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   });
+}
+
+async function playGatewayAudio(audio: GatewayTtsInlineAudio, requestUpdate: () => void): Promise<void> {
+  if (typeof window === "undefined" || typeof Audio === "undefined") {
+    throw new Error("当前环境不支持音频播放");
+  }
+  let blob: Blob;
+  if (audio.base64) {
+    const bytes = decodeBase64Audio(audio.base64);
+    const normalized = new Uint8Array(bytes.byteLength);
+    normalized.set(bytes);
+    blob = new Blob([normalized.buffer], { type: audio.mimeType || "audio/mpeg" });
+  } else if (audio.audioPath) {
+    blob = await gateway.loadTtsAudioBlob(audio.audioPath);
+  } else {
+    throw new Error("missing audio payload");
+  }
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const player = new Audio();
+      player.preload = "auto";
+      player.src = objectUrl;
+      _speaking = true;
+      _statusMessage = `网关 TTS 播放中（${audio.provider}）...`;
+      requestUpdate();
+
+      player.onended = () => {
+        _speaking = false;
+        _statusMessage = `网关 TTS 播放完成（${audio.provider}）`;
+        requestUpdate();
+        resolve();
+      };
+      player.onerror = () => {
+        _speaking = false;
+        reject(new Error("audio playback failed"));
+      };
+
+      void player.play().catch((error) => {
+        _speaking = false;
+        reject(error);
+      });
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function sourceLabel(source: Live2DChannelEvent["source"]): string {
@@ -229,27 +338,60 @@ async function sendMessage(requestUpdate: () => void) {
   _statusMessage = "处理中...";
   requestUpdate();
 
-  await wait(260);
+  let assistantText = "";
+  let assistantEmotion = "comfort";
+  try {
+    _statusMessage = "等待网关回复...";
+    requestUpdate();
 
-  const assistant = buildAssistantReply(message);
-  _messages = [..._messages, createMessage("assistant", assistant.text)];
+    assistantText = await gateway.sendChatMessage(message);
+    assistantEmotion = inferEmotion(assistantText);
+    _statusMessage = "网关回复已到达";
+  } catch (error) {
+    const fallback = buildAssistantReply(message);
+    assistantText = fallback.text;
+    assistantEmotion = fallback.emotion;
+    const details = error instanceof Error ? error.message : String(error);
+    _statusMessage = `网关回复失败，已切换本地回退：${details}`;
+  }
+
+  _messages = [..._messages, createMessage("assistant", assistantText)];
   requestUpdate();
 
   const textSignal = await invokeLive2DSignal({
     source: "text",
-    message: assistant.text,
-    emotion: assistant.emotion,
+    message: assistantText,
+    emotion: assistantEmotion,
   });
   publishResult("text", textSignal, "assistant-text", requestUpdate);
 
   if (_speakEnabled) {
     const voiceSignal = await invokeLive2DVoice({
-      message: assistant.text,
-      emotion: assistant.emotion,
+      message: assistantText,
+      emotion: assistantEmotion,
       energy: 0.95,
     });
     publishResult("voice", voiceSignal, "assistant-voice", requestUpdate);
-    await speakReply(assistant.text, assistant.emotion, requestUpdate);
+
+    let spokenByGateway = false;
+    if (_ttsPlaybackMode === "gateway") {
+      try {
+        _statusMessage = "网关 TTS 合成中...";
+        requestUpdate();
+        const ttsAudio = await gateway.convertTtsInlineAudio(assistantText, {
+          channel: "webchat",
+        });
+        await playGatewayAudio(ttsAudio, requestUpdate);
+        spokenByGateway = true;
+      } catch (error) {
+        _statusMessage = `网关 TTS 失败，回退浏览器播报：${toErrorText(error)}`;
+        requestUpdate();
+      }
+    }
+
+    if (!spokenByGateway) {
+      await speakReply(assistantText, assistantEmotion, requestUpdate);
+    }
   }
 
   _sending = false;
@@ -353,12 +495,13 @@ export function renderChat(requestUpdate: () => void): TemplateResult {
   ensureBootstrap();
   ensureChannelSubscription(requestUpdate);
   ensureRuntime(requestUpdate);
+  ensureTtsStatus(requestUpdate);
 
   return html`
     <div class="grid grid-cols-2">
       <div class="card savc-companion" data-accent>
         <div class="card-title">对话体验（M-F5）</div>
-        <div class="card-sub">文本回复可同步触发 Live2D text/voice 信号，并接入浏览器语音播报。</div>
+        <div class="card-sub">文本回复会同步触发 Live2D text/voice 信号，并优先尝试网关 TTS 播报。</div>
 
         ${renderMessages()}
 
@@ -392,11 +535,70 @@ export function renderChat(requestUpdate: () => void): TemplateResult {
               />
               启用语音播报
             </label>
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted);">
+              播报链路
+              <select
+                .value=${_ttsPlaybackMode}
+                @change=${(event: Event) => {
+                  _ttsPlaybackMode = (event.target as HTMLSelectElement).value === "browser" ? "browser" : "gateway";
+                  requestUpdate();
+                }}
+              >
+                <option value="gateway">网关 TTS</option>
+                <option value="browser">浏览器本地</option>
+              </select>
+            </label>
+            ${_ttsPlaybackMode === "gateway"
+              ? html`
+                  <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted);">
+                    Provider
+                    <select
+                      .value=${_ttsProviderDraft}
+                      @change=${(event: Event) => {
+                        const value = (event.target as HTMLSelectElement).value;
+                        _ttsProviderDraft =
+                          value === "elevenlabs" || value === "edge" ? value : "openai";
+                        requestUpdate();
+                      }}
+                    >
+                      <option value="openai">openai</option>
+                      <option value="elevenlabs">elevenlabs</option>
+                      <option value="edge">edge</option>
+                    </select>
+                  </label>
+                  <button
+                    class="btn btn--sm"
+                    ?disabled=${_ttsProviderApplying || _ttsStatusLoading}
+                    @click=${() => void applyTtsProvider(requestUpdate)}
+                  >
+                    ${_ttsProviderApplying ? "切换中..." : "应用 Provider"}
+                  </button>
+                  <button
+                    class="btn btn--sm"
+                    ?disabled=${_ttsStatusLoading}
+                    @click=${() => void refreshTtsStatus(requestUpdate)}
+                  >
+                    ${_ttsStatusLoading ? "刷新中..." : "刷新 TTS"}
+                  </button>
+                `
+              : ""}
             <button class="btn primary" ?disabled=${_sending || !_draft.trim()} @click=${() => void sendMessage(requestUpdate)}>
               ${_sending ? "处理中..." : "发送"}
             </button>
           </div>
           <div style="font-size: 12px; color: var(--muted);">${_statusMessage}</div>
+          ${_ttsPlaybackMode === "gateway"
+            ? html`
+                <div style="font-size: 12px; color: var(--muted);">
+                  TTS 状态:
+                  ${_ttsStatus
+                    ? `enabled=${_ttsStatus.enabled ? "yes" : "no"} · auto=${_ttsStatus.auto} · active=${_ttsStatus.provider} · fallback=${_ttsStatus.fallbackProviders.join(" -> ") || "-"} · checked=${_ttsCheckedAt || "--"}`
+                    : _ttsStatusError
+                      ? `读取失败：${_ttsStatusError}`
+                      : "读取中..."}
+                </div>
+              `
+            : html`<div style="font-size: 12px; color: var(--muted);">当前使用浏览器本地播报，不经过网关 TTS。</div>`}
         </div>
       </div>
 

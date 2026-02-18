@@ -13,12 +13,14 @@ import {
   type Live2DChannelSource,
 } from "../live2d-channel.js";
 import { Live2DRuntime, type Live2DRuntimeStatus } from "../live2d-runtime.js";
-import { gateway, type AgentNode, type RoutingRule, type DispatchRecord } from "../mock/index.js";
+import { gateway, type AgentNode, type RoutingRule, type DispatchRecord } from "../data/index.js";
 
 let _agents: AgentNode[] = [];
 let _rules: RoutingRule[] = [];
 let _dispatches: DispatchRecord[] = [];
 let _loaded = false;
+let _loading = false;
+let _lastLoadedAt = "";
 
 type BridgeStatus = "idle" | "sending" | "ok" | "error";
 
@@ -80,13 +82,23 @@ let _lastTapAt = 0;
 let _pendingTapTimer: ReturnType<typeof setTimeout> | undefined;
 let _lastHoverAt = 0;
 
-async function loadData() {
-  [_agents, _rules, _dispatches] = await Promise.all([
-    gateway.getAgents(),
-    gateway.getRoutingRules(),
-    gateway.getRecentDispatches(),
-  ]);
-  _loaded = true;
+async function loadData(force = false) {
+  if (_loading) return;
+  _loading = true;
+  try {
+    if (force) {
+      gateway.invalidateCache();
+    }
+    [_agents, _rules, _dispatches] = await Promise.all([
+      gateway.getAgents(),
+      gateway.getRoutingRules(),
+      gateway.getRecentDispatches(),
+    ]);
+    _loaded = true;
+    _lastLoadedAt = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  } finally {
+    _loading = false;
+  }
 }
 
 function nowLabel(): string {
@@ -596,7 +608,9 @@ function renderDispatches(): TemplateResult {
 
 export function renderOrchestrator(requestUpdate: () => void): TemplateResult {
   if (!_loaded) {
-    loadData().then(() => requestUpdate());
+    if (!_loading) {
+      void loadData().then(() => requestUpdate());
+    }
     return html`
       <div class="config-loading" style="padding: 60px;">
         <div class="config-loading__spinner"></div>
@@ -609,6 +623,25 @@ export function renderOrchestrator(requestUpdate: () => void): TemplateResult {
   ensureRuntime(requestUpdate);
 
   return html`
+    <div class="card" style="margin-bottom: 14px; animation: rise 0.28s var(--ease-out) backwards;">
+      <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+        <div>
+          <div class="card-title">编排数据</div>
+          <div class="card-sub">上次刷新 ${_lastLoadedAt || "--"} · 网关优先，失败自动回退样例</div>
+        </div>
+        <button
+          class="btn btn--sm"
+          ?disabled=${_loading}
+          @click=${() => {
+            void loadData(true).then(() => requestUpdate());
+            requestUpdate();
+          }}
+        >
+          ${_loading ? "刷新中..." : "刷新"}
+        </button>
+      </div>
+    </div>
+
     ${renderLive2DRuntimeCard()}
     ${renderTopology()}
     ${renderLive2DBridge(requestUpdate)}

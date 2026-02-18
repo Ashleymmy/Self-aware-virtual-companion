@@ -11,7 +11,7 @@ export interface AppViewState {
   themeMode: ThemeMode;
   resolvedTheme: ResolvedTheme;
 
-  // 连接状态 (mock)
+  // 连接状态
   connected: boolean;
   uptime: string;
 
@@ -25,8 +25,8 @@ export function defaultViewState(): AppViewState {
     navCollapsed: false,
     themeMode: "dark",
     resolvedTheme: "dark",
-    connected: true,
-    uptime: "0h 0m",
+    connected: false,
+    uptime: "--",
     loading: true,
   };
 }

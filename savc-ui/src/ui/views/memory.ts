@@ -1,13 +1,15 @@
 import { html, type TemplateResult } from "lit";
-import { gateway, type MemoryItem } from "../mock/index.js";
+import { gateway, type MemoryItem } from "../data/index.js";
 import { icons } from "../icons.js";
 
 let _memories: MemoryItem[] = [];
 let _filtered: MemoryItem[] = [];
 let _loaded = false;
+let _loading = false;
 let _searchQuery = "";
 let _activeCategory = "all";
 let _expandedIds = new Set<string>();
+let _lastLoadedAt = "";
 
 const CATEGORIES = [
   { key: "all", label: "全部" },
@@ -18,10 +20,20 @@ const CATEGORIES = [
   { key: "preference", label: "偏好" },
 ];
 
-async function loadData() {
-  _memories = await gateway.getMemories();
-  applyFilter();
-  _loaded = true;
+async function loadData(force = false) {
+  if (_loading) return;
+  _loading = true;
+  try {
+    if (force) {
+      gateway.invalidateCache();
+    }
+    _memories = await gateway.getMemories();
+    applyFilter();
+    _loaded = true;
+    _lastLoadedAt = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  } finally {
+    _loading = false;
+  }
 }
 
 function applyFilter() {
@@ -46,7 +58,9 @@ function categoryLabel(cat: string): string {
 
 export function renderMemory(requestUpdate: () => void): TemplateResult {
   if (!_loaded) {
-    loadData().then(() => requestUpdate());
+    if (!_loading) {
+      void loadData().then(() => requestUpdate());
+    }
     return html`
       <div class="config-loading" style="padding: 60px;">
         <div class="config-loading__spinner"></div>
@@ -88,9 +102,19 @@ export function renderMemory(requestUpdate: () => void): TemplateResult {
             `,
           )}
         </div>
+        <button
+          class="btn btn--sm"
+          ?disabled=${_loading}
+          @click=${() => {
+            void loadData(true).then(() => requestUpdate());
+            requestUpdate();
+          }}
+        >
+          ${_loading ? "刷新中..." : "刷新"}
+        </button>
       </div>
       <div style="margin-top: 10px; font-size: 12px; color: var(--muted);">
-        共 ${_memories.length} 条记忆，当前显示 ${_filtered.length} 条
+        共 ${_memories.length} 条记忆，当前显示 ${_filtered.length} 条 · 上次刷新 ${_lastLoadedAt || "--"}
       </div>
     </div>
 

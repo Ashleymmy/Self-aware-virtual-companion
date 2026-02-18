@@ -1,5 +1,5 @@
 import { html, type TemplateResult } from "lit";
-import { gateway, type PersonaTrait, type VoiceVariant, type ValueItem } from "../mock/index.js";
+import { gateway, type PersonaTrait, type VoiceVariant, type ValueItem } from "../data/index.js";
 
 let _traits: PersonaTrait[] = [];
 let _voices: VoiceVariant[] = [];
@@ -7,17 +7,29 @@ let _values: ValueItem[] = [];
 let _verbalTics: string[] = [];
 let _soulDoc = "";
 let _loaded = false;
+let _loading = false;
 let _activeSubTab: "soul" | "voice" | "values" | "preview" = "soul";
+let _lastLoadedAt = "";
 
-async function loadData() {
-  [_traits, _voices, _values, _verbalTics, _soulDoc] = await Promise.all([
-    gateway.getPersonaTraits(),
-    gateway.getVoiceVariants(),
-    gateway.getCoreValues(),
-    gateway.getVerbalTics(),
-    gateway.getSoulDoc(),
-  ]);
-  _loaded = true;
+async function loadData(force = false) {
+  if (_loading) return;
+  _loading = true;
+  try {
+    if (force) {
+      gateway.invalidateCache();
+    }
+    [_traits, _voices, _values, _verbalTics, _soulDoc] = await Promise.all([
+      gateway.getPersonaTraits(),
+      gateway.getVoiceVariants(),
+      gateway.getCoreValues(),
+      gateway.getVerbalTics(),
+      gateway.getSoulDoc(),
+    ]);
+    _loaded = true;
+    _lastLoadedAt = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  } finally {
+    _loading = false;
+  }
 }
 
 function renderSubTabs(requestUpdate: () => void): TemplateResult {
@@ -156,7 +168,9 @@ Bug 是路上的小石子，
 
 export function renderPersona(requestUpdate: () => void): TemplateResult {
   if (!_loaded) {
-    loadData().then(() => requestUpdate());
+    if (!_loading) {
+      void loadData().then(() => requestUpdate());
+    }
     return html`
       <div class="config-loading" style="padding: 60px;">
         <div class="config-loading__spinner"></div>
@@ -166,6 +180,25 @@ export function renderPersona(requestUpdate: () => void): TemplateResult {
   }
 
   return html`
+    <div class="card" style="margin-bottom: 14px; animation: rise 0.3s var(--ease-out) backwards;">
+      <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+        <div>
+          <div class="card-title">人格配置数据</div>
+          <div class="card-sub">上次刷新 ${_lastLoadedAt || "--"} · 网关优先，失败自动回退样例</div>
+        </div>
+        <button
+          class="btn btn--sm"
+          ?disabled=${_loading}
+          @click=${() => {
+            void loadData(true).then(() => requestUpdate());
+            requestUpdate();
+          }}
+        >
+          ${_loading ? "刷新中..." : "刷新"}
+        </button>
+      </div>
+    </div>
+
     ${renderSubTabs(requestUpdate)}
     ${_activeSubTab === "soul" ? renderSoulTab() : ""}
     ${_activeSubTab === "voice" ? renderVoiceTab() : ""}
