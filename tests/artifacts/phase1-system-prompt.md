@@ -1,6 +1,6 @@
 # SAVC Phase 1 System Prompt (Assembled)
 
-> generated_at: 2026-02-10 09:23:46 UTC
+> generated_at: 2026-02-17 02:36:18 UTC
 
 ## 1) 人格定义（PERSONA）
 
@@ -227,6 +227,6 @@ last_updated: "2026-02-06"
 
 ## 5) 当前时间与环境信息
 
-- current_time_utc: 2026-02-10 09:23:46 UTC
+- current_time_utc: 2026-02-17 02:36:18 UTC
 - workspace: /home/min/SAVC/Self-aware-virtual-companion/savc-core
 - language_preference: zh-CN
