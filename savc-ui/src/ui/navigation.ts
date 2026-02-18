@@ -6,7 +6,7 @@ export const TAB_GROUPS = [
   { label: "navGroups.memory", tabs: ["memory"] },
   { label: "navGroups.persona", tabs: ["persona", "orchestrator"] },
   { label: "navGroups.control", tabs: ["channels", "sessions", "instances", "cron"] },
-  { label: "navGroups.system", tabs: ["agents", "skills", "nodes", "config", "logs"] },
+  { label: "navGroups.system", tabs: ["agents", "skills", "nodes", "config", "logs", "progressHub"] },
 ] as const;
 
 export type Tab =
@@ -23,7 +23,8 @@ export type Tab =
   | "skills"
   | "nodes"
   | "config"
-  | "logs";
+  | "logs"
+  | "progressHub";
 
 export function iconForTab(tab: Tab): IconName {
   switch (tab) {
@@ -55,6 +56,8 @@ export function iconForTab(tab: Tab): IconName {
       return "settings";
     case "logs":
       return "scrollText";
+    case "progressHub":
+      return "activity";
     default:
       return "folder";
   }
@@ -73,5 +76,5 @@ export const ALL_TABS: Tab[] = [
   "memory",
   "persona", "orchestrator",
   "channels", "sessions", "instances", "cron",
-  "agents", "skills", "nodes", "config", "logs",
+  "agents", "skills", "nodes", "config", "logs", "progressHub",
 ];

@@ -79,15 +79,19 @@ function renderNav(
             </button>
             <div class="nav-group__items">
               ${group.tabs.map(
-                (tab) => html`
+                (tab) => {
+                  const isExternal = tab === "progressHub";
+                  return html`
                   <button
                     class="nav-item ${state.activeTab === tab ? "active" : ""}"
                     @click=${() => onTabClick(tab as Tab)}
                   >
                     ${renderIcon(iconForTab(tab as Tab))}
                     <span class="nav-item__text">${titleForTab(tab as Tab)}</span>
+                    ${isExternal ? html`<span style="margin-left: auto; opacity: 0.65; font-size: 11px;">↗</span>` : nothing}
                   </button>
-                `,
+                `;
+                },
               )}
             </div>
           </div>

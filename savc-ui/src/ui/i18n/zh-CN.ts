@@ -32,6 +32,7 @@ export const zhCN = {
     logs: "运行日志",
     cron: "定时任务",
     instances: "实例监控",
+    progressHub: "推进看板",
   },
 
   // Tab 副标题
@@ -51,6 +52,7 @@ export const zhCN = {
     logs: "实时查看网关文件日志",
     cron: "管理定时唤醒和周期性任务",
     instances: "监控已连接客户端和节点",
+    progressHub: "独立项目推进页面，聚合日志/计划/甘特图",
   },
 
   // 仪表盘

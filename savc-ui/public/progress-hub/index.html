@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SAVC 项目推进看板</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="hub-atmosphere" aria-hidden="true"></div>
+    <main class="hub-shell">
+      <header class="hub-header card">
+        <div>
+          <p class="hub-kicker">Project Intelligence Console</p>
+          <h1>SAVC 项目推进看板</h1>
+          <p class="hub-sub">实时整合工作日志、项目文档与提交轨迹，辅助开发决策。</p>
+        </div>
+        <div class="hub-meta">
+          <div class="meta-pill" id="connectionPill">连接中...</div>
+          <div class="meta-item">最后更新：<span id="lastUpdated">--</span></div>
+          <button class="ghost-btn" id="refreshBtn">立即刷新</button>
+        </div>
+      </header>
+
+      <section class="global-strip card" id="globalStrip"></section>
+
+      <nav class="hub-tabs card" aria-label="推进看板分区">
+        <button class="hub-tab active" data-tab="overview">概览</button>
+        <button class="hub-tab" data-tab="gantt">甘特图</button>
+        <button class="hub-tab" data-tab="logs">日志</button>
+        <button class="hub-tab" data-tab="plan">计划</button>
+      </nav>
+
+      <section class="hub-view active" id="view-overview">
+        <div class="overview-grid">
+          <article class="card brain-card">
+            <div class="section-head">
+              <h2>模块神经元拓扑</h2>
+              <p>节点代表模块，连线代表依赖关系。点击节点查看详细信息。</p>
+            </div>
+            <canvas id="brainCanvas" width="1100" height="560"></canvas>
+          </article>
+
+          <aside class="card module-drawer" id="moduleDrawer">
+            <div class="drawer-head">
+              <h3 id="drawerTitle">选择模块</h3>
+              <span id="drawerBadge" class="status-badge">--</span>
+            </div>
+            <div class="drawer-tabs" id="drawerTabs">
+              <button class="drawer-tab active" data-detail-tab="function">功能说明</button>
+              <button class="drawer-tab" data-detail-tab="progress">开发进度</button>
+              <button class="drawer-tab" data-detail-tab="deps">依赖关系</button>
+              <button class="drawer-tab" data-detail-tab="risk">风险与下一步</button>
+            </div>
+            <div class="drawer-content" id="drawerContent">
+              <p class="muted">点击左侧任意神经元查看模块详情。</p>
+            </div>
+          </aside>
+        </div>
+
+        <div class="module-cards" id="moduleCards"></div>
+      </section>
+
+      <section class="hub-view" id="view-gantt">
+        <article class="card">
+          <div class="section-head split">
+            <div>
+              <h2>项目周期与效率</h2>
+              <p>时间窗口：近 90 天至未来 30 天，进度与节奏一览。</p>
+            </div>
+            <label class="filter-inline">
+              状态筛选
+              <select id="ganttFilter">
+                <option value="all">全部</option>
+                <option value="in_progress">进行中</option>
+                <option value="blocked">阻塞</option>
+                <option value="done">已完成</option>
+              </select>
+            </label>
+          </div>
+          <div id="ganttWrap" class="gantt-wrap"></div>
+        </article>
+      </section>
+
+      <section class="hub-view" id="view-logs">
+        <div class="logs-grid">
+          <article class="card">
+            <div class="section-head split">
+              <div>
+                <h2>工作日志时间线</h2>
+                <p>聚合 Codex / Claude / 通用 worklog，支持快速检索。</p>
+              </div>
+              <div class="log-filters">
+                <select id="logSourceFilter">
+                  <option value="all">全部来源</option>
+                  <option value="worklog">Worklog</option>
+                  <option value="codex">Codex</option>
+                  <option value="claude">Claude</option>
+                </select>
+                <input id="logDateFilter" type="date" />
+                <input id="logKeywordFilter" placeholder="关键词搜索" />
+              </div>
+            </div>
+            <div id="logsList" class="logs-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="section-head">
+              <h2>项目方案文档</h2>
+              <p>docs 下开发计划/方案文档摘要视图。</p>
+            </div>
+            <div id="planDocsList" class="docs-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="hub-view" id="view-plan">
+        <div class="plan-grid">
+          <article class="card">
+            <div class="section-head">
+              <h2>决策参考</h2>
+              <p>来自模块状态、风险与近期提交摘要。</p>
+            </div>
+            <div id="planReference" class="plan-reference"></div>
+          </article>
+
+          <article class="card">
+            <div class="section-head split">
+              <div>
+                <h2>下一步规划录入</h2>
+                <p>保存后将追加写入 <code>docs/project-plan-board.md</code>。</p>
+              </div>
+              <button class="primary-btn" id="savePlanBtn">保存计划</button>
+            </div>
+            <label class="field">
+              <span>下一步开发计划</span>
+              <textarea id="nextPlanInput" rows="8" placeholder="使用 Markdown 编写下一步开发计划"></textarea>
+            </label>
+            <label class="field">
+              <span>错误更正计划</span>
+              <textarea id="correctionPlanInput" rows="8" placeholder="记录修复与纠偏计划"></textarea>
+            </label>
+            <p class="save-hint" id="saveHint">未保存</p>
+          </article>
+
+          <article class="card full-row">
+            <div class="section-head">
+              <h2>历史版本</h2>
+              <p>按时间倒序展示计划变更记录。</p>
+            </div>
+            <div id="planHistory" class="plan-history"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <aside class="file-preview" id="filePreview" hidden>
+      <div class="file-preview__backdrop" id="filePreviewBackdrop"></div>
+      <section class="file-preview__panel card" role="dialog" aria-modal="true" aria-labelledby="filePreviewTitle">
+        <header class="file-preview__head">
+          <div>
+            <h3 id="filePreviewTitle">文件详情</h3>
+            <div class="file-preview__path" id="filePreviewPath">--</div>
+          </div>
+          <button class="ghost-btn" id="filePreviewClose" aria-label="关闭详情">关闭</button>
+        </header>
+        <div class="file-preview__body md" id="filePreviewBody">
+          <p class="muted">加载中...</p>
+        </div>
+      </section>
+    </aside>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
