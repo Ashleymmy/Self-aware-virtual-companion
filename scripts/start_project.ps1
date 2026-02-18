@@ -104,6 +104,16 @@ if (-not $ready) {
   exit 1
 }
 
+Write-Host "[INFO] Starting savc-ui service in WSL..." -ForegroundColor Yellow
+$uiStart = Invoke-RepoBash -Command "bash scripts/savc_ui_service.sh start"
+if ($uiStart.Output.Count -gt 0) {
+  $uiStart.Output | ForEach-Object { Write-Host $_ }
+}
+if ($uiStart.ExitCode -ne 0) {
+  Write-Host "[ERROR] savc-ui start failed. Exit code: $($uiStart.ExitCode)" -ForegroundColor Red
+  exit $uiStart.ExitCode
+}
+
 $status = Invoke-RepoBash -Command "bash scripts/openclaw.sh channels status --probe"
 if ($status.Output.Count -gt 0) {
   $status.Output | ForEach-Object { Write-Host $_ }
@@ -138,5 +148,10 @@ if ($DashboardUrl -and -not $NoBrowser) {
 } elseif (-not $DashboardUrl) {
   Write-Host "[WARN] Dashboard URL not found in command output." -ForegroundColor Yellow
 }
+
+$SavcUiUrl = "http://localhost:5174/"
+$ProgressHubUrl = "http://localhost:5174/progress-hub/index.html"
+Write-Host "[INFO] SAVC-UI URL: $SavcUiUrl" -ForegroundColor Cyan
+Write-Host "[INFO] Progress Hub URL: $ProgressHubUrl" -ForegroundColor Cyan
 
 Write-Host "[OK] SAVC startup complete." -ForegroundColor Green

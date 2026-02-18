@@ -72,6 +72,15 @@ if ($stop.ExitCode -ne 0) {
   exit $stop.ExitCode
 }
 
+Write-Host "[INFO] Stopping savc-ui service in WSL..." -ForegroundColor Yellow
+$uiStop = Invoke-RepoBash -Command "bash scripts/savc_ui_service.sh stop"
+if ($uiStop.Output.Count -gt 0) {
+  $uiStop.Output | ForEach-Object { Write-Host $_ }
+}
+if ($uiStop.ExitCode -ne 0) {
+  Write-Host "[WARN] savc-ui stop returned non-zero. Exit code: $($uiStop.ExitCode)" -ForegroundColor Yellow
+}
+
 if (-not $NoStatus) {
   $status = Invoke-RepoBash -Command "bash scripts/openclaw.sh gateway status"
   if ($status.Output.Count -gt 0) {

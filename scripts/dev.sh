@@ -85,6 +85,17 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 1
 fi
 
+SAVC_UI_STARTED_BY_DEV=0
+if bash "${REPO_ROOT}/scripts/savc_ui_service.sh" status >/dev/null 2>&1; then
+  echo "[INFO] savc-ui already running (:5174)"
+else
+  echo "[INFO] starting savc-ui companion service (:5174)"
+  bash "${REPO_ROOT}/scripts/savc_ui_service.sh" start
+  SAVC_UI_STARTED_BY_DEV=1
+fi
+echo "[INFO] SAVC-UI URL: http://localhost:5174/"
+echo "[INFO] Progress Hub URL: http://localhost:5174/progress-hub/index.html"
+
 # OpenClaw uses OPENCLAW_GATEWAY_PORT (docs: --port > OPENCLAW_GATEWAY_PORT > gateway.port > default 18789)
 export OPENCLAW_GATEWAY_PORT="${OPENCLAW_PORT:-18789}"
 
@@ -125,6 +136,9 @@ COMPILER_PID=$!
 
 cleanup() {
   kill "${COMPILER_PID}" 2>/dev/null || true
+  if [[ "${SAVC_UI_STARTED_BY_DEV}" -eq 1 ]]; then
+    bash "${REPO_ROOT}/scripts/savc_ui_service.sh" stop >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
