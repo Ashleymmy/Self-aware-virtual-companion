@@ -34,7 +34,7 @@
 }
 
 .card-sub {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 13px;
   margin-top: 6px;
   line-height: 1.5;

@@ -15,7 +15,7 @@ function renderTopbar(
   const themeIndex = state.themeMode === "dark" ? 0 : state.themeMode === "light" ? 1 : 2;
 
   return html`
-    <header class="topbar">
+    <header class="savc-topbar topbar">
       <div class="topbar-left">
         <button class="nav-collapse-toggle" @click=${onToggleNav} title="切换导航栏">
           <span class="nav-collapse-toggle__icon">${icons.menu}</span>
@@ -70,7 +70,7 @@ function renderNav(
   onTabClick: (tab: Tab) => void,
 ): TemplateResult {
   return html`
-    <nav class="nav ${state.navCollapsed ? "nav--collapsed" : ""}">
+    <nav class="savc-nav nav ${state.navCollapsed ? "nav--collapsed" : ""}">
       ${TAB_GROUPS.map(
         (group) => html`
           <div class="nav-group">
@@ -117,7 +117,7 @@ function renderContent(
   // Use a unique key attribute so Lit recreates the wrapper div on tab change,
   // which re-triggers the CSS entrance animation.
   return html`
-    <main class="content">
+    <main class="savc-content content">
       ${renderContentHeader(tab)}
       ${keyed(tab, html`
         <div class="view-enter">
@@ -147,10 +147,10 @@ export function renderShell(
 
   if (state.loading) {
     return html`
-      <div class="${shellClass}">
+      <div class="savc-shell ${shellClass}">
         ${renderTopbar(state, callbacks.onToggleNav, callbacks.onTheme)}
         ${renderNav(state, callbacks.onTabClick)}
-        <main class="content">
+        <main class="savc-content content">
           <div class="config-loading">
             <div class="config-loading__spinner"></div>
             <span>${t("common.loading")}</span>
@@ -161,7 +161,7 @@ export function renderShell(
   }
 
   return html`
-    <div class="${shellClass}">
+    <div class="savc-shell ${shellClass}">
       ${renderTopbar(state, callbacks.onToggleNav, callbacks.onTheme)}
       ${renderNav(state, callbacks.onTabClick)}
       ${renderContent(state.activeTab, renderView)}

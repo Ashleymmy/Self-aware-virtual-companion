@@ -10,6 +10,9 @@
   --shell-focus-duration: 200ms;
   --shell-focus-ease: var(--ease-out);
   height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   display: grid;
   grid-template-columns: var(--shell-nav-width) minmax(0, 1fr);
   grid-template-rows: var(--shell-topbar-height) 1fr;
@@ -77,6 +80,7 @@
   position: sticky;
   top: 0;
   z-index: 40;
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -91,6 +95,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .topbar .nav-collapse-toggle {
@@ -114,6 +119,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .brand-logo {
@@ -132,6 +138,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  min-width: 0;
 }
 
 .brand-title {
@@ -156,6 +163,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .topbar-status .pill {
@@ -196,10 +204,12 @@
 
 .nav {
   grid-area: nav;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px 12px;
   background: var(--bg);
+  border-right: 1px solid var(--border);
   scrollbar-width: none; /* Firefox */
   transition:
     width var(--shell-focus-duration) var(--shell-focus-ease),
@@ -420,11 +430,13 @@
 
 .content {
   grid-area: content;
+  min-width: 0;
+  width: 100%;
   padding: 12px 16px 32px;
   display: block;
   min-height: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .content > * + * {
@@ -523,7 +535,7 @@
 }
 
 .grid-cols-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .grid-cols-3 {
@@ -617,5 +629,117 @@
 
   .list-item {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ===========================================
+   Host Layout Guard (avoid external CSS collisions)
+   =========================================== */
+
+savc-app .savc-shell {
+  display: grid !important;
+  grid-template-columns: var(--shell-nav-width) minmax(0, 1fr) !important;
+  grid-template-rows: var(--shell-topbar-height) 1fr !important;
+  grid-template-areas:
+    "topbar topbar"
+    "nav content" !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+@supports (height: 100dvh) {
+  savc-app .savc-shell {
+    height: 100dvh !important;
+  }
+}
+
+savc-app .shell--nav-collapsed,
+savc-app .shell--chat-focus {
+  grid-template-columns: 0px minmax(0, 1fr) !important;
+}
+
+savc-app .savc-topbar {
+  grid-area: topbar !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 40 !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 16px !important;
+  padding: 0 20px !important;
+  height: var(--shell-topbar-height) !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: var(--bg) !important;
+  overflow: visible !important;
+}
+
+savc-app .savc-nav {
+  grid-area: nav !important;
+  min-width: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 16px 12px !important;
+  background: var(--bg) !important;
+  border-right: 1px solid var(--border) !important;
+}
+
+savc-app .shell--chat-focus .savc-nav {
+  width: 0 !important;
+  padding: 0 !important;
+  border-width: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+savc-app .savc-content {
+  grid-area: content !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 12px 16px 32px !important;
+  display: block !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 1100px) {
+  savc-app .savc-shell {
+    --shell-pad: 12px;
+    --shell-gap: 12px;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto 1fr !important;
+    grid-template-areas:
+      "topbar"
+      "nav"
+      "content" !important;
+  }
+
+  savc-app .savc-nav {
+    position: static !important;
+    max-height: none !important;
+    display: flex !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 10px 14px !important;
+    background: var(--bg) !important;
+  }
+
+  savc-app .savc-topbar {
+    position: static !important;
+    padding: 12px 14px !important;
+    gap: 10px !important;
   }
 }

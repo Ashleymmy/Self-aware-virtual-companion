@@ -11,6 +11,7 @@ import { renderChat } from "./views/chat.js";
 import { renderMemory } from "./views/memory.js";
 import { renderPersona } from "./views/persona.js";
 import { renderOrchestrator } from "./views/orchestrator.js";
+import { renderLogs, activateLogsView, deactivateLogsView } from "./views/logs.js";
 
 @customElement("savc-app")
 export class SavcApp extends LitElement {
@@ -38,6 +39,10 @@ export class SavcApp extends LitElement {
 
     // Apply theme immediately
     applyTheme(this._state.resolvedTheme);
+
+    if (this._state.activeTab === "logs") {
+      activateLogsView(this._requestUpdate);
+    }
 
     // Simulate connection delay
     setTimeout(() => {
@@ -68,6 +73,7 @@ export class SavcApp extends LitElement {
   override disconnectedCallback() {
     super.disconnectedCallback();
     if (this._uptimeTimer) clearInterval(this._uptimeTimer);
+    deactivateLogsView();
   }
 
   // ── Event Handlers ──────────────────────────────────
@@ -80,8 +86,15 @@ export class SavcApp extends LitElement {
 
   private _onTabClick = (tab: Tab) => {
     if (tab === this._state.activeTab) return;
+    const previous = this._state.activeTab;
+    if (previous === "logs" && tab !== "logs") {
+      deactivateLogsView();
+    }
     this._state = { ...this._state, activeTab: tab };
     saveSettings({ lastTab: tab });
+    if (tab === "logs") {
+      activateLogsView(this._requestUpdate);
+    }
   };
 
   private _onTheme = (mode: ThemeMode, e: MouseEvent) => {
@@ -107,6 +120,8 @@ export class SavcApp extends LitElement {
         return renderPersona(this._requestUpdate);
       case "orchestrator":
         return renderOrchestrator(this._requestUpdate);
+      case "logs":
+        return renderLogs(this._requestUpdate);
       default:
         return this._renderStub(tab);
     }
@@ -117,10 +132,10 @@ export class SavcApp extends LitElement {
       <div class="card" style="animation: rise 0.35s var(--ease-out) backwards">
         <div class="card-title">${t(`tabs.${tab}`)}</div>
         <div class="card-sub">${t(`tabSubs.${tab}`)}</div>
-        <div style="margin-top: 16px; padding: 40px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius-md);">
+        <div style="margin-top: 16px; padding: 40px; text-align: center; color: var(--muted-foreground); border: 1px dashed var(--border); border-radius: var(--radius-md);">
           <div style="font-size: 32px; opacity: 0.3; margin-bottom: 12px;">🚧</div>
-          <div>此功能正在开发中</div>
-          <div style="font-size: 12px; margin-top: 4px;">完成后将对接主项目 WebSocket 数据</div>
+          <div style="font-weight: 500;">此功能正在开发中</div>
+          <div style="font-size: 12px; margin-top: 4px; color: var(--muted);">完成后将对接主项目 WebSocket 数据</div>
         </div>
       </div>
     `;
