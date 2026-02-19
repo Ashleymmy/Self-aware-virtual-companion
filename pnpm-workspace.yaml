@@ -1,4 +1,5 @@
 packages:
   - "savc-core/**"
   - "savc-ui"
+  - "tests/glmtest"
 

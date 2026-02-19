@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SAVC Studio · Unified Workbench Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-layer" aria-hidden="true"></div>
+    <header class="topbar card">
+      <div>
+        <p class="kicker">SAVC Studio Prototype</p>
+        <h1>统一交互工作台</h1>
+        <p class="subtitle">单页完成开发对话、执行观测、上下文浏览与基础 custom 设置。</p>
+      </div>
+      <div class="topbar-meta">
+        <span id="connectionBadge" class="badge offline">连接中</span>
+        <span>最后刷新：<strong id="updatedAt">--</strong></span>
+        <button id="refreshBtn" class="btn ghost">立即刷新</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar card">
+        <section>
+          <h2>场景模式</h2>
+          <div id="modeSwitch" class="mode-switch"></div>
+        </section>
+
+        <section>
+          <div class="section-row">
+            <h2>会话列表</h2>
+            <span id="sessionCount" class="mono">0</span>
+          </div>
+          <input id="sessionFilter" class="field" placeholder="搜索会话/渠道" />
+          <div id="sessionList" class="session-list"></div>
+        </section>
+      </aside>
+
+      <section class="workspace card">
+        <nav id="tabs" class="tabs">
+          <button data-tab="interaction" class="tab active">交互</button>
+          <button data-tab="execution" class="tab">执行</button>
+          <button data-tab="context" class="tab">上下文</button>
+          <button data-tab="settings" class="tab">设置</button>
+        </nav>
+
+        <section id="view-interaction" class="view active">
+          <div id="timeline" class="timeline"></div>
+          <form id="composerForm" class="composer">
+            <textarea id="messageInput" placeholder="输入需求：例如“把这个 bug 排查路径拆成 3 步”"></textarea>
+            <div class="composer-row">
+              <span id="composerHint" class="hint">模式会影响输出风格与工具策略。</span>
+              <button id="sendBtn" type="submit" class="btn primary">发送</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="view-execution" class="view">
+          <div class="section-row">
+            <h3>工具执行轨迹</h3>
+            <span id="toolCount" class="mono">0</span>
+          </div>
+          <div id="toolTimeline" class="tool-list"></div>
+        </section>
+
+        <section id="view-context" class="view">
+          <div class="context-grid">
+            <article class="context-card">
+              <h3>记忆召回</h3>
+              <div id="memoryList" class="context-list"></div>
+            </article>
+            <article class="context-card">
+              <h3>关联文档</h3>
+              <div id="docList" class="context-list"></div>
+            </article>
+            <article class="context-card">
+              <h3>最近提交</h3>
+              <div id="commitList" class="context-list"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="view-settings" class="view">
+          <form id="preferencesForm" class="settings-grid">
+            <label>
+              主模型
+              <input class="field" name="modelProfile" />
+            </label>
+            <label>
+              Fallback 模型
+              <input class="field" name="fallbackModel" />
+            </label>
+            <label>
+              TTS Provider
+              <select class="field" name="ttsProvider">
+                <option value="openai">openai</option>
+                <option value="elevenlabs">elevenlabs</option>
+                <option value="edge">edge</option>
+              </select>
+            </label>
+            <label>
+              TTS Voice
+              <input class="field" name="ttsVoice" />
+            </label>
+            <label>
+              Live2D 模式
+              <select class="field" name="live2dMode">
+                <option value="auto">auto</option>
+                <option value="gateway">gateway</option>
+                <option value="mock">mock</option>
+              </select>
+            </label>
+            <label>
+              默认场景
+              <select class="field" name="defaultMode">
+                <option value="companion">companion</option>
+                <option value="dev">dev</option>
+                <option value="debug">debug</option>
+                <option value="plan">plan</option>
+              </select>
+            </label>
+            <label>
+              Live2D 灵敏度
+              <input class="field" type="number" min="0.2" max="1.4" step="0.05" name="live2dSensitivity" />
+            </label>
+            <label class="switch-row">
+              <input type="checkbox" name="autoMemoryRecall" />
+              自动记忆召回
+            </label>
+            <label class="switch-row">
+              <input type="checkbox" name="conciseOutput" />
+              偏向简洁输出
+            </label>
+            <div class="settings-actions">
+              <span id="settingsHint" class="hint">未修改</span>
+              <button type="submit" class="btn primary">保存设置</button>
+            </div>
+          </form>
+        </section>
+      </section>
+
+      <aside class="inspector card">
+        <section>
+          <h2>当前会话</h2>
+          <div id="activeSession" class="metric-list"></div>
+        </section>
+
+        <section>
+          <h2>运行概览</h2>
+          <div id="statsGrid" class="stats-grid"></div>
+        </section>
+
+        <section>
+          <h2>渠道分布</h2>
+          <div id="channelBreakdown" class="metric-list"></div>
+        </section>
+
+        <section>
+          <h2>快速操作</h2>
+          <div class="quick-actions">
+            <button id="retryLastBtn" class="btn ghost">重试上一条需求</button>
+            <button id="copySummaryBtn" class="btn ghost">复制会话摘要</button>
+            <button id="mockFailureBtn" class="btn ghost">注入失败样例</button>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
