@@ -67,13 +67,18 @@ path.write_text("\n".join(out).rstrip("\n") + "\n", encoding="utf-8")
 PY
 }
 
+# ──────────────────────────────────────────────
+# Paths
+# ──────────────────────────────────────────────
 OPENCLAW_DIR="${HOME}/.openclaw"
 OPENCLAW_CONFIG="${OPENCLAW_DIR}/openclaw.json"
 OPENCLAW_GLOBAL_ENV="${OPENCLAW_DIR}/.env"
 
 mkdir -p "${OPENCLAW_DIR}"
 
-# Ensure a local token exists when ~/.openclaw/openclaw.json uses env substitution.
+# ──────────────────────────────────────────────
+# Gateway token
+# ──────────────────────────────────────────────
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
   OPENCLAW_GATEWAY_TOKEN="$(generate_local_token)"
   export OPENCLAW_GATEWAY_TOKEN
@@ -86,16 +91,20 @@ upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "ANTHROPIC_API_KEY" "${ANTHROPIC_API_KEY
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_API_KEY" "${OPENAI_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "ANYROUTER_API_KEY" "${ANYROUTER_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "WZW_API_KEY" "${WZW_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "GGBOOM_API_KEY" "${GGBOOM_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "CODE_API_KEY" "${CODE_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_BASE_URL" "${OPENAI_BASE_URL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "DISCORD_BOT_TOKEN" "${DISCORD_BOT_TOKEN:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "BRAVE_API_KEY" "${BRAVE_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "SILICON_EMBEDDING_API_KEY" "${SILICON_EMBEDDING_API_KEY:-}"
 
+# ──────────────────────────────────────────────
+# Resolve workspace
+# ──────────────────────────────────────────────
 if [[ -n "${OPENCLAW_WORKSPACE:-}" ]]; then
   if [[ "${OPENCLAW_WORKSPACE}" = /* ]]; then
     WORKSPACE_DIR="${OPENCLAW_WORKSPACE}"
   else
-    # In docs, OPENCLAW_WORKSPACE is set relative to config/.env.local (e.g. ../savc-core).
     WORKSPACE_DIR="${REPO_ROOT}/config/${OPENCLAW_WORKSPACE}"
   fi
 else
@@ -110,6 +119,9 @@ fi
 
 WORKSPACE_DIR_ABS="$(realpath "${WORKSPACE_DIR}")"
 
+# ──────────────────────────────────────────────
+# Backup existing config
+# ──────────────────────────────────────────────
 if [[ -f "${OPENCLAW_CONFIG}" ]]; then
   ts="$(date +%Y%m%d-%H%M%S)"
   backup="${OPENCLAW_CONFIG}.savc-backup-${ts}"
@@ -117,7 +129,11 @@ if [[ -f "${OPENCLAW_CONFIG}" ]]; then
   echo "[INFO] Backed up existing OpenClaw config to: ${backup}"
 fi
 
+# ──────────────────────────────────────────────
+# Derived values
+# ──────────────────────────────────────────────
 OPENCLAW_PORT_EFFECTIVE="${OPENCLAW_PORT:-18789}"
+OPENCLAW_SUBMODULE="${REPO_ROOT}/openclaw"
 
 if [[ -n "${SILICON_EMBEDDING_API_KEY:-}" ]]; then
   MEMORY_SEARCH_REMOTE_BLOCK="$(cat <<'JSON'
@@ -136,16 +152,42 @@ JSON
 )"
 fi
 
+# ──────────────────────────────────────────────
+# Channel config fragments (only if tokens set)
+# ──────────────────────────────────────────────
+if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+  TELEGRAM_BLOCK="$(cat <<'JSON'
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "groups": { "*": { "requireMention": true } },
+      "groupPolicy": "open",
+      "streamMode": "partial"
+    }
+JSON
+)"
+else
+  TELEGRAM_BLOCK='    "telegram": { "enabled": false }'
+fi
+
+if [[ -n "${DISCORD_BOT_TOKEN:-}" ]]; then
+  DISCORD_BLOCK="$(cat <<'JSON'
+    "discord": {
+      "enabled": true,
+      "groupPolicy": "allowlist",
+      "dm": { "enabled": true, "policy": "pairing" }
+    }
+JSON
+)"
+else
+  DISCORD_BLOCK='    "discord": { "enabled": false }'
+fi
+
+# ══════════════════════════════════════════════
+# Generate openclaw.json — full config
+# ══════════════════════════════════════════════
 cat > "${OPENCLAW_CONFIG}" <<JSON
 {
-  "gateway": {
-    "mode": "local",
-    "port": ${OPENCLAW_PORT_EFFECTIVE},
-    "auth": {
-      "mode": "token",
-      "token": "\${OPENCLAW_GATEWAY_TOKEN}"
-    }
-  },
   "models": {
     "mode": "merge",
     "providers": {
@@ -171,11 +213,20 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "contextWindow": 200000,
             "maxTokens": 8192
+          },
+          {
+            "id": "claude-haiku-4-5-20251001",
+            "name": "Claude Haiku 4.5",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
           }
         ]
       },
       "wzw": {
-        "baseUrl": "https://wzw.pp.ua/v1",
+        "baseUrl": "https://wzw.pp.ua",
         "apiKey": "\${WZW_API_KEY}",
         "api": "anthropic-messages",
         "models": [
@@ -207,21 +258,74 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
             "maxTokens": 8192
           }
         ]
+      },
+      "wzw_openai": {
+        "baseUrl": "https://wzw.pp.ua",
+        "apiKey": "\${WZW_API_KEY}",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "claude-haiku-4-5-20251001",
+            "name": "Claude Haiku 4.5 (wzw-openai)",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "claude-3-5-haiku-20241022",
+            "name": "Claude 3.5 Haiku (wzw-openai)",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "claude-sonnet-4-5-20250929",
+            "name": "Claude Sonnet 4.5 (wzw-openai)",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "qwen/qwen3-next-80b-a3b-instruct",
+            "name": "Qwen3 Next 80B (wzw-openai)",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          }
+        ]
+      },
+      "ggboom": {
+        "baseUrl": "https://ai.qaq.al",
+        "apiKey": "\${GGBOOM_API_KEY}",
+        "api": "openai-responses",
+        "models": [
+          {
+            "id": "gpt-5.2",
+            "name": "GPT-5.2 (ggboom)",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          }
+        ]
       }
     }
   },
-  "session": {
-    "dmScope": "per-channel-peer"
-  },
   "agents": {
     "defaults": {
-      "workspace": "${WORKSPACE_DIR_ABS}",
-      "heartbeat": {
-        "session": "heartbeat-main"
-      },
       "model": {
-        "primary": "anyrouter/claude-opus-4-6",
+        "primary": "ggboom/gpt-5.2",
         "fallbacks": [
+          "anyrouter/claude-haiku-4-5-20251001",
           "anyrouter/claude-sonnet-4-5-20250929",
           "wzw/claude-sonnet-4-5-20250929",
           "wzw/claude-sonnet-4-20250514",
@@ -229,31 +333,348 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
         ]
       },
       "models": {
+        "ggboom/gpt-5.2": { "alias": "gpt" },
         "anyrouter/claude-opus-4-6": { "alias": "opus" },
         "anyrouter/claude-sonnet-4-5-20250929": { "alias": "sonnet" },
+        "anyrouter/claude-haiku-4-5-20251001": { "alias": "haiku-fast" },
         "wzw/claude-sonnet-4-5-20250929": { "alias": "wzw-sonnet" },
         "wzw/claude-sonnet-4-20250514": {},
-        "wzw/claude-haiku-4-5-20251001": { "alias": "haiku" }
+        "wzw/claude-haiku-4-5-20251001": { "alias": "wzw-haiku" },
+        "wzw_openai/claude-haiku-4-5-20251001": { "alias": "wzw-haiku-oc" },
+        "wzw_openai/claude-3-5-haiku-20241022": { "alias": "wzw-haiku-35" },
+        "wzw_openai/claude-sonnet-4-5-20250929": { "alias": "wzw-sonnet-oc" },
+        "wzw_openai/qwen/qwen3-next-80b-a3b-instruct": { "alias": "qwen-next" }
       },
+      "workspace": "${WORKSPACE_DIR_ABS}",
       "memorySearch": {
         "enabled": true,
         "provider": "openai",
 ${MEMORY_SEARCH_REMOTE_BLOCK}
         "model": "Qwen/Qwen3-Embedding-8B",
         "fallback": "none"
+      },
+      "heartbeat": {
+        "session": "heartbeat-main"
+      },
+      "maxConcurrent": 4,
+      "subagents": {
+        "maxConcurrent": 8
+      },
+      "sandbox": {
+        "mode": "off",
+        "workspaceAccess": "none",
+        "scope": "session"
+      }
+    },
+    "list": [
+      {
+        "id": "main",
+        "subagents": { "allowAgents": ["*"] }
+      },
+      {
+        "id": "companion",
+        "name": "companion",
+        "workspace": "${WORKSPACE_DIR_ABS}",
+        "agentDir": "${OPENCLAW_DIR}/agents/companion/agent",
+        "model": "ggboom/gpt-5.2",
+        "tools": { "profile": "messaging", "alsoAllow": ["group:memory"] }
+      },
+      {
+        "id": "memory",
+        "name": "memory",
+        "workspace": "${WORKSPACE_DIR_ABS}",
+        "agentDir": "${OPENCLAW_DIR}/agents/memory/agent",
+        "model": "ggboom/gpt-5.2",
+        "tools": { "profile": "messaging", "alsoAllow": ["group:memory"] }
+      },
+      {
+        "id": "technical",
+        "name": "technical",
+        "workspace": "${WORKSPACE_DIR_ABS}",
+        "agentDir": "${OPENCLAW_DIR}/agents/technical/agent",
+        "model": "ggboom/gpt-5.2",
+        "tools": { "profile": "coding", "alsoAllow": ["group:web"] }
+      },
+      {
+        "id": "creative",
+        "name": "creative",
+        "workspace": "${WORKSPACE_DIR_ABS}",
+        "agentDir": "${OPENCLAW_DIR}/agents/creative/agent",
+        "model": "ggboom/gpt-5.2",
+        "tools": { "profile": "messaging", "alsoAllow": ["group:memory"] }
+      },
+      {
+        "id": "tooling",
+        "name": "tooling",
+        "workspace": "${WORKSPACE_DIR_ABS}",
+        "agentDir": "${OPENCLAW_DIR}/agents/tooling/agent",
+        "model": "ggboom/gpt-5.2",
+        "tools": { "profile": "coding", "alsoAllow": ["group:web"] }
+      },
+      {
+        "id": "voice",
+        "name": "voice",
+        "workspace": "${WORKSPACE_DIR_ABS}",
+        "agentDir": "${OPENCLAW_DIR}/agents/voice/agent",
+        "model": "ggboom/gpt-5.2",
+        "tools": { "profile": "messaging" }
+      },
+      {
+        "id": "vision",
+        "name": "vision",
+        "workspace": "${WORKSPACE_DIR_ABS}",
+        "agentDir": "${OPENCLAW_DIR}/agents/vision/agent",
+        "model": "ggboom/gpt-5.2",
+        "tools": { "profile": "messaging", "alsoAllow": ["image"] }
+      },
+      {
+        "id": "vibe-coder",
+        "name": "vibe-coder",
+        "workspace": "${WORKSPACE_DIR_ABS}",
+        "agentDir": "${OPENCLAW_DIR}/agents/vibe-coder/agent",
+        "model": "ggboom/gpt-5.2",
+        "tools": { "profile": "coding", "alsoAllow": ["group:web"] }
+      }
+    ]
+  },
+  "tools": {
+    "profile": "messaging",
+    "alsoAllow": ["savc-orchestrator"],
+    "sandbox": {
+      "tools": {
+        "allow": ["group:messaging", "group:sessions"],
+        "deny": ["group:runtime", "group:fs", "group:ui", "nodes", "cron", "gateway"]
+      }
+    }
+  },
+  "messages": {
+    "ackReactionScope": "group-mentions",
+    "tts": {
+      "auto": "always",
+      "mode": "final",
+      "openai": { "voice": "alloy" }
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": false,
+    "restart": true
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "channels": {
+${TELEGRAM_BLOCK},
+${DISCORD_BLOCK}
+  },
+  "gateway": {
+    "port": ${OPENCLAW_PORT_EFFECTIVE},
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "\${OPENCLAW_GATEWAY_TOKEN}"
+    }
+  },
+  "skills": {
+    "allowBundled": []
+  },
+  "plugins": {
+    "load": {
+      "paths": [
+        "${OPENCLAW_SUBMODULE}/extensions/savc-orchestrator"
+      ]
+    },
+    "entries": {
+      "discord": { "enabled": true },
+      "telegram": { "enabled": true },
+      "savc-orchestrator": {
+        "enabled": true,
+        "config": {
+          "savcCorePath": "${WORKSPACE_DIR_ABS}",
+          "spawnMode": "real",
+          "defaultWait": true,
+          "defaultTimeoutMs": 120000,
+          "memoryRecallEnabled": true,
+          "memoryRecallTopK": 5,
+          "memoryMinScore": 0.25,
+          "memoryPersistEnabled": true
+        }
       }
     }
   }
 }
 JSON
 
-mkdir -p "${OPENCLAW_DIR}/agents/main/sessions"
+echo "[OK] Wrote OpenClaw config: ${OPENCLAW_CONFIG}"
+
+# ══════════════════════════════════════════════
+# Register agents — SOUL.md + models.json + auth-profiles.json
+# ══════════════════════════════════════════════
+AGENTS_TEMPLATE_DIR="${REPO_ROOT}/config/openclaw/agents"
+AGENTS=(main companion memory technical creative tooling voice vision vibe-coder)
+
+for agent in "${AGENTS[@]}"; do
+  agent_dir="${OPENCLAW_DIR}/agents/${agent}"
+  mkdir -p "${agent_dir}/agent"
+  mkdir -p "${agent_dir}/sessions"
+
+  # Copy SOUL.md from repo template
+  soul_src="${AGENTS_TEMPLATE_DIR}/${agent}/SOUL.md"
+  if [[ -f "${soul_src}" ]]; then
+    cp -f "${soul_src}" "${agent_dir}/SOUL.md"
+  fi
+done
+
+echo "[OK] Copied agent SOUL.md templates (${#AGENTS[@]} agents)"
+
+# ── Main agent: full models.json with all providers ──
+cat > "${OPENCLAW_DIR}/agents/main/agent/models.json" <<MJSON
+{
+  "providers": {
+    "anyrouter": {
+      "baseUrl": "https://anyrouter.top",
+      "apiKey": "${ANYROUTER_API_KEY:-}",
+      "api": "anthropic-messages",
+      "models": [
+        {
+          "id": "claude-opus-4-6", "name": "Claude Opus 4.6",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5",
+          "reasoning": false, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        }
+      ]
+    },
+    "wzw": {
+      "baseUrl": "https://wzw.pp.ua",
+      "apiKey": "${WZW_API_KEY:-}",
+      "api": "anthropic-messages",
+      "models": [
+        {
+          "id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5 (wzw)",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4 (wzw)",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (wzw)",
+          "reasoning": false, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        }
+      ]
+    },
+    "wzw_openai": {
+      "baseUrl": "https://wzw.pp.ua",
+      "apiKey": "${WZW_API_KEY:-}",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (wzw-openai)",
+          "reasoning": false, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku (wzw-openai)",
+          "reasoning": false, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5 (wzw-openai)",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "qwen/qwen3-next-80b-a3b-instruct", "name": "Qwen3 Next 80B (wzw-openai)",
+          "reasoning": false, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        }
+      ]
+    },
+    "ggboom": {
+      "baseUrl": "https://ai.qaq.al",
+      "apiKey": "${GGBOOM_API_KEY:-}",
+      "api": "openai-responses",
+      "models": [
+        {
+          "id": "gpt-5.2", "name": "GPT-5.2 (ggboom)",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        }
+      ]
+    }
+  }
+}
+MJSON
+
+echo "[OK] Generated main agent models.json"
+
+# ── Sub-agents: simplified models.json ──
+for agent in companion memory technical creative tooling voice vision vibe-coder; do
+  cat > "${OPENCLAW_DIR}/agents/${agent}/agent/models.json" <<MJSON
+{
+  "primary": "ggboom/gpt-5.2",
+  "fallbacks": [
+    "anyrouter/claude-haiku-4-5-20251001",
+    "wzw/claude-sonnet-4-5-20250929"
+  ]
+}
+MJSON
+done
+
+echo "[OK] Generated sub-agent models.json (8 agents)"
+
+# ── Auth profiles for agents that need direct provider access ──
+AUTH_AGENTS=(main companion technical tooling)
+for agent in "${AUTH_AGENTS[@]}"; do
+  cat > "${OPENCLAW_DIR}/agents/${agent}/agent/auth-profiles.json" <<AJSON
+{
+  "version": 1,
+  "profiles": {
+    "anyrouter:default": { "type": "api_key", "provider": "anyrouter", "key": "${ANYROUTER_API_KEY:-}" },
+    "wzw:default":       { "type": "api_key", "provider": "wzw",       "key": "${WZW_API_KEY:-}" },
+    "wzw_openai:default":{ "type": "api_key", "provider": "wzw_openai","key": "${WZW_API_KEY:-}" },
+    "ggboom:default":    { "type": "api_key", "provider": "ggboom",    "key": "${GGBOOM_API_KEY:-}" },
+    "code:default":      { "type": "api_key", "provider": "code",      "key": "${CODE_API_KEY:-}" }
+  }
+}
+AJSON
+done
+
+echo "[OK] Generated auth-profiles.json (${#AUTH_AGENTS[@]} agents)"
+
+# ──────────────────────────────────────────────
+# Credentials dir + permissions
+# ──────────────────────────────────────────────
 mkdir -p "${OPENCLAW_DIR}/credentials"
 
-# Tighten permissions (recommended by `openclaw doctor`).
 chmod 700 "${OPENCLAW_DIR}" || true
 chmod 600 "${OPENCLAW_CONFIG}" || true
+find "${OPENCLAW_DIR}/agents" -name "auth-profiles.json" -exec chmod 600 {} \; 2>/dev/null || true
 
-echo "[OK] Wrote OpenClaw config: ${OPENCLAW_CONFIG}"
 echo "[OK] Synced OpenClaw env: ${OPENCLAW_GLOBAL_ENV}"
 echo "[OK] Workspace set to: ${WORKSPACE_DIR_ABS}"
+echo "[OK] Agents registered: ${AGENTS[*]}"
+echo "[OK] Plugin: savc-orchestrator → ${OPENCLAW_SUBMODULE}/extensions/savc-orchestrator"
