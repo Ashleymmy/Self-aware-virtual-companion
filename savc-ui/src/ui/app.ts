@@ -193,8 +193,11 @@ export class SavcApp extends LitElement {
 
   private _onTabClick = (tab: Tab) => {
     if (tab === "progressHub") {
-      const target = new URL("progress-hub/index.html", window.location.href);
-      window.open(target.toString(), "_blank", "noopener,noreferrer");
+      const target = new URL("/progress-hub/index.html", window.location.origin);
+      const popup = window.open(target.toString(), "_blank", "noopener,noreferrer");
+      if (!popup) {
+        window.location.assign(target.toString());
+      }
       return;
     }
     if (tab === this._state.activeTab) return;
