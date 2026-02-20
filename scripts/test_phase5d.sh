@@ -51,10 +51,71 @@ TMP_CONTINUE="${TMP_ROOT}/voice_continue.json"
 TMP_STATUS="${TMP_ROOT}/voice_status.json"
 TMP_END="${TMP_ROOT}/voice_end.json"
 TMP_VOICE_STORE="${TMP_ROOT}/voice-store"
-PORT="${PHASE5D_GATEWAY_PORT:-18805}"
-VOICE_WEBHOOK_PORT="${PHASE5D_VOICE_WEBHOOK_PORT:-3334}"
+BASE_PORT="${PHASE5D_GATEWAY_PORT:-18805}"
+BASE_VOICE_WEBHOOK_PORT="${PHASE5D_VOICE_WEBHOOK_PORT:-3334}"
+PORT=""
+VOICE_WEBHOOK_PORT=""
 TOKEN="phase5d-token"
 GATEWAY_PID=""
+
+find_free_port() {
+  local preferred="$1"
+  local avoid="${2:-}"
+  python3 - "${preferred}" "${avoid}" <<'PY'
+from __future__ import annotations
+import socket
+import sys
+
+preferred = int(sys.argv[1])
+avoid = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] else None
+
+def bindable(port: int) -> bool:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind(("127.0.0.1", port))
+    except OSError:
+        sock.close()
+        return False
+    sock.close()
+    return True
+
+if preferred > 0 and preferred != avoid and bindable(preferred):
+    print(preferred)
+    raise SystemExit(0)
+
+for port in range(max(1024, preferred + 1), preferred + 500):
+    if port != avoid and bindable(port):
+        print(port)
+        raise SystemExit(0)
+
+for _ in range(32):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    if port != avoid:
+        print(port)
+        raise SystemExit(0)
+
+raise SystemExit(1)
+PY
+}
+
+PORT="$(find_free_port "${BASE_PORT}")" || {
+  fail "failed to allocate gateway port near ${BASE_PORT}"
+  exit 1
+}
+VOICE_WEBHOOK_PORT="$(find_free_port "${BASE_VOICE_WEBHOOK_PORT}" "${PORT}")" || {
+  fail "failed to allocate voice webhook port near ${BASE_VOICE_WEBHOOK_PORT}"
+  exit 1
+}
+if [[ "${PORT}" != "${BASE_PORT}" ]]; then
+  echo "[INFO] gateway port ${BASE_PORT} is busy, using ${PORT}"
+fi
+if [[ "${VOICE_WEBHOOK_PORT}" != "${BASE_VOICE_WEBHOOK_PORT}" ]]; then
+  echo "[INFO] voice webhook port ${BASE_VOICE_WEBHOOK_PORT} is busy, using ${VOICE_WEBHOOK_PORT}"
+fi
 
 cleanup() {
   if [[ -n "${GATEWAY_PID}" ]]; then
