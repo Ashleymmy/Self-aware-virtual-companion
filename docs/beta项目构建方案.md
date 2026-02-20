@@ -4,6 +4,7 @@
 > 创建日期: 2026-02-05
 > 项目: Self-aware Virtual Companion (SAVC)
 > 状态: **执行规划**
+> 最后校准日期: 2026-02-19（与当前仓库结构对齐）
 
 ---
 
@@ -58,7 +59,7 @@
 
 **T-0.2.1: 确认项目仓库结构**
 
-当前仓库已存在于 `D:\MIN\SAVC\Self-aware-virtual-companion\`，需创建标准目录结构：
+当前仓库已存在于本地工作目录（`Self-aware-virtual-companion/`），需创建标准目录结构：
 
 ```
 Self-aware-virtual-companion/
@@ -67,7 +68,7 @@ Self-aware-virtual-companion/
 │   ├── iPad部署方案探讨.md
 │   └── beta项目构建方案.md
 │
-├── openclaw/                      # OpenClaw 核心 (git submodule)
+├── openclaw/                      # OpenClaw 核心源码目录（当前仓库内维护）
 │   ├── src/
 │   ├── dist/
 │   └── package.json
@@ -114,7 +115,6 @@ Self-aware-virtual-companion/
 │   └── integration/               # 集成测试
 │
 ├── .gitignore
-├── .gitmodules                    # Git submodule 配置
 ├── package.json
 ├── pnpm-workspace.yaml
 └── README.md
@@ -154,6 +154,7 @@ Thumbs.db
 ```yaml
 packages:
   - 'savc-core/**'
+  - 'savc-ui'
 ```
 
 **T-0.2.4: 创建 config/.env.example**
@@ -194,14 +195,14 @@ OPENCLAW_WORKSPACE=../savc-core           # 工作目录指向 savc-core
 
 #### 任务清单
 
-**T-0.3.1: 将 OpenClaw 添加为 Git Submodule**
+**T-0.3.1: 确认 OpenClaw 源码目录可用**
 
 ```bash
-cd D:\MIN\SAVC\Self-aware-virtual-companion
-git submodule add https://github.com/openclaw/openclaw.git openclaw
+cd <repo-root>/openclaw
+pnpm install
 ```
 
-> **决策点**: 如果后续需要修改 OpenClaw 源码，改为 Fork 后再添加 submodule。初期建议先用官方仓库，有定制需求时再 Fork。
+> **说明**: 当前仓库直接维护 `openclaw/` 目录（非 `.gitmodules` submodule 形态）。
 
 **T-0.3.2: 构建 OpenClaw**
 
@@ -238,7 +239,7 @@ openclaw --version        # 确认 >= v2026.1.29（修复 CVE-2026-25253）
 ```
 
 #### 验收标准
-- [x] OpenClaw 作为 submodule 集成成功
+- [x] OpenClaw 源码目录已就位并可构建
 - [x] `pnpm build` 无错误
 - [x] Gateway 可以在 18789 端口正常启动
 - [x] Workspace 路径正确指向 `savc-core/`
@@ -365,7 +366,7 @@ memory_privacy:
 |--------|------|------|
 | 项目目录结构 | 根目录 | [x] |
 | .gitignore | `.gitignore` | [x] |
-| Git submodule 配置 | `.gitmodules` | [x] |
+| OpenClaw 源码目录可用 | `openclaw/` | [x] |
 | OpenClaw 构建通过 | `openclaw/dist/` | [x] |
 | Gateway 可运行 | localhost:18789 | [x] |
 | 环境变量模板 | `config/.env.example` | [x] |

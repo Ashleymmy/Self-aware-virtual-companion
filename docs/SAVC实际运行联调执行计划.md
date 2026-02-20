@@ -1,13 +1,40 @@
 # SAVC 实际运行联调执行计划
 
-> 版本: 1.0
-> 日期: 2026-02-18
-> 状态: 待执行
+> 版本: 1.1
+> 日期: 2026-02-20
+> 状态: 已执行（持续校准）
 > 前置依赖: 多 Agent 协同编排方案（Phase 4b 已完成）、记忆系统语义检索升级（Phase 4a 已完成）
 
 ---
 
-## 1. 背景与问题诊断
+## 0. 2026-02-20 校准快照（当前开发态）
+
+### 0.1 当前结论
+
+- 开发场景整体可用，主链路可运行，当前重点是工程稳定性而非功能缺失。
+- `openai-codex/gpt-5.2` 已作为默认模型，OAuth 状态正常，fallback 已配置多 provider 兜底。
+- `savc-orchestrator` 插件已启用，`spawnMode=real`，7 个工具已注册。
+- `~/.openclaw/agents/` 已包含 `main/companion/memory/technical/creative/tooling/voice/vision/vibe-coder`。
+- 记忆检索在 `agents.defaults.memorySearch` 下已启用（`enabled=true`）。
+
+### 0.2 脚本实测快照
+
+| 检查项 | 结果 |
+|---|---|
+| `bash scripts/test_phase4b.sh` | PASS 26 / FAIL 0 |
+| `bash scripts/test_phase5c.sh` | PASS 7 / FAIL 0 |
+| `bash scripts/test_phase5d.sh` | PASS 18 / FAIL 0 |
+| `bash scripts/test_phase5e.sh` | PASS 14 / WARN 1 / FAIL 0 |
+| `node openclaw/openclaw.mjs agent --local` 烟雾测试 | 返回 `DEV_OK`，provider=`openai-codex` |
+
+### 0.3 已识别并收敛的问题
+
+- `phase5d` 偶发失败根因是本机 `3334` 端口占用，而非语音工具逻辑回归。
+- 已在 `scripts/test_phase5d.sh` 加入“自动选择空闲端口”优化：默认端口被占用时自动切换可用端口。
+
+---
+
+## 1. 背景与问题诊断（2026-02-18 基线）
 
 ### 1.1 现状总结
 
@@ -19,9 +46,9 @@ SAVC 项目已完成 Phase 0-5 的框架搭建，包括：
 - Web UI 管理界面（Lit + Vite）
 - TTS / Live2D / Voice 集成
 
-**但实际运行时几乎全是 mock 模式**，无法完成真实任务。
+**说明**: 本节描述的是 2026-02-18 盘点时的断层基线，已不等同于当前运行态（以 0 章节为准）。
 
-### 1.2 核心断层诊断
+### 1.2 核心断层诊断（历史）
 
 经过完整的代码审计，发现 5 个关键断层：
 
@@ -33,10 +60,10 @@ SAVC 项目已完成 Phase 0-5 的框架搭建，包括：
 | 4 | **记忆搜索已禁用** | `openclaw.json` 中 `memorySearch.enabled: false` | Agent 无法检索用户记忆 |
 | 5 | **模型 ID 不匹配** | YAML 中 `claude-opus-4-5-20251101` 等名称在 OpenClaw 中不存在 | real 模式下子 agent 可能无法解析模型 |
 
-### 1.3 消息流断点图示
+### 1.3 消息流断点图示（历史）
 
 ```
-当前实际流程（断裂）:
+2026-02-18 时流程（断裂）:
 用户消息 → OpenClaw Gateway → main agent (无编排工具) → 直接用 Claude 回复
                                   ↓
                               savc-orchestrator 未加载 → 无 savc_route 工具
@@ -58,6 +85,8 @@ SAVC 项目已完成 Phase 0-5 的框架搭建，包括：
 ---
 
 ## 2. 执行步骤
+
+> 注: 本章节保留执行方案用于追溯；当前状态与验收结果请优先参考 0 章节。
 
 ### Step 1: 修改 `~/.openclaw/openclaw.json` — 启用插件 + 记忆
 
