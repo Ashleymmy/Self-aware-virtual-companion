@@ -90,11 +90,13 @@ upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENCLAW_GATEWAY_TOKEN" "${OPENCLAW_GAT
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "ANTHROPIC_API_KEY" "${ANTHROPIC_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_API_KEY" "${OPENAI_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "ANYROUTER_API_KEY" "${ANYROUTER_API_KEY:-}"
-upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "WZW_API_KEY" "${WZW_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "GGBOOM_API_KEY" "${GGBOOM_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "CODE_API_KEY" "${CODE_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "LAOYOU_API_KEY" "${LAOYOU_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "NEB_API_KEY" "${NEB_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_BASE_URL" "${OPENAI_BASE_URL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "DISCORD_BOT_TOKEN" "${DISCORD_BOT_TOKEN:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "TELEGRAM_BOT_TOKEN" "${TELEGRAM_BOT_TOKEN:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "BRAVE_API_KEY" "${BRAVE_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "SILICON_EMBEDDING_API_KEY" "${SILICON_EMBEDDING_API_KEY:-}"
 
@@ -183,6 +185,76 @@ else
   DISCORD_BLOCK='    "discord": { "enabled": false }'
 fi
 
+# iMessage: enabled when imsg binary is present
+IMSG_BIN="${IMSG_CLI_PATH:-${HOME}/.openclaw/bin/imsg}"
+IMSG_DB="${IMSG_DB_PATH:-${HOME}/Library/Messages/chat.db}"
+# 允许发消息给媛媛的号码（allowlist 模式，无需配对码）
+IMSG_ALLOW_FROM="${IMSG_ALLOW_FROM:-+8613225515320}"
+if [[ -x "${IMSG_BIN}" ]]; then
+  IMESSAGE_BLOCK="$(cat <<JSON
+    "imessage": {
+      "enabled": true,
+      "cliPath": "${IMSG_BIN}",
+      "dbPath": "${IMSG_DB}",
+      "dmPolicy": "allowlist",
+      "allowFrom": ["${IMSG_ALLOW_FROM}"],
+      "groupPolicy": "allowlist",
+      "includeAttachments": true
+    }
+JSON
+)"
+else
+  IMESSAGE_BLOCK='    "imessage": { "enabled": false }'
+fi
+
+# Dev mode toggle:
+# - 1 (default): enable yuanyuan autonomous dev path (coding tools + workspace access)
+# - 0: keep conservative messaging-only defaults
+SAVC_AUTODEV_ENABLE="${SAVC_AUTODEV_ENABLE:-1}"
+
+if [[ "${SAVC_AUTODEV_ENABLE}" == "1" ]]; then
+  SANDBOX_WORKSPACE_ACCESS="rw"
+  MAIN_AGENT_TOOLS_BLOCK="$(cat <<'JSON'
+        "tools": {
+          "profile": "coding",
+          "alsoAllow": ["savc-orchestrator", "group:web", "group:sessions", "group:runtime", "group:fs", "image"]
+        }
+JSON
+)"
+  GLOBAL_TOOLS_BLOCK="$(cat <<'JSON'
+  "tools": {
+    "profile": "coding",
+    "alsoAllow": ["savc-orchestrator", "group:web", "group:sessions"],
+    "exec": {
+      "applyPatch": { "enabled": true }
+    },
+    "sandbox": {
+      "tools": {
+        "allow": ["group:messaging", "group:sessions", "group:web", "group:runtime", "group:fs", "image"],
+        "deny": ["group:ui", "nodes", "cron", "gateway"]
+      }
+    }
+  },
+JSON
+)"
+else
+  SANDBOX_WORKSPACE_ACCESS="none"
+  MAIN_AGENT_TOOLS_BLOCK=''
+  GLOBAL_TOOLS_BLOCK="$(cat <<'JSON'
+  "tools": {
+    "profile": "messaging",
+    "alsoAllow": ["savc-orchestrator"],
+    "sandbox": {
+      "tools": {
+        "allow": ["group:messaging", "group:sessions"],
+        "deny": ["group:runtime", "group:fs", "group:ui", "nodes", "cron", "gateway"]
+      }
+    }
+  },
+JSON
+)"
+fi
+
 # ══════════════════════════════════════════════
 # Generate openclaw.json — full config
 # ══════════════════════════════════════════════
@@ -225,14 +297,14 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
           }
         ]
       },
-      "wzw": {
-        "baseUrl": "https://wzw.pp.ua",
-        "apiKey": "\${WZW_API_KEY}",
-        "api": "anthropic-messages",
+      "laoyou": {
+        "baseUrl": "https://api.freestyle.cc.cd",
+        "apiKey": "\${LAOYOU_API_KEY}",
+        "api": "openai-completions",
         "models": [
           {
-            "id": "claude-sonnet-4-5-20250929",
-            "name": "Claude Sonnet 4.5 (wzw)",
+            "id": "claude-opus-4-6",
+            "name": "Claude Opus 4.6 (laoyou)",
             "reasoning": true,
             "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
@@ -240,8 +312,8 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
             "maxTokens": 8192
           },
           {
-            "id": "claude-sonnet-4-20250514",
-            "name": "Claude Sonnet 4 (wzw)",
+            "id": "claude-sonnet-4-5-20250929",
+            "name": "Claude Sonnet 4.5 (laoyou)",
             "reasoning": true,
             "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
@@ -250,7 +322,7 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
           },
           {
             "id": "claude-haiku-4-5-20251001",
-            "name": "Claude Haiku 4.5 (wzw)",
+            "name": "Claude Haiku 4.5 (laoyou)",
             "reasoning": false,
             "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
@@ -259,23 +331,14 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
           }
         ]
       },
-      "wzw_openai": {
-        "baseUrl": "https://wzw.pp.ua",
-        "apiKey": "\${WZW_API_KEY}",
+      "code": {
+        "baseUrl": "https://code.claudex.us.ci",
+        "apiKey": "\${CODE_API_KEY}",
         "api": "openai-completions",
         "models": [
           {
             "id": "claude-haiku-4-5-20251001",
-            "name": "Claude Haiku 4.5 (wzw-openai)",
-            "reasoning": false,
-            "input": ["text", "image"],
-            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-            "contextWindow": 200000,
-            "maxTokens": 8192
-          },
-          {
-            "id": "claude-3-5-haiku-20241022",
-            "name": "Claude 3.5 Haiku (wzw-openai)",
+            "name": "Claude Haiku 4.5 (code)",
             "reasoning": false,
             "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
@@ -284,17 +347,8 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
           },
           {
             "id": "claude-sonnet-4-5-20250929",
-            "name": "Claude Sonnet 4.5 (wzw-openai)",
+            "name": "Claude Sonnet 4.5 (code)",
             "reasoning": true,
-            "input": ["text", "image"],
-            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-            "contextWindow": 200000,
-            "maxTokens": 8192
-          },
-          {
-            "id": "qwen/qwen3-next-80b-a3b-instruct",
-            "name": "Qwen3 Next 80B (wzw-openai)",
-            "reasoning": false,
             "input": ["text", "image"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "contextWindow": 200000,
@@ -315,6 +369,15 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "contextWindow": 200000,
             "maxTokens": 8192
+          },
+          {
+            "id": "gpt-5.3",
+            "name": "GPT-5.3 (ggboom)",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
           }
         ]
       }
@@ -325,25 +388,24 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
       "model": {
         "primary": "ggboom/gpt-5.2",
         "fallbacks": [
-          "anyrouter/claude-haiku-4-5-20251001",
+          "ggboom/gpt-5.2",
           "anyrouter/claude-sonnet-4-5-20250929",
-          "wzw/claude-sonnet-4-5-20250929",
-          "wzw/claude-sonnet-4-20250514",
-          "wzw/claude-haiku-4-5-20251001"
+          "laoyou/claude-sonnet-4-5-20250929",
+          "code/claude-sonnet-4-5-20250929",
+          "anyrouter/claude-haiku-4-5-20251001"
         ]
       },
       "models": {
         "ggboom/gpt-5.2": { "alias": "gpt" },
+        "ggboom/gpt-5.3": { "alias": "gpt5" },
         "anyrouter/claude-opus-4-6": { "alias": "opus" },
         "anyrouter/claude-sonnet-4-5-20250929": { "alias": "sonnet" },
-        "anyrouter/claude-haiku-4-5-20251001": { "alias": "haiku-fast" },
-        "wzw/claude-sonnet-4-5-20250929": { "alias": "wzw-sonnet" },
-        "wzw/claude-sonnet-4-20250514": {},
-        "wzw/claude-haiku-4-5-20251001": { "alias": "wzw-haiku" },
-        "wzw_openai/claude-haiku-4-5-20251001": { "alias": "wzw-haiku-oc" },
-        "wzw_openai/claude-3-5-haiku-20241022": { "alias": "wzw-haiku-35" },
-        "wzw_openai/claude-sonnet-4-5-20250929": { "alias": "wzw-sonnet-oc" },
-        "wzw_openai/qwen/qwen3-next-80b-a3b-instruct": { "alias": "qwen-next" }
+        "anyrouter/claude-haiku-4-5-20251001": { "alias": "haiku" },
+        "laoyou/claude-opus-4-6": { "alias": "laoyou-opus" },
+        "laoyou/claude-sonnet-4-5-20250929": { "alias": "laoyou-sonnet" },
+        "laoyou/claude-haiku-4-5-20251001": { "alias": "laoyou-haiku" },
+        "code/claude-haiku-4-5-20251001": { "alias": "code-haiku" },
+        "code/claude-sonnet-4-5-20250929": { "alias": "code-sonnet" }
       },
       "workspace": "${WORKSPACE_DIR_ABS}",
       "memorySearch": {
@@ -362,14 +424,15 @@ ${MEMORY_SEARCH_REMOTE_BLOCK}
       },
       "sandbox": {
         "mode": "off",
-        "workspaceAccess": "none",
+        "workspaceAccess": "${SANDBOX_WORKSPACE_ACCESS}",
         "scope": "session"
       }
     },
     "list": [
       {
         "id": "main",
-        "subagents": { "allowAgents": ["*"] }
+        "subagents": { "allowAgents": ["*"] }${MAIN_AGENT_TOOLS_BLOCK:+,}
+${MAIN_AGENT_TOOLS_BLOCK}
       },
       {
         "id": "companion",
@@ -437,16 +500,7 @@ ${MEMORY_SEARCH_REMOTE_BLOCK}
       }
     ]
   },
-  "tools": {
-    "profile": "messaging",
-    "alsoAllow": ["savc-orchestrator"],
-    "sandbox": {
-      "tools": {
-        "allow": ["group:messaging", "group:sessions"],
-        "deny": ["group:runtime", "group:fs", "group:ui", "nodes", "cron", "gateway"]
-      }
-    }
-  },
+${GLOBAL_TOOLS_BLOCK}
   "messages": {
     "ackReactionScope": "group-mentions",
     "tts": {
@@ -465,7 +519,8 @@ ${MEMORY_SEARCH_REMOTE_BLOCK}
   },
   "channels": {
 ${TELEGRAM_BLOCK},
-${DISCORD_BLOCK}
+${DISCORD_BLOCK},
+${IMESSAGE_BLOCK}
   },
   "gateway": {
     "port": ${OPENCLAW_PORT_EFFECTIVE},
@@ -481,12 +536,14 @@ ${DISCORD_BLOCK}
   "plugins": {
     "load": {
       "paths": [
-        "${OPENCLAW_SUBMODULE}/extensions/savc-orchestrator"
+        "${OPENCLAW_SUBMODULE}/extensions/savc-orchestrator",
+        "${OPENCLAW_SUBMODULE}/extensions/imessage"
       ]
     },
     "entries": {
       "discord": { "enabled": true },
       "telegram": { "enabled": true },
+      "imessage": { "enabled": true },
       "savc-orchestrator": {
         "enabled": true,
         "config": {
@@ -556,62 +613,6 @@ cat > "${OPENCLAW_DIR}/agents/main/agent/models.json" <<MJSON
         }
       ]
     },
-    "wzw": {
-      "baseUrl": "https://wzw.pp.ua",
-      "apiKey": "${WZW_API_KEY:-}",
-      "api": "anthropic-messages",
-      "models": [
-        {
-          "id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5 (wzw)",
-          "reasoning": true, "input": ["text", "image"],
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-          "contextWindow": 200000, "maxTokens": 8192
-        },
-        {
-          "id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4 (wzw)",
-          "reasoning": true, "input": ["text", "image"],
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-          "contextWindow": 200000, "maxTokens": 8192
-        },
-        {
-          "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (wzw)",
-          "reasoning": false, "input": ["text", "image"],
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-          "contextWindow": 200000, "maxTokens": 8192
-        }
-      ]
-    },
-    "wzw_openai": {
-      "baseUrl": "https://wzw.pp.ua",
-      "apiKey": "${WZW_API_KEY:-}",
-      "api": "openai-completions",
-      "models": [
-        {
-          "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (wzw-openai)",
-          "reasoning": false, "input": ["text", "image"],
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-          "contextWindow": 200000, "maxTokens": 8192
-        },
-        {
-          "id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku (wzw-openai)",
-          "reasoning": false, "input": ["text", "image"],
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-          "contextWindow": 200000, "maxTokens": 8192
-        },
-        {
-          "id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5 (wzw-openai)",
-          "reasoning": true, "input": ["text", "image"],
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-          "contextWindow": 200000, "maxTokens": 8192
-        },
-        {
-          "id": "qwen/qwen3-next-80b-a3b-instruct", "name": "Qwen3 Next 80B (wzw-openai)",
-          "reasoning": false, "input": ["text", "image"],
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
-          "contextWindow": 200000, "maxTokens": 8192
-        }
-      ]
-    },
     "ggboom": {
       "baseUrl": "https://ai.qaq.al",
       "apiKey": "${GGBOOM_API_KEY:-}",
@@ -619,6 +620,56 @@ cat > "${OPENCLAW_DIR}/agents/main/agent/models.json" <<MJSON
       "models": [
         {
           "id": "gpt-5.2", "name": "GPT-5.2 (ggboom)",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "gpt-5.3", "name": "GPT-5.3 (ggboom)",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        }
+      ]
+    },
+    "laoyou": {
+      "baseUrl": "https://api.freestyle.cc.cd",
+      "apiKey": "${LAOYOU_API_KEY:-}",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "claude-opus-4-6", "name": "Claude Opus 4.6 (laoyou)",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5 (laoyou)",
+          "reasoning": true, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (laoyou)",
+          "reasoning": false, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        }
+      ]
+    },
+    "code": {
+      "baseUrl": "https://code.claudex.us.ci",
+      "apiKey": "${CODE_API_KEY:-}",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (code)",
+          "reasoning": false, "input": ["text", "image"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 200000, "maxTokens": 8192
+        },
+        {
+          "id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5 (code)",
           "reasoning": true, "input": ["text", "image"],
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
           "contextWindow": 200000, "maxTokens": 8192
@@ -637,8 +688,11 @@ for agent in companion memory technical creative tooling voice vision vibe-coder
 {
   "primary": "ggboom/gpt-5.2",
   "fallbacks": [
-    "anyrouter/claude-haiku-4-5-20251001",
-    "wzw/claude-sonnet-4-5-20250929"
+    "ggboom/gpt-5.2",
+    "anyrouter/claude-sonnet-4-5-20250929",
+    "laoyou/claude-sonnet-4-5-20250929",
+    "code/claude-sonnet-4-5-20250929",
+    "anyrouter/claude-haiku-4-5-20251001"
   ]
 }
 MJSON
@@ -654,9 +708,8 @@ for agent in "${AUTH_AGENTS[@]}"; do
   "version": 1,
   "profiles": {
     "anyrouter:default": { "type": "api_key", "provider": "anyrouter", "key": "${ANYROUTER_API_KEY:-}" },
-    "wzw:default":       { "type": "api_key", "provider": "wzw",       "key": "${WZW_API_KEY:-}" },
-    "wzw_openai:default":{ "type": "api_key", "provider": "wzw_openai","key": "${WZW_API_KEY:-}" },
     "ggboom:default":    { "type": "api_key", "provider": "ggboom",    "key": "${GGBOOM_API_KEY:-}" },
+    "laoyou:default":    { "type": "api_key", "provider": "laoyou",    "key": "${LAOYOU_API_KEY:-}" },
     "code:default":      { "type": "api_key", "provider": "code",      "key": "${CODE_API_KEY:-}" }
   }
 }
@@ -678,3 +731,8 @@ echo "[OK] Synced OpenClaw env: ${OPENCLAW_GLOBAL_ENV}"
 echo "[OK] Workspace set to: ${WORKSPACE_DIR_ABS}"
 echo "[OK] Agents registered: ${AGENTS[*]}"
 echo "[OK] Plugin: savc-orchestrator → ${OPENCLAW_SUBMODULE}/extensions/savc-orchestrator"
+if [[ "${SAVC_AUTODEV_ENABLE}" == "1" ]]; then
+  echo "[OK] Yuanyuan autodev mode: enabled (workspaceAccess=rw, main tools=coding)"
+else
+  echo "[INFO] Yuanyuan autodev mode: disabled (set SAVC_AUTODEV_ENABLE=1 to enable)"
+fi

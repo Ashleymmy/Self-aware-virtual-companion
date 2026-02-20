@@ -1,6 +1,7 @@
 # Environment (contains secrets)
 .env
 config/.env.local
+infra/docker/.env
 
 # Node dependencies
 node_modules/
@@ -50,3 +51,6 @@ savc-core/memory/**
 
 # Git bundle backup (local-only)
 *.bundle
+
+# Runtime artifacts
+.runtime/

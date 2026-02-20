@@ -7,6 +7,18 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 WORKSPACE="${REPO_ROOT}/savc-core"
 DATE="${1:-}"
 
+if [[ "${SAVC_SELF_UPGRADE_LOOP:-0}" == "1" ]]; then
+  UPGRADE_ARGS=(--workspace "${WORKSPACE}")
+  if [[ -n "${DATE}" ]]; then
+    UPGRADE_ARGS+=(--date "${DATE}")
+  fi
+  if [[ "${PERSONA_TUNING_APPLY:-}" == "1" ]]; then
+    UPGRADE_ARGS+=(--apply-persona)
+  fi
+  bash "${REPO_ROOT}/scripts/dev_self_upgrade.sh" "${UPGRADE_ARGS[@]}"
+  exit 0
+fi
+
 if [[ -n "${DATE}" ]]; then
   node "${REPO_ROOT}/scripts/self_reflection_runtime.mjs" daily --workspace "${WORKSPACE}" --date "${DATE}"
 else

@@ -1,0 +1,43 @@
+{
+  "gateway": {
+    "port": 18789,
+    "auth": {
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    }
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/workspace/savc-core",
+      "memorySearch": {
+        "enabled": true,
+        "provider": "openai",
+        "remote": {
+          "baseUrl": "https://api.siliconflow.cn/v1",
+          "apiKey": "${SILICON_EMBEDDING_API_KEY}"
+        },
+        "fallback": "none",
+        "model": "Qwen/Qwen3-Embedding-8B"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "savc-orchestrator": {
+        "enabled": true,
+        "config": {
+          "savcCorePath": "/workspace/savc-core",
+          "spawnMode": "real",
+          "defaultWait": true,
+          "defaultTimeoutMs": 120000,
+          "memoryRecallEnabled": true,
+          "memoryRecallTopK": 5,
+          "memoryMinScore": 0.25,
+          "memoryPersistEnabled": true
+        }
+      }
+    }
+  }
+}

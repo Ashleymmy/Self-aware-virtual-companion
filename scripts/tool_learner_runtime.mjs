@@ -82,10 +82,9 @@ function boolFlag(value) {
   return ['1', 'true', 'yes', 'on'].includes(text);
 }
 
-async function runOpenClaw(repoRoot, args) {
-  const scriptPath = path.join(repoRoot, 'scripts', 'openclaw.sh');
+async function runCommand(command, commandArgs) {
   return new Promise((resolve) => {
-    const child = spawn('bash', [scriptPath, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, commandArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => {
@@ -98,6 +97,31 @@ async function runOpenClaw(repoRoot, args) {
       resolve({ code: code ?? 1, stdout, stderr });
     });
   });
+}
+
+async function runOpenClaw(repoRoot, args) {
+  const scriptPath = path.join(repoRoot, 'scripts', 'openclaw.sh');
+  const modulePath = path.join(repoRoot, 'openclaw', 'openclaw.mjs');
+
+  const primary = await runCommand('bash', [scriptPath, ...args]);
+  if (primary.code === 0) {
+    return primary;
+  }
+
+  if (!(await exists(modulePath))) {
+    return primary;
+  }
+
+  const fallback = await runCommand('node', [modulePath, ...args]);
+  if (fallback.code === 0) {
+    return fallback;
+  }
+
+  return {
+    code: fallback.code,
+    stdout: [primary.stdout, fallback.stdout].filter(Boolean).join('\n'),
+    stderr: [primary.stderr, fallback.stderr].filter(Boolean).join('\n'),
+  };
 }
 
 async function scaffoldTool(toolRoot, toolName, date) {
