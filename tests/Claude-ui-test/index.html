@@ -1,0 +1,3955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAVC Studio · 统一交互工作台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ─── Design Tokens ─── */
+:root {
+  --sidebar-bg:     #1E1710;
+  --sidebar-hover:  #2C2218;
+  --sidebar-active: #3A2E22;
+  --sidebar-border: #3D3025;
+
+  --main-bg:        #F7F3EE;
+  --main-surface:   #FFFFFF;
+  --border:         #DDD5C8;
+  --border-light:   #EDE8E0;
+
+  --panel-bg:       #EFEBE4;
+  --panel-border:   #DDD5C8;
+
+  --accent:         #C8571E;
+  --accent-light:   #F2E8E0;
+  --accent-dark:    #A34415;
+  --accent-muted:   #E8B49A;
+
+  --text-dark:      #2C1F14;
+  --text-mid:       #7B6651;
+  --text-light:     #A89886;
+  --text-cream:     #F0E8DE;
+  --text-cream-mid: #B8A898;
+
+  --status-ok:      #2D7A47;
+  --status-ok-bg:   #E6F4EC;
+  --status-warn:    #B8640A;
+  --status-warn-bg: #FEF3E2;
+  --status-err:     #C0392B;
+  --status-err-bg:  #FDE8E6;
+
+  --font-ui:      'Inter', 'Noto Sans SC', sans-serif;
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-mono:    'Menlo', 'Courier New', monospace;
+
+  --transition:  180ms ease-out;
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   16px;
+}
+
+/* ─────────────────────────────────
+   FLOATING VSCODE WIDGET
+───────────────────────────────── */
+#vscode-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 740px;
+  height: 500px;
+  background: #1E1A12;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.35);
+  z-index: 300;
+  display: none;
+  flex-direction: column;
+  font-family: 'Menlo', 'Courier New', monospace;
+  font-size: 12px;
+  transform-origin: bottom right;
+  transform: scale(0.21);
+  transition: transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              box-shadow 300ms ease;
+}
+#vscode-widget.vsc-mini   { display: flex; transform: scale(0.21); cursor: pointer; }
+#vscode-widget.vsc-expanded {
+  display: flex; transform: scale(1); cursor: default;
+  box-shadow: 0 28px 72px rgba(0,0,0,0.55), 0 10px 30px rgba(0,0,0,0.4);
+}
+.vsc-mini-overlay {
+  position: absolute; inset: 0; z-index: 50; cursor: pointer;
+}
+#vscode-widget.vsc-expanded .vsc-mini-overlay { display: none; }
+
+/* Title bar */
+.vsc-titlebar {
+  height: 32px; background: #2A2018; display: flex;
+  align-items: center; padding: 0 10px; gap: 8px;
+  flex-shrink: 0; cursor: move; user-select: none;
+  border-bottom: 1px solid #3A2E1E;
+}
+.vsc-traffic { display: flex; gap: 6px; margin-right: 4px; }
+.vsc-dot {
+  width: 12px; height: 12px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+}
+.vsc-dot-close { background: #ff5f57; }
+.vsc-dot-min   { background: #febc2e; }
+.vsc-dot-max   { background: #28c840; }
+.vsc-title-text {
+  flex: 1; text-align: center; font-size: 12px; color: #C8B89A;
+  font-family: var(--font-ui); letter-spacing: 0.01em;
+}
+.vsc-tb-btn {
+  width: 24px; height: 20px; background: transparent; border: none;
+  color: #7B6845; cursor: pointer; font-size: 14px; display: flex;
+  align-items: center; justify-content: center; border-radius: 3px;
+}
+.vsc-tb-btn:hover { background: rgba(255,255,255,0.08); color: #E0D4C4; }
+
+/* Body layout */
+.vsc-body { flex: 1; display: flex; overflow: hidden; }
+
+/* Activity bar */
+.vsc-activitybar {
+  width: 46px; background: #231C10; display: flex; flex-direction: column;
+  align-items: center; padding-top: 6px; gap: 2px; flex-shrink: 0;
+}
+.vsc-ab-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: #7B6845; cursor: pointer; border-radius: 4px; font-size: 15px;
+  position: relative; transition: color 120ms;
+}
+.vsc-ab-icon:hover { color: #C8B89A; }
+.vsc-ab-icon.active { color: #F0E8DE; }
+.vsc-ab-icon.active::before {
+  content: ''; position: absolute; left: -2px; top: 6px; bottom: 6px;
+  width: 2px; background: #C8571E; border-radius: 0 2px 2px 0;
+}
+
+/* Sidebar */
+.vsc-sidebar {
+  width: 195px; background: #2C2218; border-right: 1px solid #3A2E1E;
+  display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+}
+.vsc-sidebar-title {
+  padding: 8px 12px 6px; font-size: 10px; font-weight: 700; color: #A89070;
+  letter-spacing: 0.1em; text-transform: uppercase; font-family: var(--font-ui);
+}
+.vsc-sidebar-panel { flex: 1; overflow-y: auto; overflow-x: hidden; display: none; }
+.vsc-sidebar-panel.active { display: block; }
+.vsc-sidebar-panel::-webkit-scrollbar { width: 4px; }
+.vsc-sidebar-panel::-webkit-scrollbar-thumb { background: #4A3A28; }
+
+/* File tree */
+.vsc-tree-row {
+  display: flex; align-items: center; padding: 1.5px 4px; color: #D4C4A8;
+  cursor: pointer; white-space: nowrap; font-size: 12px; font-family: var(--font-ui);
+  transition: background 80ms; gap: 2px;
+}
+.vsc-tree-row:hover { background: #302418; }
+.vsc-tree-row.active { background: #4A3520 !important; color: #F0E8DE; }
+.vsc-tree-arrow { width: 14px; color: #7B6845; font-size: 10px; flex-shrink: 0; text-align: center; }
+.vsc-tree-ico   { font-size: 12px; flex-shrink: 0; }
+.vsc-tree-name  { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.vsc-tree-mod   { font-size: 10px; padding-right: 4px; flex-shrink: 0; }
+.vsc-tree-mod.m { color: #E8C080; }
+.vsc-tree-mod.u { color: #73c991; }
+
+/* Git panel */
+.vsc-git-commit-area { padding: 8px; border-bottom: 1px solid #3A2E1E; }
+.vsc-git-textarea {
+  width: 100%; background: #1E1A12; border: 1px solid #4A3828; border-radius: 3px;
+  color: #D4C4A8; font-size: 11px; padding: 5px 8px; font-family: var(--font-ui);
+  outline: none; resize: none; height: 48px; box-sizing: border-box;
+}
+.vsc-git-textarea:focus { border-color: #C8571E; }
+.vsc-git-commit-btn {
+  width: 100%; margin-top: 5px; background: #C8571E; color: #fff; border: none;
+  border-radius: 3px; padding: 5px; font-size: 11px; cursor: pointer;
+  font-family: var(--font-ui);
+}
+.vsc-git-commit-btn:hover { background: #A34415; }
+.vsc-git-section-title {
+  padding: 6px 12px 4px; font-size: 10px; font-weight: 700; color: #A89070;
+  letter-spacing: 0.08em; text-transform: uppercase; font-family: var(--font-ui);
+}
+.vsc-git-file {
+  display: flex; align-items: center; padding: 2px 8px 2px 16px; gap: 6px;
+  color: #D4C4A8; font-size: 11px; font-family: var(--font-ui); cursor: default;
+}
+.vsc-git-file:hover { background: #302418; }
+.vsc-git-mark { font-size: 10px; width: 12px; flex-shrink: 0; }
+.vsc-git-mark.m { color: #E8C080; }
+.vsc-git-mark.u { color: #73c991; }
+.vsc-git-mark.a { color: #6ABFB8; }
+
+/* Editor area */
+.vsc-editor-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #1E1A12; }
+
+/* Tabs */
+.vsc-tabs { display: flex; background: #252018; overflow-x: auto; flex-shrink: 0; height: 34px; }
+.vsc-tabs::-webkit-scrollbar { height: 0; }
+.vsc-tab {
+  display: flex; align-items: center; gap: 5px; padding: 0 12px;
+  font-size: 12px; font-family: var(--font-ui); color: #7B6845; cursor: pointer;
+  white-space: nowrap; border-right: 1px solid #1E1A12; border-top: 2px solid transparent;
+  transition: background 100ms; flex-shrink: 0;
+}
+.vsc-tab:hover  { background: #2A2018; color: #C8B89A; }
+.vsc-tab.active { background: #1E1A12; color: #F0E8DE; border-top-color: #C8571E; }
+.vsc-tab-x { font-size: 10px; color: #4A3828; opacity: 0; }
+.vsc-tab:hover .vsc-tab-x, .vsc-tab.active .vsc-tab-x { opacity: 1; }
+
+/* Breadcrumb */
+.vsc-breadcrumb {
+  height: 24px; display: flex; align-items: center; padding: 0 12px; gap: 4px;
+  font-size: 11px; font-family: var(--font-ui); color: #7B6845;
+  border-bottom: 1px solid #2A2018; flex-shrink: 0;
+}
+.vsc-bc-sep { color: #4A3828; }
+.vsc-bc-cur { color: #C8B89A; }
+
+/* Code display */
+.vsc-code { flex: 1; overflow-y: auto; overflow-x: auto; padding: 6px 0; }
+.vsc-code::-webkit-scrollbar { width: 8px; }
+.vsc-code::-webkit-scrollbar-thumb { background: #4A3A28; }
+/* CodeMirror mount container */
+#vsc-cm-mount { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+#vsc-cm-mount .cm-editor { height: 100%; font-size: 12px; }
+#vsc-cm-mount .cm-scroller { overflow: auto; }
+.vsc-code-line {
+  display: flex; min-height: 18px; font-size: 12.5px;
+  font-family: 'Menlo', 'Courier New', monospace; line-height: 18px;
+}
+.vsc-code-line:hover { background: rgba(255,255,255,0.03); }
+.vsc-code-line.hi    { background: rgba(255,200,120,0.07); }
+.vsc-ln { width: 44px; text-align: right; padding-right: 14px; color: #5A4830; user-select: none; flex-shrink: 0; }
+.vsc-code-line.hi .vsc-ln { color: #C8B89A; }
+.vsc-ct  { flex: 1; padding-right: 20px; white-space: pre; color: #D4C4A8; }
+/* Syntax tokens */
+.k  { color: #7EB8E8; }
+.f  { color: #DCDCAA; }
+.s  { color: #D4926A; }
+.c  { color: #7A9955; }
+.n  { color: #B8CEA8; }
+.t  { color: #5EC9B0; }
+.p  { color: #9CDCFE; }
+
+/* Bottom panel */
+.vsc-panel {
+  height: 155px; background: #1A1610; border-top: 1px solid #3A2E1E;
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.vsc-panel.hidden { display: none; }
+/* xterm.js overrides to fit warm theme */
+#xterm-mount .xterm { height: 100%; padding: 4px; }
+.vsc-panel-tabs {
+  display: flex; background: #252018; height: 28px; border-bottom: 1px solid #3A2E1E;
+  flex-shrink: 0; align-items: stretch;
+}
+.vsc-panel-tab {
+  padding: 0 14px; font-size: 11px; font-family: var(--font-ui);
+  color: #7B6845; cursor: pointer; display: flex; align-items: center;
+  border-bottom: 2px solid transparent;
+}
+.vsc-panel-tab.active { color: #C8B89A; border-bottom-color: #C8571E; }
+.vsc-terminal {
+  flex: 1; overflow-y: auto; padding: 5px 10px;
+  font-family: 'Menlo', 'Courier New', monospace; font-size: 11.5px;
+}
+.vsc-terminal::-webkit-scrollbar { width: 4px; }
+.vsc-terminal::-webkit-scrollbar-thumb { background: #4A3A28; }
+.tl { line-height: 18px; white-space: pre; }
+.tp { color: #C8A870; }
+.to { color: #7B6845; }
+.te { color: #f48771; }
+.tw { color: #E8C080; }
+
+/* Status bar */
+.vsc-statusbar {
+  height: 22px; background: #A34415; display: flex; align-items: center;
+  padding: 0 10px; gap: 0; flex-shrink: 0;
+}
+.vsc-sb {
+  font-size: 11px; font-family: var(--font-ui); color: #F0E8DE;
+  padding: 0 6px; cursor: pointer; height: 100%;
+  display: flex; align-items: center; gap: 3px;
+}
+.vsc-sb:hover { background: rgba(255,255,255,0.12); }
+.vsc-sb-r { margin-left: auto; }
+
+/* ─── Reset ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-dark);
+  background: var(--main-bg);
+  display: flex;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+
+/* ─── Sidebar ─── */
+#sidebar {
+  width: 240px;
+  min-width: 0;
+  flex-shrink: 0;
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--sidebar-border);
+  overflow: hidden;
+  transition: width 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              border-color 280ms ease;
+}
+#sidebar.collapsed {
+  width: 0;
+  border-right-color: transparent;
+}
+/* Fix inner content width so it clips cleanly during animation */
+#sidebar > * { min-width: 240px; }
+
+/* ─── Sidebar Toggle Tab ─── */
+#sidebar-toggle {
+  position: fixed;
+  top: 50%;
+  left: 240px;
+  transform: translateY(-50%);
+  z-index: 200;
+  width: 20px;
+  height: 52px;
+  background: #2A2018;
+  border: 1px solid var(--sidebar-border);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-cream-mid);
+  font-size: 12px;
+  padding: 0;
+  line-height: 1;
+  user-select: none;
+  transition: left 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              background var(--transition), color var(--transition);
+}
+#sidebar-toggle:hover {
+  background: var(--sidebar-active);
+  color: var(--text-cream);
+}
+#sidebar-toggle.sidebar-collapsed {
+  left: 0;
+  border-radius: 0 8px 8px 0;
+}
+
+.sidebar-header {
+  padding: 20px 16px 14px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+.sidebar-wordmark {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--text-cream);
+  letter-spacing: 0.02em;
+}
+.sidebar-subtitle {
+  font-size: 10px;
+  color: var(--text-cream-mid);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.sidebar-avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+.avatar-wrapper {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 8px;
+}
+.avatar-wrapper svg { width: 52px; height: 52px; border-radius: 50%; }
+.online-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  background: #4CAF50;
+  border-radius: 50%;
+  border: 2px solid var(--sidebar-bg);
+}
+.avatar-name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text-cream);
+  margin-bottom: 2px;
+}
+.avatar-status {
+  font-size: 11px;
+  color: #4CAF50;
+}
+
+.sidebar-scenes {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+.scenes-label {
+  font-size: 10px;
+  color: var(--text-cream-mid);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.scenes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.scene-pill {
+  background: var(--sidebar-hover);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 20px;
+  color: var(--text-cream-mid);
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: var(--transition);
+  font-family: var(--font-ui);
+}
+.scene-pill:hover {
+  background: var(--sidebar-active);
+  color: var(--text-cream);
+}
+.scene-pill.active {
+  background: var(--accent);
+  border-color: var(--accent-dark);
+  color: #fff;
+}
+
+.sidebar-divider {
+  border: none;
+  border-top: 1px solid var(--sidebar-border);
+  margin: 0;
+}
+
+.monitor-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 16px;
+  padding: 9px 12px;
+  background: var(--sidebar-hover);
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-md);
+  color: var(--text-cream-mid);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: var(--font-ui);
+}
+.monitor-btn:hover {
+  background: var(--sidebar-active);
+  color: var(--text-cream);
+}
+.monitor-btn.active {
+  background: var(--accent);
+  border-color: var(--accent-dark);
+  color: #fff;
+}
+.monitor-btn-arrow {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.sidebar-sessions {
+  padding: 10px 16px;
+  flex: 1;
+}
+.sessions-label {
+  font-size: 10px;
+  color: var(--text-cream-mid);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.session-item {
+  display: flex;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  margin-bottom: 2px;
+  gap: 8px;
+}
+.session-item:hover { background: var(--sidebar-hover); }
+.session-item.active { background: var(--sidebar-active); }
+.session-channel-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.badge-web    { background: #1A6ECA22; color: #5BA3F5; }
+.badge-discord { background: #5865F222; color: #8892F8; }
+.badge-tg     { background: #27A7E722; color: #4DBFEF; }
+.session-info { flex: 1; min-width: 0; }
+.session-name {
+  font-size: 12px;
+  color: var(--text-cream);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-preview {
+  font-size: 10px;
+  color: var(--text-cream-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.sidebar-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--sidebar-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-cream-mid);
+}
+.footer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4CAF50;
+  flex-shrink: 0;
+}
+
+/* ─── Main Content ─── */
+#main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.view {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+.view.active { display: flex; }
+
+/* ─────────────────────────────────
+   VIEW 1: COMPANION
+───────────────────────────────── */
+#view-companion {
+  background: #FAF6F0;
+  flex-direction: row;
+}
+
+.companion-presence {
+  width: 200px;
+  min-width: 200px;
+  background: #F2EDE5;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 16px 20px;
+  overflow-y: auto;
+}
+.companion-avatar-wrap {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin-bottom: 20px;
+}
+.companion-avatar-wrap svg {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 8px rgba(200,87,30,0.10), 0 0 0 18px rgba(200,87,30,0.05);
+}
+.companion-name {
+  font-family: var(--font-display);
+  font-size: 28px;
+  color: var(--text-dark);
+  margin-bottom: 6px;
+}
+.companion-subtitle {
+  font-size: 13px;
+  color: var(--text-mid);
+  margin-bottom: 28px;
+}
+.emotion-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 28px;
+}
+.emotion-ring-label {
+  font-size: 11px;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 8px;
+}
+.memories-section {
+  width: 100%;
+}
+.memories-label {
+  font-size: 11px;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
+}
+.memory-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.memory-chip {
+  background: #E8DDD2;
+  border: 1px solid #D5C8BA;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-mid);
+}
+
+.companion-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.companion-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.msg.user { align-items: flex-end; }
+.msg.assistant { align-items: flex-start; }
+.msg-bubble {
+  max-width: 78%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.msg.user .msg-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.msg.assistant .msg-bubble {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  color: var(--text-dark);
+  border-bottom-left-radius: 4px;
+}
+.msg-time {
+  font-size: 10px;
+  color: var(--text-light);
+}
+
+.companion-input-area {
+  padding: 16px 28px 24px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.companion-input {
+  flex: 1;
+  border: 1.5px solid var(--border);
+  border-radius: 24px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-family: var(--font-ui);
+  background: var(--main-surface);
+  color: var(--text-dark);
+  outline: none;
+  transition: var(--transition);
+}
+.companion-input:focus { border-color: var(--accent); }
+.send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.send-btn:hover { background: var(--accent-dark); }
+
+/* ─────────────────────────────────
+   COMPANION: LIVE2D PANEL
+───────────────────────────────── */
+.companion-live2d {
+  width: 380px;
+  min-width: 320px;
+  background: #EDE7DE;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.live2d-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.45);
+  flex-shrink: 0;
+}
+.live2d-header-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.live2d-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--status-warn-bg);
+  color: var(--status-warn);
+  border: 1px solid rgba(184,100,10,0.2);
+  font-weight: 500;
+}
+.live2d-badge.gateway {
+  background: var(--status-ok-bg);
+  color: var(--status-ok);
+  border-color: rgba(45,122,71,0.2);
+}
+
+.live2d-canvas-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(170deg, #F8F2EA 0%, #EAE0D2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Subtle ambient glow behind character */
+.live2d-canvas-area::before {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(200,87,30,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  pointer-events: none;
+}
+
+.live2d-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  animation: l2d-breathe 3.6s ease-in-out infinite;
+}
+@keyframes l2d-breathe {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+
+.live2d-head svg {
+  filter: drop-shadow(0 6px 18px rgba(0,0,0,0.14));
+}
+
+.live2d-neck {
+  width: 28px;
+  height: 22px;
+  background: linear-gradient(180deg, #E8A070, #D08050);
+  margin: -4px auto 0;
+  border-radius: 0 0 8px 8px;
+}
+.live2d-body-shape {
+  width: 150px;
+  height: 170px;
+  background: linear-gradient(165deg, #D4826A 0%, #C0684A 40%, #A8543A 100%);
+  border-radius: 75px 75px 50px 50px;
+  position: relative;
+  box-shadow: inset 0 -20px 40px rgba(0,0,0,0.1), 0 4px 20px rgba(0,0,0,0.12);
+  margin-top: -6px;
+}
+/* Collar detail */
+.live2d-body-shape::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 30px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 0 0 25px 25px;
+  clip-path: polygon(20% 0, 80% 0, 100% 100%, 0% 100%);
+}
+
+/* Lip sync waveform at bottom of canvas */
+.live2d-waveform {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 20px;
+}
+.wf-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.5;
+}
+.wf-bar:nth-child(1) { animation: wf 1.1s 0.0s ease-in-out infinite alternate; }
+.wf-bar:nth-child(2) { animation: wf 0.9s 0.1s ease-in-out infinite alternate; }
+.wf-bar:nth-child(3) { animation: wf 1.3s 0.2s ease-in-out infinite alternate; }
+.wf-bar:nth-child(4) { animation: wf 0.8s 0.0s ease-in-out infinite alternate; }
+.wf-bar:nth-child(5) { animation: wf 1.1s 0.3s ease-in-out infinite alternate; }
+.wf-bar:nth-child(6) { animation: wf 1.4s 0.1s ease-in-out infinite alternate; }
+.wf-bar:nth-child(7) { animation: wf 0.9s 0.2s ease-in-out infinite alternate; }
+@keyframes wf {
+  from { height: 3px; }
+  to   { height: 16px; }
+}
+
+/* Canvas corner label */
+.live2d-canvas-label {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  font-size: 9px;
+  color: var(--text-light);
+  background: rgba(255,255,255,0.65);
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  backdrop-filter: blur(4px);
+}
+
+/* Controls bar */
+.live2d-controls {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+.live2d-controls-label {
+  font-size: 10px;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+.live2d-action-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.live2d-action-btn {
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  font-size: 11px;
+  color: var(--text-mid);
+  background: rgba(255,255,255,0.65);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: var(--transition);
+}
+.live2d-action-btn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-muted);
+  color: var(--accent);
+}
+.live2d-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.live2d-mode-label {
+  font-size: 11px;
+  color: var(--text-light);
+  flex: 1;
+}
+.live2d-mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: #DDD5C8;
+  border-radius: 6px;
+  padding: 2px;
+}
+.live2d-mode-opt {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  color: var(--text-mid);
+  transition: var(--transition);
+  user-select: none;
+}
+.live2d-mode-opt.active {
+  background: var(--main-surface);
+  color: var(--text-dark);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* ─────────────────────────────────
+   VIEW 2: DEV
+───────────────────────────────── */
+#view-dev {
+  background: var(--main-bg);
+  flex-direction: row;
+}
+
+.dev-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+
+.dev-tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--main-surface);
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+.dev-tab-btn {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-mid);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  font-family: var(--font-ui);
+  transition: var(--transition);
+  margin-bottom: -1px;
+}
+.dev-tab-btn:hover { color: var(--text-dark); }
+.dev-tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+.dev-tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.dev-tab-content.active { display: flex; }
+
+/* tab: interaction */
+.dev-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dev-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dev-msg.user { align-items: flex-end; }
+.dev-msg.assistant { align-items: flex-start; }
+.dev-msg-bubble {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  border-left: 3px solid transparent;
+}
+.dev-msg.user .dev-msg-bubble {
+  background: var(--accent-light);
+  border-left-color: var(--accent);
+  color: var(--text-dark);
+}
+.dev-msg.assistant .dev-msg-bubble {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-muted);
+  color: var(--text-dark);
+}
+
+.dev-input-area {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  gap: 8px;
+  background: var(--main-surface);
+  flex-shrink: 0;
+}
+.dev-input {
+  flex: 1;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 9px 14px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  background: var(--panel-bg);
+  color: var(--text-dark);
+  outline: none;
+  transition: var(--transition);
+}
+.dev-input:focus { border-color: var(--accent); background: var(--main-surface); }
+.dev-send-btn {
+  padding: 9px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: var(--transition);
+}
+.dev-send-btn:hover { background: var(--accent-dark); }
+
+/* tab: exec */
+.tool-list { padding: 16px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.tool-row {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+}
+.tool-row-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 10px;
+}
+.tool-status-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.tool-status-ok   { background: var(--status-ok-bg);   color: var(--status-ok);  }
+.tool-status-err  { background: var(--status-err-bg);  color: var(--status-err); }
+.tool-status-run  { background: var(--status-warn-bg); color: var(--status-warn);}
+.tool-name { font-size: 13px; font-weight: 500; color: var(--text-dark); font-family: var(--font-mono); flex: 1; }
+.tool-duration { font-size: 11px; color: var(--text-light); }
+.tool-detail {
+  display: none;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border-light);
+  font-size: 12px;
+  color: var(--text-mid);
+  font-family: var(--font-mono);
+  background: var(--panel-bg);
+  line-height: 1.6;
+}
+.tool-row.open .tool-detail { display: block; }
+
+/* tab: context */
+.context-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  align-content: start;
+}
+.context-col-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+.context-card {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.context-card-title { font-size: 12px; font-weight: 500; color: var(--text-dark); margin-bottom: 4px; }
+.context-card-desc  { font-size: 11px; color: var(--text-mid); line-height: 1.5; }
+
+/* tab: settings */
+.settings-section { padding: 20px 24px; overflow-y: auto; }
+.settings-group {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-label { font-size: 13px; color: var(--text-dark); }
+.settings-desc  { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.settings-select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  background: var(--panel-bg);
+  color: var(--text-dark);
+  cursor: pointer;
+  outline: none;
+}
+.toggle {
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: var(--transition);
+}
+.toggle.on::after { left: 18px; }
+
+/* right panel */
+.dev-right-panel {
+  width: 280px;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px;
+  gap: 14px;
+}
+.panel-card {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.panel-card-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-light);
+  margin-bottom: 10px;
+}
+.session-card-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dark);
+  margin-bottom: 4px;
+}
+.session-card-meta {
+  font-size: 11px;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+.tool-trace-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 11px;
+  color: var(--text-mid);
+  border-bottom: 1px dashed var(--border-light);
+}
+.tool-trace-item:last-child { border-bottom: none; }
+.trace-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.stat-number-card {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  text-align: center;
+}
+.stat-num {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-lbl { font-size: 10px; color: var(--text-light); }
+.channel-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+.channel-bar-label { width: 60px; color: var(--text-mid); flex-shrink: 0; }
+.channel-bar-track { flex: 1; background: var(--border-light); border-radius: 3px; height: 6px; overflow: hidden; }
+.channel-bar-fill  { height: 100%; border-radius: 3px; }
+.channel-bar-val   { width: 24px; text-align: right; color: var(--text-light); flex-shrink: 0; }
+
+/* ─────────────────────────────────
+   VIEW 3: DEBUG
+───────────────────────────────── */
+#view-debug {
+  background: #1A1410;
+  flex-direction: row;
+}
+
+.debug-left {
+  width: 220px;
+  min-width: 220px;
+  background: #140F0A;
+  border-right: 1px solid #2D2218;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 14px;
+}
+.debug-tree-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #6B5A4A;
+  margin-bottom: 12px;
+}
+.debug-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+  margin-top: 10px;
+}
+.debug-section-label.err { color: #C0392B; }
+.debug-section-label.warn { color: #B8640A; }
+.debug-error-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: var(--transition);
+}
+.debug-error-item:hover { background: rgba(255,255,255,0.04); }
+.debug-error-item.active { background: rgba(192,57,43,0.12); }
+.debug-error-item.warn-item:hover { background: rgba(255,255,255,0.04); }
+.debug-error-item.warn-item.active { background: rgba(184,100,10,0.12); }
+.error-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.dot-red  { background: #C0392B; }
+.dot-yellow { background: #B8640A; }
+.error-text { font-size: 12px; color: #C4B8A8; line-height: 1.5; }
+.error-detail { font-size: 10px; color: #6B5A4A; margin-top: 1px; }
+
+.debug-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.debug-chat-area {
+  flex: 0 0 45%;
+  border-bottom: 2px solid #2D2218;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.debug-resize-handle {
+  height: 8px;
+  background: #1A1410;
+  border-top: 1px solid #2D2218;
+  border-bottom: 1px solid #2D2218;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  flex-shrink: 0;
+}
+.debug-resize-dots {
+  display: flex;
+  gap: 3px;
+}
+.debug-resize-dots span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #4D3A2A;
+}
+.debug-terminal {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #0D0A07;
+}
+.terminal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #1E1710;
+  background: #110D0A;
+  flex-shrink: 0;
+}
+.terminal-search {
+  flex: 1;
+  background: #1A1410;
+  border: 1px solid #2D2218;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: #C4B8A8;
+  outline: none;
+}
+.terminal-search::placeholder { color: #4D3A2A; }
+.terminal-logs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.log-line {
+  display: flex;
+  gap: 8px;
+  padding: 1px 0;
+}
+.log-line.log-err { background: rgba(192,57,43,0.10); padding: 1px 4px; border-radius: 2px; }
+.log-ts   { color: #4EC9B0; flex-shrink: 0; }
+.log-agent { flex-shrink: 0; font-weight: 600; }
+.log-agent.orch   { color: #B8640A; }
+.log-agent.memory { color: #C0392B; }
+.log-agent.voice  { color: #2D7A47; }
+.log-agent.live2d { color: #6B8FD4; }
+.log-agent.sys    { color: #6B5A4A; }
+.log-arrow { color: #4D3A2A; flex-shrink: 0; }
+.log-text  { color: #C4B8A8; flex: 1; }
+.log-text.err-text { color: #E87070; }
+
+.debug-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.debug-msg.user { align-items: flex-end; }
+.debug-msg.assistant { align-items: flex-start; }
+.debug-msg-bubble {
+  max-width: 80%;
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.debug-msg.user .debug-msg-bubble {
+  background: #2C2018;
+  color: #C4B8A8;
+  border-right: 3px solid #4D3A2A;
+}
+.debug-msg.assistant .debug-msg-bubble {
+  background: #1E1610;
+  border: 1px solid #2D2218;
+  border-left: 3px solid #4D3A2A;
+  color: #C4B8A8;
+}
+.debug-msg.assistant .debug-msg-bubble.error-reply {
+  border-left: 3px solid #C0392B;
+}
+.debug-msg-time { font-size: 10px; color: #4D3A2A; }
+
+/* ─────────────────────────────────
+   VIEW 4: PLAN
+───────────────────────────────── */
+#view-plan {
+  background: #F4F0E8;
+  flex-direction: row;
+}
+
+.plan-outline {
+  width: 200px;
+  min-width: 200px;
+  background: #EDE8DE;
+  border-right: 1px solid #DDD5C8;
+  padding: 16px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.plan-outline-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-light);
+  margin-bottom: 12px;
+}
+.outline-root {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 8px;
+  padding: 4px 8px;
+}
+.outline-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+.outline-item::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 70%;
+  background: var(--border);
+}
+.outline-item:hover { background: #E3DDD3; color: var(--text-dark); }
+.outline-item.active {
+  background: rgba(200,87,30,0.1);
+  color: var(--accent);
+  font-weight: 500;
+}
+.outline-item-num { color: var(--text-light); font-size: 11px; }
+
+.plan-kanban {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px;
+  gap: 0;
+}
+.kanban-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-light);
+  margin-bottom: 12px;
+}
+.kanban-cols {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  overflow: hidden;
+}
+.kanban-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.kanban-col-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+.kanban-col-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+.kanban-col-count {
+  background: var(--border);
+  color: var(--text-mid);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.kanban-col-cards {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kanban-card {
+  background: var(--main-surface);
+  border: 1px solid #DDD5C8;
+  border-radius: 8px;
+  padding: 11px 13px;
+}
+.kanban-card-title { font-size: 13px; font-weight: 500; color: var(--text-dark); margin-bottom: 7px; }
+.kanban-card-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.kanban-tag {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--panel-bg);
+  color: var(--text-mid);
+  border: 1px solid var(--border-light);
+}
+.kanban-phase {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.phase-w0 { background: var(--status-ok-bg); color: var(--status-ok); }
+.phase-w1 { background: var(--status-warn-bg); color: var(--status-warn); }
+.phase-w2 { background: var(--accent-light); color: var(--accent); }
+.phase-arch { background: #EEF2FF; color: #5B6AD4; }
+.phase-api  { background: #F3F0FF; color: #7C5CFC; }
+
+.plan-milestone {
+  width: 210px;
+  min-width: 210px;
+  background: #EDE8DE;
+  border-left: 1px solid #DDD5C8;
+  padding: 16px 16px;
+  overflow-y: auto;
+}
+.milestone-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-light);
+  margin-bottom: 16px;
+}
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: var(--border);
+}
+.milestone-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+.milestone-dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid;
+  background: #EDE8DE;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.milestone-dot.done   { background: var(--status-ok); border-color: var(--status-ok); }
+.milestone-dot.active { background: var(--status-warn); border-color: var(--status-warn); }
+.milestone-dot.todo   { background: #EDE8DE; border-color: var(--border); }
+.milestone-dot.launch { background: var(--accent); border-color: var(--accent); }
+.milestone-info {}
+.milestone-week {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.milestone-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+.badge-done   { background: var(--status-ok-bg);   color: var(--status-ok);  }
+.badge-active { background: var(--status-warn-bg); color: var(--status-warn);}
+.badge-todo   { background: var(--border-light);   color: var(--text-light); }
+.milestone-date { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.milestone-desc { font-size: 11px; color: var(--text-mid); margin-top: 3px; line-height: 1.5; }
+
+/* ─────────────────────────────────
+   VIEW 5: MONITOR
+───────────────────────────────── */
+#view-monitor {
+  background: #F7F3EE;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.monitor-section {
+  padding: 16px 20px;
+  flex-shrink: 0;
+}
+.monitor-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-light);
+  margin-bottom: 12px;
+}
+
+/* Agent Cards */
+.agent-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.agent-card {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.agent-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.agent-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dark);
+  font-family: var(--font-mono);
+}
+.agent-status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.badge-running { background: var(--status-warn-bg); color: var(--status-warn); }
+.badge-error   { background: var(--status-err-bg);  color: var(--status-err);  }
+.badge-idle    { background: var(--status-ok-bg);   color: var(--status-ok);   }
+.agent-card-role {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+.agent-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-mid);
+  margin-bottom: 10px;
+}
+.agent-tool-label { color: var(--text-light); font-size: 11px; }
+.agent-tool-name  { font-family: var(--font-mono); color: var(--text-dark); }
+.progress-track {
+  background: var(--border-light);
+  border-radius: 4px;
+  height: 6px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 600ms ease-out;
+}
+.fill-accent { background: var(--accent); }
+.fill-ok     { background: var(--status-ok); }
+.fill-err    { background: var(--status-err); }
+.agent-events { display: flex; flex-direction: column; gap: 4px; }
+.agent-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-mid);
+  line-height: 1.5;
+}
+.event-icon { flex-shrink: 0; width: 12px; }
+
+/* Dependency graph */
+.dep-graph-card {
+  background: var(--main-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.dep-graph-card svg { display: block; width: 100%; }
+
+/* Monitor log stream */
+.monitor-log-card {
+  background: #1A1410;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 0 20px 20px;
+}
+.monitor-log-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #2D2218;
+  background: #140F0A;
+  flex-wrap: wrap;
+}
+.filter-chip {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: #2C2218;
+  color: #8A7A68;
+  border: 1px solid #3D3025;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: var(--font-ui);
+}
+.filter-chip.active { background: var(--accent); color: #fff; border-color: var(--accent-dark); }
+.filter-chip:hover { background: #3A2E22; color: #C4B8A8; }
+.clear-btn {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: transparent;
+  color: #6B5A4A;
+  border: 1px solid #3D3025;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: var(--transition);
+}
+.clear-btn:hover { color: #C4B8A8; border-color: #6B5A4A; }
+.monitor-log-list {
+  height: 200px;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+<nav id="sidebar">
+  <!-- Header -->
+  <div class="sidebar-header">
+    <div class="sidebar-wordmark">SAVC Studio</div>
+    <div class="sidebar-subtitle">Unified Workbench</div>
+  </div>
+
+  <!-- Avatar -->
+  <div class="sidebar-avatar-section">
+    <div class="avatar-wrapper">
+      <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="faceGrad" cx="50%" cy="45%" r="55%">
+            <stop offset="0%" stop-color="#F5C89A"/>
+            <stop offset="100%" stop-color="#E8A070"/>
+          </radialGradient>
+        </defs>
+        <circle cx="26" cy="26" r="26" fill="url(#faceGrad)"/>
+        <!-- eyes -->
+        <ellipse cx="19" cy="24" rx="2.5" ry="3" fill="#3C2010"/>
+        <ellipse cx="33" cy="24" rx="2.5" ry="3" fill="#3C2010"/>
+        <circle cx="20" cy="23" r="0.8" fill="#fff" opacity="0.7"/>
+        <circle cx="34" cy="23" r="0.8" fill="#fff" opacity="0.7"/>
+        <!-- eyebrows -->
+        <path d="M16 20 Q19 18.5 22 20" stroke="#7A4820" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <path d="M30 20 Q33 18.5 36 20" stroke="#7A4820" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <!-- nose -->
+        <ellipse cx="26" cy="29" rx="1.5" ry="1" fill="#D0845A" opacity="0.6"/>
+        <!-- mouth -->
+        <path d="M22 33 Q26 36.5 30 33" stroke="#C0603A" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <!-- blush -->
+        <ellipse cx="15" cy="31" rx="4" ry="2.5" fill="#E88060" opacity="0.25"/>
+        <ellipse cx="37" cy="31" rx="4" ry="2.5" fill="#E88060" opacity="0.25"/>
+        <!-- hair top -->
+        <path d="M6 24 Q6 4 26 4 Q46 4 46 24 Q44 12 26 12 Q8 12 6 24Z" fill="#3C2010"/>
+        <!-- ear -->
+        <ellipse cx="4" cy="28" rx="3" ry="4" fill="#E8A070"/>
+        <ellipse cx="48" cy="28" rx="3" ry="4" fill="#E8A070"/>
+      </svg>
+      <div class="online-dot"></div>
+    </div>
+    <div class="avatar-name">媛媛</div>
+    <div class="avatar-status">● 在线</div>
+  </div>
+
+  <!-- Scene Pills -->
+  <div class="sidebar-scenes">
+    <div class="scenes-label">模式</div>
+    <div class="scenes-grid">
+      <button class="scene-pill" onclick="switchView('companion')">陪伴</button>
+      <button class="scene-pill active" id="pill-dev" onclick="switchView('dev')">开发</button>
+      <button class="scene-pill" onclick="switchView('debug')">排障</button>
+      <button class="scene-pill" onclick="switchView('plan')">计划</button>
+    </div>
+  </div>
+
+  <hr class="sidebar-divider">
+
+  <!-- Monitor Button -->
+  <button class="monitor-btn" id="monitor-btn" onclick="switchView('monitor')">
+    <span>📊 监控大盘</span>
+    <span class="monitor-btn-arrow">›</span>
+  </button>
+
+  <hr class="sidebar-divider">
+
+  <!-- Sessions -->
+  <div class="sidebar-sessions">
+    <div class="sessions-label">会话</div>
+    <div class="session-item active" id="session-0" onclick="selectSession(0)">
+      <span class="session-channel-badge badge-web">Web</span>
+      <div class="session-info">
+        <div class="session-name">xiaoming</div>
+        <div class="session-preview">帮我看下这个 bug...</div>
+      </div>
+    </div>
+    <div class="session-item" id="session-1" onclick="selectSession(1)">
+      <span class="session-channel-badge badge-discord">Discord</span>
+      <div class="session-info">
+        <div class="session-name">dev_channel</div>
+        <div class="session-preview">工具调用结果回来了</div>
+      </div>
+    </div>
+    <div class="session-item" id="session-2" onclick="selectSession(2)">
+      <span class="session-channel-badge badge-tg">TG</span>
+      <div class="session-info">
+        <div class="session-name">telegram_bot</div>
+        <div class="session-preview">记忆召回完成 ✓</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <div class="footer-dot"></div>
+    <span>在线 · :5174</span>
+  </div>
+</nav>
+
+<button id="sidebar-toggle" onclick="toggleSidebar()" title="折叠 / 展开侧栏">
+  <span class="toggle-icon">‹</span>
+</button>
+
+<!-- ═══════════════════════ MAIN ═══════════════════════ -->
+<div id="main">
+
+  <!-- ─── VIEW 1: COMPANION ─── -->
+  <div class="view" id="view-companion">
+    <!-- Presence Panel -->
+    <div class="companion-presence">
+      <div class="companion-avatar-wrap">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="cpFaceGrad" cx="50%" cy="45%" r="55%">
+              <stop offset="0%" stop-color="#F5C89A"/>
+              <stop offset="100%" stop-color="#E8A070"/>
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="50" fill="url(#cpFaceGrad)"/>
+          <ellipse cx="35" cy="46" rx="5" ry="6" fill="#3C2010"/>
+          <ellipse cx="65" cy="46" rx="5" ry="6" fill="#3C2010"/>
+          <circle cx="37" cy="44" r="1.5" fill="#fff" opacity="0.7"/>
+          <circle cx="67" cy="44" r="1.5" fill="#fff" opacity="0.7"/>
+          <path d="M29 38 Q35 35 41 38" stroke="#7A4820" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M59 38 Q65 35 71 38" stroke="#7A4820" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <ellipse cx="50" cy="57" rx="3" ry="2" fill="#D0845A" opacity="0.6"/>
+          <path d="M41 65 Q50 72 59 65" stroke="#C0603A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <ellipse cx="27" cy="60" rx="8" ry="5" fill="#E88060" opacity="0.25"/>
+          <ellipse cx="73" cy="60" rx="8" ry="5" fill="#E88060" opacity="0.25"/>
+          <path d="M10 46 Q10 5 50 5 Q90 5 90 46 Q86 20 50 20 Q14 20 10 46Z" fill="#3C2010"/>
+          <ellipse cx="7" cy="52" rx="6" ry="8" fill="#E8A070"/>
+          <ellipse cx="93" cy="52" rx="6" ry="8" fill="#E8A070"/>
+        </svg>
+      </div>
+      <div class="companion-name">媛媛</div>
+      <div class="companion-subtitle">正在倾听...</div>
+
+      <!-- Emotion Ring -->
+      <div class="emotion-ring">
+        <svg width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="36" fill="none" stroke="#E8DDD2" stroke-width="6"/>
+          <circle cx="45" cy="45" r="36" fill="none" stroke="#C8571E" stroke-width="6"
+            stroke-dasharray="170 56" stroke-dashoffset="-28"
+            stroke-linecap="round"
+            style="transform-origin:45px 45px; transform:rotate(-90deg)"/>
+          <text x="45" y="49" text-anchor="middle" font-size="14" font-family="Inter,sans-serif" fill="#7B6651">75%</text>
+        </svg>
+        <div class="emotion-ring-label">专注度</div>
+      </div>
+
+      <!-- Memories -->
+      <div class="memories-section">
+        <div class="memories-label">最近记忆</div>
+        <div class="memory-chips">
+          <span class="memory-chip">SAVC 项目</span>
+          <span class="memory-chip">OpenClaw</span>
+          <span class="memory-chip">开发工作台</span>
+          <span class="memory-chip">媛媛初始化</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live2D Panel -->
+    <div class="companion-live2d">
+      <div class="live2d-header">
+        <span class="live2d-header-title">Live2D</span>
+        <span class="live2d-badge" id="l2d-badge">Mock 模式</span>
+      </div>
+
+      <!-- Canvas Area -->
+      <div class="live2d-canvas-area">
+        <!-- Character figure (placeholder until real WebGL canvas is mounted) -->
+        <div class="live2d-figure">
+          <!-- Head -->
+          <div class="live2d-head">
+            <svg width="140" height="140" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="l2dFaceGrad" cx="50%" cy="45%" r="55%">
+                  <stop offset="0%" stop-color="#F5C89A"/>
+                  <stop offset="100%" stop-color="#E8A070"/>
+                </radialGradient>
+              </defs>
+              <circle cx="50" cy="50" r="50" fill="url(#l2dFaceGrad)"/>
+              <!-- eyes -->
+              <ellipse cx="35" cy="46" rx="5" ry="6" fill="#3C2010"/>
+              <ellipse cx="65" cy="46" rx="5" ry="6" fill="#3C2010"/>
+              <circle cx="37" cy="44" r="1.5" fill="#fff" opacity="0.7"/>
+              <circle cx="67" cy="44" r="1.5" fill="#fff" opacity="0.7"/>
+              <!-- eyebrows -->
+              <path d="M29 38 Q35 35 41 38" stroke="#7A4820" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <path d="M59 38 Q65 35 71 38" stroke="#7A4820" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <!-- nose -->
+              <ellipse cx="50" cy="57" rx="3" ry="2" fill="#D0845A" opacity="0.6"/>
+              <!-- mouth (smile) -->
+              <path d="M41 65 Q50 72 59 65" stroke="#C0603A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <!-- blush -->
+              <ellipse cx="27" cy="60" rx="8" ry="5" fill="#E88060" opacity="0.25"/>
+              <ellipse cx="73" cy="60" rx="8" ry="5" fill="#E88060" opacity="0.25"/>
+              <!-- hair -->
+              <path d="M10 46 Q10 5 50 5 Q90 5 90 46 Q86 20 50 20 Q14 20 10 46Z" fill="#3C2010"/>
+              <!-- ears -->
+              <ellipse cx="7" cy="52" rx="6" ry="8" fill="#E8A070"/>
+              <ellipse cx="93" cy="52" rx="6" ry="8" fill="#E8A070"/>
+            </svg>
+          </div>
+          <!-- Neck + Body -->
+          <div class="live2d-neck"></div>
+          <div class="live2d-body-shape"></div>
+        </div>
+
+        <!-- Lip sync waveform -->
+        <div class="live2d-waveform" id="l2d-waveform">
+          <div class="wf-bar" style="height:4px"></div>
+          <div class="wf-bar" style="height:8px"></div>
+          <div class="wf-bar" style="height:5px"></div>
+          <div class="wf-bar" style="height:12px"></div>
+          <div class="wf-bar" style="height:6px"></div>
+          <div class="wf-bar" style="height:9px"></div>
+          <div class="wf-bar" style="height:4px"></div>
+        </div>
+
+        <!-- Corner label -->
+        <div class="live2d-canvas-label">canvas:mock · 30fps</div>
+      </div>
+
+      <!-- Controls -->
+      <div class="live2d-controls">
+        <div class="live2d-controls-label">动作触发</div>
+        <div class="live2d-action-btns">
+          <button class="live2d-action-btn" onclick="l2dAction('smile')">微笑</button>
+          <button class="live2d-action-btn" onclick="l2dAction('blink')">眨眼</button>
+          <button class="live2d-action-btn" onclick="l2dAction('wave')">挥手</button>
+          <button class="live2d-action-btn" onclick="l2dAction('think')">思考</button>
+          <button class="live2d-action-btn" onclick="l2dAction('nod')">点头</button>
+        </div>
+        <div class="live2d-mode-row">
+          <span class="live2d-mode-label">渲染模式</span>
+          <div class="live2d-mode-toggle">
+            <div class="live2d-mode-opt" onclick="setL2dMode('gateway',this)">Gateway</div>
+            <div class="live2d-mode-opt active" onclick="setL2dMode('mock',this)">Mock</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="companion-chat">
+      <div class="companion-messages" id="companion-messages">
+        <div class="msg assistant">
+          <div class="msg-bubble">嗨～ 我在这里陪着你呢 🌸 今天有什么想聊的吗？可以是工作上的困惑，也可以就是随便说说。</div>
+          <div class="msg-time">14:22</div>
+        </div>
+        <div class="msg user">
+          <div class="msg-bubble">最近项目进展还不错，但有点累了</div>
+          <div class="msg-time">14:23</div>
+        </div>
+        <div class="msg assistant">
+          <div class="msg-bubble">听到了～ 你已经做了很多了，W0 的原型都跑起来了。累是正常的，要记得给自己充电哦。有没有什么让你觉得特别耗神的部分？</div>
+          <div class="msg-time">14:23</div>
+        </div>
+      </div>
+      <div class="companion-input-area">
+        <input class="companion-input" id="companion-input" type="text" placeholder="说说你想聊什么..." onkeydown="companionSend(event)">
+        <button class="send-btn" onclick="companionSend({key:'Enter'})">›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 2: DEV ─── -->
+  <div class="view active" id="view-dev">
+    <!-- Main Area -->
+    <div class="dev-main">
+      <!-- Tab Bar -->
+      <div class="dev-tab-bar">
+        <button class="dev-tab-btn active" onclick="switchDevTab('interaction')">交互</button>
+        <button class="dev-tab-btn" onclick="switchDevTab('exec')">执行</button>
+        <button class="dev-tab-btn" onclick="switchDevTab('context')">上下文</button>
+        <button class="dev-tab-btn" onclick="switchDevTab('settings')">设置</button>
+      </div>
+
+      <!-- Tab: Interaction -->
+      <div class="dev-tab-content active" id="dev-tab-interaction">
+        <div class="dev-messages" id="dev-messages">
+          <div class="dev-msg assistant">
+            <div class="dev-msg-bubble">你好，我是媛媛。当前运行在开发模式下，工具调用已启用。有什么需要协助的吗？</div>
+            <div class="msg-time" style="font-size:10px;color:var(--text-light);margin-top:2px;">14:20</div>
+          </div>
+          <div class="dev-msg user">
+            <div class="dev-msg-bubble">帮我读一下 openclaw.mjs 的配置结构</div>
+            <div class="msg-time" style="font-size:10px;color:var(--text-light);margin-top:2px;">14:21</div>
+          </div>
+          <div class="dev-msg assistant">
+            <div class="dev-msg-bubble">好的，正在调用 read_file 工具读取文件结构... 已完成。openclaw.mjs 导出了主运行时入口，包含 Agent 注册、工具路由和 WebSocket 网关初始化逻辑。</div>
+            <div class="msg-time" style="font-size:10px;color:var(--text-light);margin-top:2px;">14:21</div>
+          </div>
+        </div>
+        <div class="dev-input-area">
+          <input class="dev-input" id="dev-input" type="text" placeholder="输入消息，Enter 发送..." onkeydown="devSend(event)">
+          <button class="dev-send-btn" onclick="devSend({key:'Enter'})">发送</button>
+        </div>
+      </div>
+
+      <!-- Tab: Exec -->
+      <div class="dev-tab-content" id="dev-tab-exec">
+        <div class="tool-list">
+          <div class="tool-row open" onclick="toggleTool(this)">
+            <div class="tool-row-header">
+              <div class="tool-status-icon tool-status-ok">✓</div>
+              <div class="tool-name">read_file</div>
+              <div class="tool-duration">142ms</div>
+            </div>
+            <div class="tool-detail">
+              输入: { path: "openclaw/openclaw.mjs" }<br>
+              输出: 文件大小 8.4KB，读取成功<br>
+              返回: 文件内容字符串（已截断至 2000 字符）
+            </div>
+          </div>
+          <div class="tool-row" onclick="toggleTool(this)">
+            <div class="tool-row-header">
+              <div class="tool-status-icon tool-status-ok">✓</div>
+              <div class="tool-name">bash_execute</div>
+              <div class="tool-duration">88ms</div>
+            </div>
+            <div class="tool-detail">
+              命令: ls -la tests/Claude-ui-test/<br>
+              退出码: 0<br>
+              输出: index.html (34KB)
+            </div>
+          </div>
+          <div class="tool-row" onclick="toggleTool(this)">
+            <div class="tool-row-header">
+              <div class="tool-status-icon tool-status-err">✗</div>
+              <div class="tool-name">memory_recall</div>
+              <div class="tool-duration">超时</div>
+            </div>
+            <div class="tool-detail">
+              查询: "SAVC 项目历史记忆"<br>
+              错误: TimeoutError - 请求超时 (3000ms)<br>
+              重试: 已排队，等待 MemoryAgent 恢复
+            </div>
+          </div>
+          <div class="tool-row" onclick="toggleTool(this)">
+            <div class="tool-row-header">
+              <div class="tool-status-icon tool-status-run">●</div>
+              <div class="tool-name">tool_invoke</div>
+              <div class="tool-duration">运行中</div>
+            </div>
+            <div class="tool-detail">
+              目标: lipsync_render<br>
+              状态: 等待 VoiceAgent 音频帧...<br>
+              已用时: 1240ms
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Context -->
+      <div class="dev-tab-content" id="dev-tab-context">
+        <div class="context-grid">
+          <div>
+            <div class="context-col-title">记忆召回</div>
+            <div class="context-card">
+              <div class="context-card-title">项目初始化记忆</div>
+              <div class="context-card-desc">2026-02-19 · SAVC Studio 原型启动，媛媛角色初始化完成</div>
+            </div>
+            <div class="context-card">
+              <div class="context-card-title">开发偏好</div>
+              <div class="context-card-desc">用户偏好: 简洁回复 · 代码优先 · 中文交互</div>
+            </div>
+            <div class="context-card">
+              <div class="context-card-title">上次会话</div>
+              <div class="context-card-desc">讨论了 openclaw.mjs 的 Agent 注册机制</div>
+            </div>
+          </div>
+          <div>
+            <div class="context-col-title">关联文档</div>
+            <div class="context-card">
+              <div class="context-card-title">CLAUDE.md</div>
+              <div class="context-card-desc">项目指令 · 角色定义 · 工作日志规则</div>
+            </div>
+            <div class="context-card">
+              <div class="context-card-title">config/models.yaml</div>
+              <div class="context-card-desc">模型规划配置（草案）· 主模型 / TTS / 视觉</div>
+            </div>
+            <div class="context-card">
+              <div class="context-card-title">PRD 原型文档</div>
+              <div class="context-card-desc">信息架构 v1.2 · 功能范围冻结 · 接口草案</div>
+            </div>
+          </div>
+          <div>
+            <div class="context-col-title">最近提交</div>
+            <div class="context-card">
+              <div class="context-card-title">ecfed68</div>
+              <div class="context-card-desc">feat(setup): generate full OpenClaw runtime config from setup.sh</div>
+            </div>
+            <div class="context-card">
+              <div class="context-card-title">08e8285</div>
+              <div class="context-card-desc">mac环境依赖安装脚本</div>
+            </div>
+            <div class="context-card">
+              <div class="context-card-title">8f942f0</div>
+              <div class="context-card-desc">feat(codex-test): add unified interaction workbench prototype</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Settings -->
+      <div class="dev-tab-content" id="dev-tab-settings">
+        <div class="settings-section">
+          <div class="settings-group">
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">主模型</div>
+                <div class="settings-desc">对话与推理核心</div>
+              </div>
+              <select class="settings-select">
+                <option>claude-sonnet-4-6</option>
+                <option>claude-opus-4-6</option>
+                <option>ollama/llama3</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">TTS 引擎</div>
+                <div class="settings-desc">语音合成服务</div>
+              </div>
+              <select class="settings-select">
+                <option>OpenAI TTS (nova)</option>
+                <option>Edge TTS</option>
+                <option>关闭</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">Live2D 渲染</div>
+                <div class="settings-desc">虚拟形象动作同步</div>
+              </div>
+              <select class="settings-select">
+                <option>mock 模式</option>
+                <option>本地渲染器</option>
+                <option>关闭</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">工具调用</div>
+                <div class="settings-desc">允许媛媛使用工具</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">记忆持久化</div>
+                <div class="settings-desc">保存对话记忆到向量库</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">流式输出</div>
+                <div class="settings-desc">启用 SSE 流式响应</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">调试日志</div>
+                <div class="settings-desc">输出详细运行日志</div>
+              </div>
+              <div class="toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="dev-right-panel">
+      <!-- Session Card -->
+      <div class="panel-card">
+        <div class="panel-card-title">当前会话</div>
+        <div class="session-card-name" id="panel-session-name">xiaoming · Web</div>
+        <div class="session-card-meta" id="panel-session-meta">
+          会话 ID: sess_8f3a2b<br>
+          消息数: 6<br>
+          上下文: 3.2K tokens<br>
+          开始: 14:20
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div>
+        <div class="panel-card-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-light);margin-bottom:8px;">本日统计</div>
+        <div class="stats-grid">
+          <div class="stat-number-card">
+            <div class="stat-num">24</div>
+            <div class="stat-lbl">消息</div>
+          </div>
+          <div class="stat-number-card">
+            <div class="stat-num">8</div>
+            <div class="stat-lbl">工具调用</div>
+          </div>
+          <div class="stat-number-card">
+            <div class="stat-num">3</div>
+            <div class="stat-lbl">会话</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tool Trace -->
+      <div class="panel-card">
+        <div class="panel-card-title">工具轨迹</div>
+        <div class="tool-trace-item">
+          <div class="trace-dot" style="background:var(--status-ok)"></div>
+          <span>read_file · 142ms</span>
+        </div>
+        <div class="tool-trace-item">
+          <div class="trace-dot" style="background:var(--status-ok)"></div>
+          <span>bash_execute · 88ms</span>
+        </div>
+        <div class="tool-trace-item">
+          <div class="trace-dot" style="background:var(--status-err)"></div>
+          <span>memory_recall · 超时</span>
+        </div>
+        <div class="tool-trace-item">
+          <div class="trace-dot" style="background:var(--status-warn)"></div>
+          <span>tool_invoke · 运行中</span>
+        </div>
+      </div>
+
+      <!-- Channel Distribution -->
+      <div class="panel-card">
+        <div class="panel-card-title">渠道分布</div>
+        <div class="channel-bar-row">
+          <div class="channel-bar-label">Web</div>
+          <div class="channel-bar-track">
+            <div class="channel-bar-fill" style="width:60%;background:#4A90D9"></div>
+          </div>
+          <div class="channel-bar-val">60%</div>
+        </div>
+        <div class="channel-bar-row">
+          <div class="channel-bar-label">Discord</div>
+          <div class="channel-bar-track">
+            <div class="channel-bar-fill" style="width:25%;background:#5865F2"></div>
+          </div>
+          <div class="channel-bar-val">25%</div>
+        </div>
+        <div class="channel-bar-row">
+          <div class="channel-bar-label">Telegram</div>
+          <div class="channel-bar-track">
+            <div class="channel-bar-fill" style="width:15%;background:#27A7E7"></div>
+          </div>
+          <div class="channel-bar-val">15%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 3: DEBUG ─── -->
+  <div class="view" id="view-debug">
+    <!-- Left Error Tree -->
+    <div class="debug-left">
+      <div class="debug-tree-title">错误树</div>
+      <div class="debug-section-label err">错误 (3)</div>
+      <div class="debug-error-item active" onclick="selectDebugItem(this)">
+        <div class="error-dot dot-red"></div>
+        <div>
+          <div class="error-text">memory_recall 超时</div>
+          <div class="error-detail">3000ms · MemoryAgent</div>
+        </div>
+      </div>
+      <div class="debug-error-item" onclick="selectDebugItem(this)">
+        <div class="error-dot dot-red"></div>
+        <div>
+          <div class="error-text">gateway 连接中断</div>
+          <div class="error-detail">WebSocket 重连中</div>
+        </div>
+      </div>
+      <div class="debug-error-item" onclick="selectDebugItem(this)">
+        <div class="error-dot dot-red"></div>
+        <div>
+          <div class="error-text">ollama 服务未启动</div>
+          <div class="error-detail">port 11434 不可达</div>
+        </div>
+      </div>
+
+      <div class="debug-section-label warn">警告 (2)</div>
+      <div class="debug-error-item warn-item" onclick="selectDebugItem(this)">
+        <div class="error-dot dot-yellow"></div>
+        <div>
+          <div class="error-text">live2d mock 模式降级</div>
+          <div class="error-detail">渲染器不可用</div>
+        </div>
+      </div>
+      <div class="debug-error-item warn-item" onclick="selectDebugItem(this)">
+        <div class="error-dot dot-yellow"></div>
+        <div>
+          <div class="error-text">TTS 重试 2/3</div>
+          <div class="error-detail">nova 音色合成失败</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Main -->
+    <div class="debug-right">
+      <!-- Chat -->
+      <div class="debug-chat-area">
+        <div class="debug-msg user">
+          <div class="debug-msg-bubble">memory_recall 一直超时，什么情况？</div>
+          <div class="debug-msg-time">14:18</div>
+        </div>
+        <div class="debug-msg assistant">
+          <div class="debug-msg-bubble">正在分析... MemoryAgent 的向量检索服务连接超时，可能是 Chroma 实例未启动，或者连接参数有误。</div>
+          <div class="debug-msg-time">14:18</div>
+        </div>
+        <div class="debug-msg user">
+          <div class="debug-msg-bubble">怎么排查？</div>
+          <div class="debug-msg-time">14:19</div>
+        </div>
+        <div class="debug-msg assistant">
+          <div class="debug-msg-bubble error-reply">【错误分析】检测到 MemoryAgent 连接失败:<br>
+            1. Chroma 服务未在 :8000 运行<br>
+            2. ~/.openclaw/openclaw.json 中 memory.endpoint 配置错误<br>
+            建议: 运行 <code style="background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;font-family:var(--font-mono);font-size:11px">bash scripts/setup.sh</code> 重新初始化环境
+          </div>
+          <div class="debug-msg-time">14:19</div>
+        </div>
+      </div>
+
+      <!-- Resize Handle -->
+      <div class="debug-resize-handle">
+        <div class="debug-resize-dots">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="debug-terminal">
+        <div class="terminal-toolbar">
+          <input class="terminal-search" type="text" placeholder="搜索日志...">
+        </div>
+        <div class="terminal-logs" id="debug-logs">
+          <div class="log-line">
+            <span class="log-ts">14:18:02</span>
+            <span class="log-agent orch">Orchestrator</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">接收用户指令: "memory_recall 超时排查"</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:18:02</span>
+            <span class="log-agent orch">Orchestrator</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">task_decompose 启动，子任务 3 个</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:18:03</span>
+            <span class="log-agent memory">MemoryAgent</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">memory_recall 启动，查询: "SAVC 项目历史"</span>
+          </div>
+          <div class="log-line log-err">
+            <span class="log-ts">14:18:06</span>
+            <span class="log-agent memory">MemoryAgent</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text err-text">TimeoutError: 请求超时 (3000ms) — chroma:8000 连接失败</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:18:06</span>
+            <span class="log-agent orch">Orchestrator</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">捕获 MemoryAgent 错误，降级处理</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:18:07</span>
+            <span class="log-agent voice">VoiceAgent</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">TTS 合成启动，文本长度 48 字符</span>
+          </div>
+          <div class="log-line log-err">
+            <span class="log-ts">14:18:08</span>
+            <span class="log-agent voice">VoiceAgent</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text err-text">TTS 合成失败，重试 1/3</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:18:09</span>
+            <span class="log-agent live2d">Live2DAgent</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">降级为 mock 模式，lipsync 跳过</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:18:10</span>
+            <span class="log-agent voice">VoiceAgent</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">TTS 重试 2/3，等待 1500ms</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:18:12</span>
+            <span class="log-agent sys">System</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">WebSocket 心跳超时，尝试重连...</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:19:01</span>
+            <span class="log-agent orch">Orchestrator</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">用户追问: "怎么排查"，继续处理</span>
+          </div>
+          <div class="log-line">
+            <span class="log-ts">14:19:03</span>
+            <span class="log-agent orch">Orchestrator</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">错误分析完成，已生成排查建议</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 4: PLAN ─── -->
+  <div class="view" id="view-plan">
+    <!-- Outline -->
+    <div class="plan-outline">
+      <div class="plan-outline-title">文档大纲</div>
+      <div class="outline-root">§ SAVC Studio</div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">1.</span> 背景与问题
+      </div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">2.</span> 产品目标
+      </div>
+      <div class="outline-item active" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">3.</span> 信息架构
+      </div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">4.</span> 功能范围
+      </div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">5.</span> 技术架构
+      </div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">6.</span> 开发计划
+      </div>
+    </div>
+
+    <!-- Kanban -->
+    <div class="plan-kanban">
+      <div class="kanban-title">开发看板</div>
+      <div class="kanban-cols">
+        <!-- Todo -->
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-name">待办</div>
+            <div class="kanban-col-count">4</div>
+          </div>
+          <div class="kanban-col-cards">
+            <div class="kanban-card">
+              <div class="kanban-card-title">W1 MVP 骨架</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">前端</span>
+                <span class="kanban-tag">后端</span>
+              </div>
+              <span class="kanban-phase phase-w1">W1</span>
+            </div>
+            <div class="kanban-card">
+              <div class="kanban-card-title">W2 工具轨迹面板</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">前端</span>
+              </div>
+              <span class="kanban-phase phase-w2">W2</span>
+            </div>
+            <div class="kanban-card">
+              <div class="kanban-card-title">W3 Custom 设置</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">UX</span>
+              </div>
+              <span class="kanban-phase phase-w2">W3</span>
+            </div>
+            <div class="kanban-card">
+              <div class="kanban-card-title">W4 联调验收</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">全栈</span>
+              </div>
+              <span class="kanban-phase phase-w1">W4</span>
+            </div>
+          </div>
+        </div>
+        <!-- In Progress -->
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-name">进行中</div>
+            <div class="kanban-col-count" style="background:var(--status-warn-bg);color:var(--status-warn)">2</div>
+          </div>
+          <div class="kanban-col-cards">
+            <div class="kanban-card" style="border-left:3px solid var(--status-warn)">
+              <div class="kanban-card-title">W0 原型制作</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">前端</span>
+                <span class="kanban-tag">设计</span>
+              </div>
+              <span class="kanban-phase phase-w0">W0</span>
+            </div>
+            <div class="kanban-card" style="border-left:3px solid var(--status-warn)">
+              <div class="kanban-card-title">会话链路打通</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">架构</span>
+              </div>
+              <span class="kanban-phase phase-arch">架构</span>
+            </div>
+          </div>
+        </div>
+        <!-- Done -->
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-name">已完成</div>
+            <div class="kanban-col-count" style="background:var(--status-ok-bg);color:var(--status-ok)">3</div>
+          </div>
+          <div class="kanban-col-cards">
+            <div class="kanban-card" style="opacity:0.8">
+              <div class="kanban-card-title">PRD 冻结</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">产品</span>
+              </div>
+              <span class="kanban-phase phase-w0">W0 ✓</span>
+            </div>
+            <div class="kanban-card" style="opacity:0.8">
+              <div class="kanban-card-title">数据模型设计</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">架构</span>
+              </div>
+              <span class="kanban-phase phase-arch">架构 ✓</span>
+            </div>
+            <div class="kanban-card" style="opacity:0.8">
+              <div class="kanban-card-title">接口草案</div>
+              <div class="kanban-card-tags">
+                <span class="kanban-tag">API</span>
+              </div>
+              <span class="kanban-phase phase-api">API ✓</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Milestone -->
+    <div class="plan-milestone">
+      <div class="milestone-title">里程碑</div>
+      <div class="timeline">
+        <div class="milestone-item">
+          <div class="milestone-dot done"></div>
+          <div class="milestone-info">
+            <div class="milestone-week">
+              W0 <span class="milestone-badge badge-done">完成</span>
+            </div>
+            <div class="milestone-date">2026-02-19</div>
+            <div class="milestone-desc">原型制作、PRD 冻结</div>
+          </div>
+        </div>
+        <div class="milestone-item">
+          <div class="milestone-dot active"></div>
+          <div class="milestone-info">
+            <div class="milestone-week">
+              W1 <span class="milestone-badge badge-active">进行中</span>
+            </div>
+            <div class="milestone-date">2026-02-21</div>
+            <div class="milestone-desc">MVP 骨架搭建</div>
+          </div>
+        </div>
+        <div class="milestone-item">
+          <div class="milestone-dot todo"></div>
+          <div class="milestone-info">
+            <div class="milestone-week">
+              W2 <span class="milestone-badge badge-todo">待开始</span>
+            </div>
+            <div class="milestone-date">2026-02-24</div>
+            <div class="milestone-desc">工具轨迹 + 监控</div>
+          </div>
+        </div>
+        <div class="milestone-item">
+          <div class="milestone-dot todo"></div>
+          <div class="milestone-info">
+            <div class="milestone-week">
+              W3 <span class="milestone-badge badge-todo">待开始</span>
+            </div>
+            <div class="milestone-date">2026-02-28</div>
+            <div class="milestone-desc">自定义设置 + TTS</div>
+          </div>
+        </div>
+        <div class="milestone-item">
+          <div class="milestone-dot todo"></div>
+          <div class="milestone-info">
+            <div class="milestone-week">
+              W4 <span class="milestone-badge badge-todo">待开始</span>
+            </div>
+            <div class="milestone-date">2026-03-04</div>
+            <div class="milestone-desc">全链路联调验收</div>
+          </div>
+        </div>
+        <div class="milestone-item">
+          <div class="milestone-dot launch"></div>
+          <div class="milestone-info">
+            <div class="milestone-week" style="color:var(--accent)">
+              上线
+            </div>
+            <div class="milestone-date">2026-03-06</div>
+            <div class="milestone-desc">SAVC Studio v1.0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 5: MONITOR ─── -->
+  <div class="view" id="view-monitor">
+    <!-- Agent Cards -->
+    <div class="monitor-section">
+      <div class="monitor-section-title">Agent 状态</div>
+      <div class="agent-cards-grid">
+        <!-- Card 1: Orchestrator -->
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-name">OrchestratorAgent</div>
+            <div class="agent-status-badge badge-running">running</div>
+          </div>
+          <div class="agent-card-role">角色：任务编排 / 分解器</div>
+          <div class="agent-tool-row">
+            <span class="agent-tool-label">当前工具：</span>
+            <span class="agent-tool-name">task_decompose</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill fill-accent" id="orch-progress" style="width:65%"></div>
+          </div>
+          <div class="agent-events">
+            <div class="agent-event"><span class="event-icon">✓</span><span>接收到用户指令</span></div>
+            <div class="agent-event"><span class="event-icon">▶</span><span>正在分解子任务</span></div>
+            <div class="agent-event"><span class="event-icon">⋯</span><span>等待 MemoryAgent</span></div>
+          </div>
+        </div>
+        <!-- Card 2: Memory -->
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-name">MemoryAgent</div>
+            <div class="agent-status-badge badge-error">error</div>
+          </div>
+          <div class="agent-card-role">角色：语义记忆 / 召回器</div>
+          <div class="agent-tool-row">
+            <span class="agent-tool-label">当前工具：</span>
+            <span class="agent-tool-name" style="color:var(--status-err)">memory_recall (失败)</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill fill-err" style="width:30%"></div>
+          </div>
+          <div class="agent-events">
+            <div class="agent-event"><span class="event-icon">▶</span><span>语义检索启动</span></div>
+            <div class="agent-event"><span class="event-icon">✗</span><span style="color:var(--status-err)">连接超时 3000ms</span></div>
+            <div class="agent-event"><span class="event-icon">⟳</span><span>等待重试...</span></div>
+          </div>
+        </div>
+        <!-- Card 3: Voice -->
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-name">VoiceAgent</div>
+            <div class="agent-status-badge badge-idle">idle</div>
+          </div>
+          <div class="agent-card-role">角色：TTS 语音合成</div>
+          <div class="agent-tool-row">
+            <span class="agent-tool-label">当前工具：</span>
+            <span class="agent-tool-name" style="color:var(--text-light)">— (空闲)</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill fill-ok" style="width:100%"></div>
+          </div>
+          <div class="agent-events">
+            <div class="agent-event"><span class="event-icon">✓</span><span>nova 音色合成完成</span></div>
+            <div class="agent-event"><span class="event-icon">✓</span><span>音频输出就绪</span></div>
+            <div class="agent-event"><span class="event-icon">—</span><span style="color:var(--text-light)">等待下一指令</span></div>
+          </div>
+        </div>
+        <!-- Card 4: Live2D -->
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-name">Live2DAgent</div>
+            <div class="agent-status-badge badge-running">running</div>
+          </div>
+          <div class="agent-card-role">角色：Live2D 动作渲染</div>
+          <div class="agent-tool-row">
+            <span class="agent-tool-label">当前工具：</span>
+            <span class="agent-tool-name">lipsync_render</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill fill-accent" id="live2d-progress" style="width:45%"></div>
+          </div>
+          <div class="agent-events">
+            <div class="agent-event"><span class="event-icon">▶</span><span>接收 lipSync 帧数据</span></div>
+            <div class="agent-event"><span class="event-icon">▶</span><span>渲染中 24fps</span></div>
+            <div class="agent-event"><span class="event-icon">⋯</span><span>等待 VoiceAgent</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dependency Graph -->
+    <div class="monitor-section" style="padding-bottom:0">
+      <div class="monitor-section-title">依赖关系图</div>
+      <div class="dep-graph-card">
+        <svg viewBox="0 0 720 180" height="180" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow-run" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#B8640A"/>
+            </marker>
+            <marker id="arrow-err" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#C0392B"/>
+            </marker>
+            <marker id="arrow-idle" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#2D7A47"/>
+            </marker>
+          </defs>
+
+          <!-- Orchestrator (left-center) -->
+          <rect x="40" y="65" width="140" height="50" rx="8" fill="#FEF3E2" stroke="#B8640A" stroke-width="1.5"/>
+          <text x="110" y="86" text-anchor="middle" font-size="11" font-weight="600" fill="#7A4000" font-family="Menlo,monospace">Orchestrator</text>
+          <text x="110" y="103" text-anchor="middle" font-size="10" fill="#B8640A" font-family="Menlo,monospace">running</text>
+
+          <!-- Memory (top-right from Orch) -->
+          <rect x="270" y="20" width="130" height="50" rx="8" fill="#FDE8E6" stroke="#C0392B" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="335" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="#7A1010" font-family="Menlo,monospace">MemoryAgent</text>
+          <text x="335" y="58" text-anchor="middle" font-size="10" fill="#C0392B" font-family="Menlo,monospace">error</text>
+
+          <!-- Voice (bottom-right from Orch) -->
+          <rect x="270" y="110" width="130" height="50" rx="8" fill="#E6F4EC" stroke="#2D7A47" stroke-width="1.5" stroke-dasharray="2,4"/>
+          <text x="335" y="131" text-anchor="middle" font-size="11" font-weight="600" fill="#0A4020" font-family="Menlo,monospace">VoiceAgent</text>
+          <text x="335" y="148" text-anchor="middle" font-size="10" fill="#2D7A47" font-family="Menlo,monospace">idle</text>
+
+          <!-- Live2D (far right from Voice) -->
+          <rect x="500" y="85" width="130" height="50" rx="8" fill="#FEF3E2" stroke="#B8640A" stroke-width="1.5"/>
+          <text x="565" y="106" text-anchor="middle" font-size="11" font-weight="600" fill="#7A4000" font-family="Menlo,monospace">Live2DAgent</text>
+          <text x="565" y="123" text-anchor="middle" font-size="10" fill="#B8640A" font-family="Menlo,monospace">running</text>
+
+          <!-- Orch -> Memory -->
+          <path d="M180 80 C225 80 225 45 270 45" fill="none" stroke="#C0392B" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-err)"/>
+          <!-- Orch -> Voice -->
+          <path d="M180 90 C225 90 225 135 270 135" fill="none" stroke="#B8640A" stroke-width="1.5" marker-end="url(#arrow-run)"/>
+          <!-- Voice -> Live2D -->
+          <path d="M400 135 C445 135 445 110 500 110" fill="none" stroke="#2D7A47" stroke-width="1.5" stroke-dasharray="2,4" marker-end="url(#arrow-idle)"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Log Stream -->
+    <div class="monitor-log-card" style="margin-top:16px">
+      <div class="monitor-log-toolbar">
+        <button class="filter-chip active" onclick="setMonitorFilter(this,'all')">全部</button>
+        <button class="filter-chip" onclick="setMonitorFilter(this,'Orchestrator')">Orchestrator</button>
+        <button class="filter-chip" onclick="setMonitorFilter(this,'Memory')">Memory</button>
+        <button class="filter-chip" onclick="setMonitorFilter(this,'Voice')">Voice</button>
+        <button class="filter-chip" onclick="setMonitorFilter(this,'Live2D')">Live2D</button>
+        <button class="clear-btn" onclick="clearMonitorLog()">清除</button>
+      </div>
+      <div class="monitor-log-list" id="monitor-logs">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
+
+</div><!-- end #main -->
+
+<script>
+// ─── State ───
+let currentView = 'dev';
+let monitorInterval = null;
+let monitorLogIdx = 0;
+let orchProgress = 65;
+let live2dProgress = 45;
+let currentFilter = 'all';
+const orchSteps = [65, 75, 85, 65];
+const live2dSteps = [45, 60, 75, 45];
+let orchStep = 0, live2dStep = 0;
+
+const sessions = [
+  { name: 'xiaoming · Web',      meta: '会话 ID: sess_8f3a2b\n消息数: 6\n上下文: 3.2K tokens\n开始: 14:20' },
+  { name: 'dev_channel · Discord', meta: '会话 ID: sess_2c91de\n消息数: 12\n上下文: 5.8K tokens\n开始: 13:45' },
+  { name: 'telegram_bot · TG',    meta: '会话 ID: sess_7a04bc\n消息数: 3\n上下文: 1.1K tokens\n开始: 14:10' },
+];
+
+// ─── Monitor log pool ───
+const LOG_POOL = [
+  { ts:'14:20:01', agent:'Orchestrator', agentCls:'orch',   text:'接收用户指令，开始编排', err:false },
+  { ts:'14:20:01', agent:'MemoryAgent',  agentCls:'memory', text:'启动语义检索...', err:false },
+  { ts:'14:20:04', agent:'MemoryAgent',  agentCls:'memory', text:'TimeoutError: chroma:8000 连接失败', err:true  },
+  { ts:'14:20:04', agent:'Orchestrator', agentCls:'orch',   text:'MemoryAgent 错误，降级继续', err:false },
+  { ts:'14:20:05', agent:'VoiceAgent',   agentCls:'voice',  text:'TTS 合成启动，nova 音色', err:false },
+  { ts:'14:20:06', agent:'Live2DAgent',  agentCls:'live2d', text:'lipsync_render 开始，24fps', err:false },
+  { ts:'14:20:07', agent:'VoiceAgent',   agentCls:'voice',  text:'nova 合成完成，输出就绪', err:false },
+  { ts:'14:20:08', agent:'Live2DAgent',  agentCls:'live2d', text:'帧数据接收中...', err:false },
+  { ts:'14:20:09', agent:'Orchestrator', agentCls:'orch',   text:'task_decompose 进度 75%', err:false },
+  { ts:'14:20:10', agent:'MemoryAgent',  agentCls:'memory', text:'重试 memory_recall (1/3)', err:false },
+  { ts:'14:20:12', agent:'MemoryAgent',  agentCls:'memory', text:'TimeoutError: 重试失败 (2/3)', err:true  },
+  { ts:'14:20:13', agent:'Live2DAgent',  agentCls:'live2d', text:'等待 VoiceAgent 下一帧', err:false },
+  { ts:'14:20:14', agent:'Orchestrator', agentCls:'orch',   text:'编排完成，响应生成中', err:false },
+  { ts:'14:20:15', agent:'VoiceAgent',   agentCls:'voice',  text:'空闲，等待下一指令', err:false },
+  { ts:'14:20:16', agent:'Orchestrator', agentCls:'orch',   text:'任务分解完成，子任务 4 个', err:false },
+  { ts:'14:20:17', agent:'MemoryAgent',  agentCls:'memory', text:'重试 memory_recall (3/3)...', err:false },
+  { ts:'14:20:18', agent:'Live2DAgent',  agentCls:'live2d', text:'lipsync_render 进度 60%', err:false },
+  { ts:'14:20:19', agent:'MemoryAgent',  agentCls:'memory', text:'TimeoutError: 达到最大重试次数', err:true  },
+  { ts:'14:20:20', agent:'Orchestrator', agentCls:'orch',   text:'会话响应已发送至用户', err:false },
+  { ts:'14:20:21', agent:'Live2DAgent',  agentCls:'live2d', text:'动作渲染循环继续...', err:false },
+];
+
+function makeLogLine(log) {
+  if (currentFilter !== 'all' && !log.agent.toLowerCase().includes(currentFilter.toLowerCase())) return null;
+  const div = document.createElement('div');
+  div.className = 'log-line' + (log.err ? ' log-err' : '');
+  div.dataset.agent = log.agent;
+  div.innerHTML =
+    `<span class="log-ts">${log.ts}</span>` +
+    `<span class="log-agent ${log.agentCls}">${log.agent}</span>` +
+    `<span class="log-arrow">›</span>` +
+    `<span class="log-text${log.err?' err-text':''}">${log.text}</span>`;
+  return div;
+}
+
+function initMonitorLogs() {
+  const container = document.getElementById('monitor-logs');
+  container.innerHTML = '';
+  // seed with first 12
+  for (let i = 0; i < 12; i++) {
+    const line = makeLogLine(LOG_POOL[i % LOG_POOL.length]);
+    if (line) container.appendChild(line);
+  }
+  monitorLogIdx = 12;
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendMonitorLog() {
+  const container = document.getElementById('monitor-logs');
+  if (!container) return;
+  const log = LOG_POOL[monitorLogIdx % LOG_POOL.length];
+  monitorLogIdx++;
+  const line = makeLogLine(log);
+  if (line) {
+    container.appendChild(line);
+    // keep max 40 lines
+    while (container.children.length > 40) container.removeChild(container.firstChild);
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function updateProgress() {
+  orchStep = (orchStep + 1) % orchSteps.length;
+  live2dStep = (live2dStep + 1) % live2dSteps.length;
+  const op = document.getElementById('orch-progress');
+  const lp = document.getElementById('live2d-progress');
+  if (op) op.style.width = orchSteps[orchStep] + '%';
+  if (lp) lp.style.width = live2dSteps[live2dStep] + '%';
+}
+
+// ─── switchView ───
+function switchView(mode) {
+  // hide all views
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const target = document.getElementById('view-' + mode);
+  if (target) target.classList.add('active');
+  currentView = mode;
+
+  // update scene pills
+  document.querySelectorAll('.scene-pill').forEach(p => p.classList.remove('active'));
+  const pillMap = { companion:'pill-companion', dev:'pill-dev', debug:'pill-debug', plan:'pill-plan' };
+  if (pillMap[mode]) {
+    const pill = document.getElementById(pillMap[mode]);
+    if (pill) pill.classList.add('active');
+  }
+
+  // update monitor btn
+  const mb = document.getElementById('monitor-btn');
+  if (mb) mb.classList.toggle('active', mode === 'monitor');
+
+  // monitor interval
+  clearInterval(monitorInterval);
+  if (mode === 'monitor') {
+    initMonitorLogs();
+    monitorInterval = setInterval(() => {
+      appendMonitorLog();
+    }, 1500);
+    setInterval(updateProgress, 2000);
+  }
+
+  // scroll debug logs to bottom
+  if (mode === 'debug') {
+    setTimeout(() => {
+      const dl = document.getElementById('debug-logs');
+      if (dl) dl.scrollTop = dl.scrollHeight;
+    }, 50);
+  }
+
+  // vscode widget: show in dev mode, hide otherwise
+  const vscW = document.getElementById('vscode-widget');
+  if (vscW) {
+    if (mode === 'dev') {
+      if (VSC.state === 'hidden') showVSCode();
+    } else {
+      hideVSCode();
+    }
+  }
+}
+
+// Give scene pills proper IDs
+document.addEventListener('DOMContentLoaded', () => {
+  const pills = document.querySelectorAll('.scene-pill');
+  const modes = ['companion','dev','debug','plan'];
+  pills.forEach((p, i) => { p.id = 'pill-' + modes[i]; });
+  // Show widget since dev view is default active
+  showVSCode();
+
+  // init dev view active
+  switchView('dev');
+
+  // scroll debug logs
+  const dl = document.getElementById('debug-logs');
+  if (dl) dl.scrollTop = dl.scrollHeight;
+});
+
+// ─── Dev Tab ───
+function switchDevTab(name) {
+  document.querySelectorAll('.dev-tab-btn').forEach((b, i) => {
+    const tabs = ['interaction','exec','context','settings'];
+    b.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.dev-tab-content').forEach(c => {
+    c.classList.toggle('active', c.id === 'dev-tab-' + name);
+  });
+}
+
+// ─── Send messages ───
+const YUANYUAN_REPLIES = [
+  '好的，我理解你的意思～ 让我想想怎么帮你处理这个。',
+  '嗯，这是个有趣的问题。根据我的分析，可以从这几个角度考虑...',
+  '收到！正在处理中，稍等一下～',
+  '这个我知道！你可以试试这个方向，应该能解决问题。',
+  '我觉得你说得很有道理，我们可以一步步来实现。',
+  '好的！我来帮你看看，已经找到相关信息了。',
+];
+
+let replyIdx = 0;
+function getReply() { return YUANYUAN_REPLIES[replyIdx++ % YUANYUAN_REPLIES.length]; }
+
+function now() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+/* ─── Sidebar Toggle ─── */
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const toggle  = document.getElementById('sidebar-toggle');
+  const icon    = toggle.querySelector('.toggle-icon');
+  const isNowCollapsed = sidebar.classList.toggle('collapsed');
+  toggle.classList.toggle('sidebar-collapsed', isNowCollapsed);
+  icon.textContent = isNowCollapsed ? '›' : '‹';
+}
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === '\\') { e.preventDefault(); toggleSidebar(); }
+});
+
+/* ─── Live2D Controls ─── */
+function l2dAction(action) {
+  const figure = document.querySelector('.live2d-figure');
+  const subtitle = document.querySelector('.companion-subtitle');
+  const actions = {
+    smile:  { anim: 'l2d-smile',  label: '微笑中...' },
+    blink:  { anim: 'l2d-blink',  label: '眨眼~' },
+    wave:   { anim: 'l2d-wave',   label: '在挥手呢！' },
+    think:  { anim: 'l2d-think',  label: '思考中...' },
+    nod:    { anim: 'l2d-nod',    label: '嗯嗯！' }
+  };
+  const a = actions[action];
+  if (!a || !figure) return;
+  figure.style.animation = 'none';
+  figure.offsetHeight; // reflow
+  figure.style.animation = '';
+  if (subtitle) subtitle.textContent = a.label;
+  setTimeout(() => { if (subtitle) subtitle.textContent = '正在倾听...'; }, 1800);
+}
+
+function setL2dMode(mode, el) {
+  document.querySelectorAll('.live2d-mode-opt').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  const badge = document.getElementById('l2d-badge');
+  const label = document.querySelector('.live2d-canvas-label');
+  if (mode === 'gateway') {
+    if (badge) { badge.textContent = 'Gateway 模式'; badge.className = 'live2d-badge gateway'; }
+    if (label) label.textContent = 'canvas:gateway · 30fps';
+  } else {
+    if (badge) { badge.textContent = 'Mock 模式'; badge.className = 'live2d-badge'; }
+    if (label) label.textContent = 'canvas:mock · 30fps';
+  }
+}
+
+function companionSend(e) {
+  if (e.key !== 'Enter') return;
+  const inp = document.getElementById('companion-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  const container = document.getElementById('companion-messages');
+  // user msg
+  const um = document.createElement('div');
+  um.className = 'msg user';
+  um.innerHTML = `<div class="msg-bubble">${escHtml(text)}</div><div class="msg-time">${now()}</div>`;
+  container.appendChild(um);
+  container.scrollTop = container.scrollHeight;
+  // assistant reply
+  setTimeout(() => {
+    const am = document.createElement('div');
+    am.className = 'msg assistant';
+    am.innerHTML = `<div class="msg-bubble">${getReply()}</div><div class="msg-time">${now()}</div>`;
+    container.appendChild(am);
+    container.scrollTop = container.scrollHeight;
+  }, 800);
+}
+
+function devSend(e) {
+  if (e.key !== 'Enter') return;
+  const inp = document.getElementById('dev-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  const container = document.getElementById('dev-messages');
+  const um = document.createElement('div');
+  um.className = 'dev-msg user';
+  um.innerHTML = `<div class="dev-msg-bubble">${escHtml(text)}</div><div class="msg-time" style="font-size:10px;color:var(--text-light);margin-top:2px;">${now()}</div>`;
+  container.appendChild(um);
+  container.scrollTop = container.scrollHeight;
+  setTimeout(() => {
+    const am = document.createElement('div');
+    am.className = 'dev-msg assistant';
+    am.innerHTML = `<div class="dev-msg-bubble">${getReply()}</div><div class="msg-time" style="font-size:10px;color:var(--text-light);margin-top:2px;">${now()}</div>`;
+    container.appendChild(am);
+    container.scrollTop = container.scrollHeight;
+  }, 800);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Tool toggle ───
+function toggleTool(row) {
+  row.classList.toggle('open');
+}
+
+// ─── Session select ───
+function selectSession(idx) {
+  document.querySelectorAll('.session-item').forEach((item, i) => {
+    item.classList.toggle('active', i === idx);
+  });
+  const s = sessions[idx];
+  const nameEl = document.getElementById('panel-session-name');
+  const metaEl = document.getElementById('panel-session-meta');
+  if (nameEl) nameEl.textContent = s.name;
+  if (metaEl) metaEl.innerHTML = s.meta.replace(/\n/g,'<br>');
+}
+
+// ─── Debug item select ───
+function selectDebugItem(el) {
+  el.closest('.debug-left').querySelectorAll('.debug-error-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ─── Plan outline ───
+function setOutlineActive(el) {
+  el.closest('.plan-outline').querySelectorAll('.outline-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ─── Monitor filter ───
+function setMonitorFilter(btn, filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  initMonitorLogs();
+}
+
+function clearMonitorLog() {
+  const container = document.getElementById('monitor-logs');
+  if (container) container.innerHTML = '';
+  monitorLogIdx = 0;
+}
+/* ─── VSCode Floating Widget ─── */
+const VSC = {
+  state: 'hidden',  // 'hidden' | 'mini' | 'expanded'
+  dragActive: false, dragOX: 0, dragOY: 0,
+  currentFile: '',
+};
+
+function showVSCode() {
+  const w = document.getElementById('vscode-widget');
+  w.className = 'vsc-mini';
+  VSC.state = 'mini';
+}
+function hideVSCode(e) {
+  if (e) e.stopPropagation();
+  const w = document.getElementById('vscode-widget');
+  w.className = '';
+  w.style.display = 'none';
+  VSC.state = 'hidden';
+  stopVscPolling();
+}
+function expandVSCode() {
+  if (VSC.state === 'expanded') return;
+  const w = document.getElementById('vscode-widget');
+  w.className = 'vsc-expanded';
+  VSC.state = 'expanded';
+  startVscPolling();
+}
+function collapseVSCode(e) {
+  if (e) e.stopPropagation();
+  const w = document.getElementById('vscode-widget');
+  w.className = 'vsc-mini';
+  VSC.state = 'mini';
+  stopVscPolling();
+}
+
+function switchVscPanel(panel, iconEl) {
+  // Activity bar highlight
+  document.querySelectorAll('.vsc-ab-icon').forEach(i => i.classList.remove('active'));
+  if (iconEl) iconEl.classList.add('active');
+  // Sidebar panels
+  document.querySelectorAll('.vsc-sidebar-panel').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('vsc-panel-' + panel);
+  if (target) target.classList.add('active');
+  // Update title
+  const titles = { explorer: '资源管理器', git: '源代码管理' };
+  const t = document.getElementById('vsc-sidebar-title');
+  if (t) t.textContent = titles[panel] || panel;
+}
+
+function switchVscTab(tab, treeRow) {
+  // Update editor tabs
+  document.querySelectorAll('.vsc-tab').forEach(t => t.classList.remove('active'));
+  const tabEl = document.getElementById('vsc-tab-' + tab);
+  if (tabEl) tabEl.classList.add('active');
+  // Update code panels
+  document.querySelectorAll('[id^="vsc-code-"]').forEach(p => { p.style.display = 'none'; });
+  const codeEl = document.getElementById('vsc-code-' + tab);
+  if (codeEl) codeEl.style.display = '';
+  // Update tree highlight
+  document.querySelectorAll('.vsc-tree-row').forEach(r => r.classList.remove('active'));
+  if (treeRow) treeRow.classList.add('active');
+  else {
+    const mapped = { index: 'vsc-tree-index' };
+    if (mapped[tab]) { const r = document.getElementById(mapped[tab]); if (r) r.classList.add('active'); }
+  }
+  // Update breadcrumb and status bar lang
+  const bc = document.getElementById('vsc-breadcrumb');
+  const sbLang = document.getElementById('vsc-sb-lang');
+  const names  = { index: 'index.html', music: 'music-mvp.html', openclaw: 'openclaw.mjs' };
+  const paths  = { index: ['tests','Claude-ui-test','index.html'],
+                   music: ['tests','Claude-ui-test','music-mvp.html'],
+                   openclaw: ['openclaw','openclaw.mjs'] };
+  const langs  = { index: 'HTML', music: 'HTML', openclaw: 'JavaScript' };
+  if (bc && paths[tab]) {
+    bc.innerHTML = paths[tab].map((seg, i) =>
+      i < paths[tab].length - 1
+        ? `<span>${seg}</span><span class="vsc-bc-sep">›</span>`
+        : `<span class="vsc-bc-cur">${seg}</span>`
+    ).join('');
+  }
+  if (sbLang) sbLang.textContent = langs[tab] || 'Plain Text';
+}
+
+function toggleVscPanel(e) {
+  if (e) e.stopPropagation();
+  const p = document.getElementById('vsc-panel-term');
+  if (p) p.classList.toggle('hidden');
+}
+
+/* Drag: title bar → move widget */
+(function initVscDrag() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const tb = document.getElementById('vsc-titlebar');
+    const w  = document.getElementById('vscode-widget');
+    if (!tb || !w) return;
+    tb.addEventListener('mousedown', e => {
+      if (VSC.state !== 'expanded') return;
+      if (e.target.closest('.vsc-tb-btn, .vsc-dot')) return;
+      VSC.dragActive = true;
+      const rect = w.getBoundingClientRect();
+      VSC.dragOX = e.clientX - rect.left;
+      VSC.dragOY = e.clientY - rect.top;
+      document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', e => {
+      if (!VSC.dragActive) return;
+      const nx = e.clientX - VSC.dragOX;
+      const ny = e.clientY - VSC.dragOY;
+      const maxX = window.innerWidth  - w.offsetWidth;
+      const maxY = window.innerHeight - w.offsetHeight;
+      w.style.left   = Math.max(0, Math.min(nx, maxX)) + 'px';
+      w.style.top    = Math.max(0, Math.min(ny, maxY)) + 'px';
+      w.style.right  = 'auto';
+      w.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', () => {
+      VSC.dragActive = false;
+      document.body.style.userSelect = '';
+    });
+  });
+})();
+
+/* ─── Phase 1: Real API Integration (graceful degradation) ─── */
+const SAVC_BASE = 'http://localhost:5174';
+let vscGitPollTimer = null;
+const vscExpandedDirs = new Set(['']); // tracks expanded dir paths
+
+function vscEsc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderFsTreeNodes(nodes, depth) {
+  if (!nodes || !nodes.length) return '';
+  let html = '';
+  const indent = 4 + depth * 14;
+  for (const node of nodes) {
+    const gs = node.gitStatus;
+    const gsMark = gs ? `<span class="vsc-tree-mod ${gs === 'M' ? 'm' : 'u'}">${gs}</span>` : '';
+    if (node.type === 'dir') {
+      const isExp = vscExpandedDirs.has(node.path);
+      html += `<div class="vsc-tree-row" style="padding-left:${indent}px" onclick="vscToggleDir('${vscEsc(node.path)}')">
+        <span class="vsc-tree-arrow">${isExp ? '▾' : '▸'}</span>
+        <span class="vsc-tree-ico">${isExp ? '📂' : '📁'}</span>
+        <span class="vsc-tree-name">${vscEsc(node.name)}</span>${gsMark}
+      </div>`;
+      if (isExp && node.children) html += renderFsTreeNodes(node.children, depth + 1);
+    } else {
+      const ext = (node.name.split('.').pop() || '').toLowerCase();
+      const icoMap = { html:'⟨/⟩', htm:'⟨/⟩', js:'JS', mjs:'JS', ts:'TS', tsx:'TS', css:'{}', json:'{}', md:'¶', yaml:'≡', yml:'≡', sh:'$' };
+      const icoRaw = icoMap[ext];
+      const ico = icoRaw
+        ? `<span class="vsc-tree-ico" style="font-size:9px;font-family:monospace">${icoRaw}</span>`
+        : `<span class="vsc-tree-ico">📄</span>`;
+      html += `<div class="vsc-tree-row" style="padding-left:${indent}px" onclick="vscOpenFile('${vscEsc(node.path)}',this)">
+        <span class="vsc-tree-arrow"></span>${ico}
+        <span class="vsc-tree-name">${vscEsc(node.name)}</span>${gsMark}
+      </div>`;
+    }
+  }
+  return html;
+}
+
+let vscTreeCache = null;
+function fetchFsTree() {
+  fetch(`${SAVC_BASE}/__savc/fs/tree?path=.&depth=3`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok || !data.tree) return;
+      vscTreeCache = data.tree;
+      renderFsTree(data.tree);
+    })
+    .catch(() => { /* keep mock data */ });
+}
+
+function renderFsTree(tree) {
+  const panel = document.getElementById('vsc-panel-explorer');
+  if (!panel) return;
+  const header = `<div class="vsc-tree-row" style="padding-left:4px;font-size:11px;color:#bbbcbd;font-family:var(--font-ui)">
+    <span class="vsc-tree-arrow">▾</span>
+    <span style="font-weight:700;letter-spacing:.02em">SAVC</span>
+  </div>`;
+  panel.innerHTML = header + renderFsTreeNodes(tree, 0);
+}
+
+function vscToggleDir(dirPath) {
+  if (vscExpandedDirs.has(dirPath)) vscExpandedDirs.delete(dirPath);
+  else vscExpandedDirs.add(dirPath);
+  if (vscTreeCache) renderFsTree(vscTreeCache);
+}
+
+function vscOpenFile(filePath, rowEl) {
+  document.querySelectorAll('.vsc-tree-row').forEach(r => r.classList.remove('active'));
+  if (rowEl) rowEl.classList.add('active');
+  VSC.currentFile = filePath;
+
+  const fileName = filePath.split('/').pop();
+  const tabKey = filePath.replace(/[^a-z0-9]/gi, '_');
+  const tabId  = 'vsc-tab-dyn-' + tabKey;
+  const codeId = 'vsc-code-dyn-' + tabKey;
+
+  if (!document.getElementById(tabId)) {
+    const tabs = document.querySelector('.vsc-tabs');
+    const t = document.createElement('div');
+    t.className = 'vsc-tab'; t.id = tabId;
+    t.innerHTML = `<span>${vscEsc(fileName)}</span><span class="vsc-tab-x">×</span>`;
+    t.querySelector('.vsc-tab-x').onclick = e => { e.stopPropagation(); t.remove(); const cp = document.getElementById(codeId); if(cp) cp.remove(); };
+    t.onclick = () => { VSC.currentFile = filePath; vscActivatePanel(tabId, codeId, filePath); };
+    tabs.appendChild(t);
+  }
+
+  // Only create plain-text panel if CM is NOT available (fallback)
+  if (!window.vscCM && !document.getElementById(codeId)) {
+    const area = document.querySelector('.vsc-editor-area');
+    const cp = document.createElement('div');
+    cp.className = 'vsc-code'; cp.id = codeId; cp.style.display = 'none';
+    cp.innerHTML = '<div class="vsc-code-line"><span class="vsc-ln">…</span><span class="vsc-ct">加载中…</span></div>';
+    const term = document.getElementById('vsc-panel-term');
+    if (term) area.insertBefore(cp, term); else area.appendChild(cp);
+  }
+
+  vscActivatePanel(tabId, codeId, filePath);
+
+  fetch(`${SAVC_BASE}/__savc/fs/read?path=${encodeURIComponent(filePath)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) return;
+      const langLabel = { typescript:'TypeScript', javascript:'JavaScript', html:'HTML', css:'CSS', markdown:'Markdown', json:'JSON', yaml:'YAML', shell:'Shell', plaintext:'Plain Text' };
+      const sbLang = document.getElementById('vsc-sb-lang');
+      if (sbLang) sbLang.textContent = langLabel[data.language] || data.language || 'Plain Text';
+      if (window.vscCM) {
+        window.vscCM.open(data.content, data.language);
+        const cm = document.getElementById('vsc-cm-mount');
+        if (cm) cm.style.display = '';
+        document.querySelectorAll('[id^="vsc-code-"]').forEach(p => { p.style.display = 'none'; });
+      } else {
+        const cp = document.getElementById(codeId);
+        if (!cp) return;
+        const lines = data.content.split('\n');
+        cp.innerHTML = lines.map((line, i) =>
+          `<div class="vsc-code-line"><span class="vsc-ln">${i+1}</span><span class="vsc-ct">${vscEsc(line)}</span></div>`
+        ).join('');
+      }
+    })
+    .catch(() => {});
+}
+
+function vscActivatePanel(tabId, codeId, filePath) {
+  document.querySelectorAll('.vsc-tab').forEach(t => t.classList.remove('active'));
+  const tab = document.getElementById(tabId);
+  if (tab) tab.classList.add('active');
+  // If CM is active, leave display handled by vscOpenFile fetch callback
+  if (!window.vscCM) {
+    document.querySelectorAll('[id^="vsc-code-"]').forEach(p => { p.style.display = 'none'; });
+    const cp = document.getElementById(codeId);
+    if (cp) cp.style.display = '';
+  }
+  const bc = document.getElementById('vsc-breadcrumb');
+  if (bc && filePath) {
+    const parts = filePath.split('/');
+    bc.innerHTML = parts.map((seg, i) =>
+      i < parts.length - 1
+        ? `<span>${vscEsc(seg)}</span><span class="vsc-bc-sep">›</span>`
+        : `<span class="vsc-bc-cur">${vscEsc(seg)}</span>`
+    ).join('');
+  }
+}
+
+/* ─── Phase 2: Write / Git ops ─── */
+
+function vscSaveFile() {
+  const filePath = VSC.currentFile;
+  if (!filePath) return;
+  const content = window.vscCM ? window.vscCM.getContent() : null;
+  if (content === null) return; // no CM = read-only in Phase 1 mode
+  fetch(`${SAVC_BASE}/__savc/fs/write`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath, content }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      const sbLang = document.getElementById('vsc-sb-lang');
+      if (sbLang) { const orig = sbLang.textContent; sbLang.textContent = '✓ 已保存'; setTimeout(() => { sbLang.textContent = orig; }, 1500); }
+    }
+  })
+  .catch(() => {});
+}
+
+function vscStageFile(filePath) {
+  fetch(`${SAVC_BASE}/__savc/git/add`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths: [filePath] }),
+  })
+  .then(r => r.json())
+  .then(data => { if (data.ok) fetchGitStatus(); })
+  .catch(() => {});
+}
+
+function vscCommit() {
+  const msgEl = document.getElementById('vsc-git-msg');
+  if (!msgEl) return;
+  const message = msgEl.value.trim();
+  if (!message) { msgEl.focus(); return; }
+  fetch(`${SAVC_BASE}/__savc/git/commit`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) { msgEl.value = ''; fetchGitStatus(); fetchFsTree(); }
+    else { msgEl.style.borderColor = '#C8571E'; setTimeout(() => { msgEl.style.borderColor = ''; }, 2000); }
+  })
+  .catch(() => {});
+}
+
+// Ctrl+S handler for the widget
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's' && VSC.state === 'expanded') {
+    e.preventDefault(); vscSaveFile();
+  }
+});
+
+function fetchGitStatus() {
+  fetch(`${SAVC_BASE}/__savc/git/status`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) return;
+      const br = document.getElementById('vsc-sb-branch');
+      if (br) br.textContent = `⎇ ${data.branch}`;
+      const panel = document.getElementById('vsc-panel-git');
+      if (!panel) return;
+      const commitArea = panel.querySelector('.vsc-git-commit-area');
+      const commitHtml = commitArea ? commitArea.outerHTML : '';
+      const mkFile = (f, sym, cls, stageable) => {
+        const name = f.split('/').pop();
+        const dir  = f.includes('/') ? f.split('/').slice(0,-1).join('/') : '';
+        const stageBtn = stageable
+          ? `<span onclick="vscStageFile('${vscEsc(f)}')" style="margin-left:auto;padding:0 4px;cursor:pointer;color:#73c991;font-weight:700" title="暂存">+</span>`
+          : '';
+        return `<div class="vsc-git-file" style="cursor:pointer" onclick="vscOpenFile('${vscEsc(f)}',null)"><span class="vsc-git-mark ${cls}">${sym}</span>${vscEsc(name)}<span style="font-size:9px;color:#7B6845;margin-left:4px;opacity:.65">${dir ? dir+'/' : ''}</span>${stageBtn}</div>`;
+      };
+      const mkList = (files, sym, cls, stageable) => files.length
+        ? files.map(f => mkFile(f, sym, cls, stageable)).join('')
+        : `<div style="font-size:10px;color:#6B5A48;padding:4px 8px;opacity:.7">无</div>`;
+      panel.innerHTML = commitHtml
+        + (data.staged.length ? `<div class="vsc-git-section-title">暂存的更改 (${data.staged.length})</div>${mkList(data.staged,'A','a',false)}` : '')
+        + `<div class="vsc-git-section-title">更改 (${data.unstaged.length})</div>${mkList(data.unstaged,'M','m',true)}`
+        + `<div class="vsc-git-section-title" style="padding-top:6px">未跟踪 (${data.untracked.length})</div>${mkList(data.untracked,'U','u',true)}`;
+    })
+    .catch(() => { /* keep mock */ });
+}
+
+function startVscPolling() {
+  if (vscGitPollTimer) return;
+  fetchFsTree();
+  fetchGitStatus();
+  vscGitPollTimer = setInterval(fetchGitStatus, 8000);
+}
+function stopVscPolling() {
+  if (vscGitPollTimer) { clearInterval(vscGitPollTimer); vscGitPollTimer = null; }
+}
+
+</script>
+<!-- ═══════════════════════ FLOATING VSCODE WIDGET ═══════════════════════ -->
+<div id="vscode-widget">
+  <!-- Mini-state click overlay -->
+  <div class="vsc-mini-overlay" onclick="expandVSCode()"></div>
+
+  <!-- Title bar (drag handle) -->
+  <div class="vsc-titlebar" id="vsc-titlebar">
+    <div class="vsc-traffic">
+      <div class="vsc-dot vsc-dot-close" onclick="hideVSCode(event)"></div>
+      <div class="vsc-dot vsc-dot-min"   onclick="collapseVSCode(event)"></div>
+      <div class="vsc-dot vsc-dot-max"></div>
+    </div>
+    <div class="vsc-title-text">项目工作区 · SAVC</div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <button class="vsc-tb-btn" onclick="toggleVscPanel(event)" title="切换终端">⊟</button>
+      <button class="vsc-tb-btn" onclick="collapseVSCode(event)" title="缩小">⊡</button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="vsc-body">
+
+    <!-- Activity bar -->
+    <div class="vsc-activitybar">
+      <div class="vsc-ab-icon active" id="vsc-ab-explorer" onclick="switchVscPanel('explorer',this)" title="资源管理器">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M3 3h8l2 2h8v14H3z"/></svg>
+      </div>
+      <div class="vsc-ab-icon" id="vsc-ab-git" onclick="switchVscPanel('git',this)" title="源代码管理">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+          <line x1="12" y1="7" x2="12" y2="12"/><line x1="12" y1="12" x2="5" y2="17"/>
+          <line x1="12" y1="12" x2="19" y2="17"/></svg>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="vsc-sidebar">
+      <div class="vsc-sidebar-title" id="vsc-sidebar-title">资源管理器</div>
+
+      <!-- Explorer panel -->
+      <div class="vsc-sidebar-panel active" id="vsc-panel-explorer">
+        <div class="vsc-tree-row" style="padding-left:4px; font-size:11px; color:#bbbcbd; font-family:var(--font-ui)">
+          <span class="vsc-tree-arrow">▾</span>
+          <span style="font-weight:700;letter-spacing:.02em">SAVC</span>
+        </div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">config</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">docs</span><span class="vsc-tree-mod u">●</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">openclaw</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">savc-core</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">savc-ui</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">scripts</span><span class="vsc-tree-mod m">M</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow">▾</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">tests</span><span class="vsc-tree-mod u">●</span></div>
+        <div class="vsc-tree-row" style="padding-left:28px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">artifacts</span></div>
+        <div class="vsc-tree-row" style="padding-left:28px"><span class="vsc-tree-arrow">▾</span><span class="vsc-tree-ico">📂</span><span class="vsc-tree-name">Claude-ui-test</span><span class="vsc-tree-mod u">●</span></div>
+        <div class="vsc-tree-row active" id="vsc-tree-index" style="padding-left:42px" onclick="switchVscTab('index',this)"><span class="vsc-tree-arrow"></span><span class="vsc-tree-ico">⟨/⟩</span><span class="vsc-tree-name">index.html</span><span class="vsc-tree-mod u">U</span></div>
+        <div class="vsc-tree-row" style="padding-left:42px" onclick="switchVscTab('music',this)"><span class="vsc-tree-arrow"></span><span class="vsc-tree-ico">⟨/⟩</span><span class="vsc-tree-name">music-mvp.html</span><span class="vsc-tree-mod u">U</span></div>
+        <div class="vsc-tree-row" style="padding-left:28px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">codex-test</span></div>
+        <div class="vsc-tree-row" style="padding-left:28px"><span class="vsc-tree-arrow">▸</span><span class="vsc-tree-ico">📁</span><span class="vsc-tree-name">integration</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow"></span><span class="vsc-tree-ico">📄</span><span class="vsc-tree-name">openclaw.mjs</span><span class="vsc-tree-mod m">M</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow"></span><span class="vsc-tree-ico">📄</span><span class="vsc-tree-name">package.json</span><span class="vsc-tree-mod m">M</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow"></span><span class="vsc-tree-ico">📄</span><span class="vsc-tree-name">pnpm-lock.yaml</span><span class="vsc-tree-mod m">M</span></div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow"></span><span class="vsc-tree-ico">📄</span><span class="vsc-tree-name">CLAUDE.md</span></div>
+      </div>
+
+      <!-- Git panel -->
+      <div class="vsc-sidebar-panel" id="vsc-panel-git">
+        <div class="vsc-git-commit-area">
+          <textarea class="vsc-git-textarea" id="vsc-git-msg" placeholder="消息（Ctrl+Enter 提交到 'main'）"></textarea>
+          <button class="vsc-git-commit-btn" onclick="vscCommit()">✓ 提交</button>
+        </div>
+        <div class="vsc-git-section-title">暂存的更改</div>
+        <div class="vsc-git-section-title" style="padding-top:2px">更改</div>
+        <div class="vsc-git-file"><span class="vsc-git-mark m">M</span>openclaw.mjs</div>
+        <div class="vsc-git-file"><span class="vsc-git-mark m">M</span>pnpm-lock.yaml</div>
+        <div class="vsc-git-file"><span class="vsc-git-mark m">M</span>scripts/setup.sh</div>
+        <div class="vsc-git-file"><span class="vsc-git-mark m">M</span>tests/artifacts/phase1…</div>
+        <div class="vsc-git-section-title" style="padding-top:6px">未跟踪</div>
+        <div class="vsc-git-file"><span class="vsc-git-mark u">U</span>.claude/</div>
+        <div class="vsc-git-file"><span class="vsc-git-mark u">U</span>docs/worklog/claude/</div>
+        <div class="vsc-git-file"><span class="vsc-git-mark u">U</span>docs/原型.html</div>
+        <div class="vsc-git-file"><span class="vsc-git-mark u">U</span>tests/Claude-ui-test/</div>
+      </div>
+    </div>
+
+    <!-- Editor area -->
+    <div class="vsc-editor-area">
+      <!-- Tabs -->
+      <div class="vsc-tabs">
+        <div class="vsc-tab active" id="vsc-tab-index"><span>index.html</span><span class="vsc-tab-x">×</span></div>
+        <div class="vsc-tab" id="vsc-tab-music" onclick="switchVscTab('music',null)"><span>music-mvp.html</span><span class="vsc-tab-x">×</span></div>
+        <div class="vsc-tab" id="vsc-tab-openclaw" onclick="switchVscTab('openclaw',null)"><span>openclaw.mjs</span><span class="vsc-tab-x">×</span></div>
+      </div>
+      <!-- Breadcrumb -->
+      <div class="vsc-breadcrumb" id="vsc-breadcrumb">
+        <span>tests</span><span class="vsc-bc-sep">›</span>
+        <span>Claude-ui-test</span><span class="vsc-bc-sep">›</span>
+        <span class="vsc-bc-cur">index.html</span>
+      </div>
+      <!-- Code panels (one active at a time) -->
+      <div class="vsc-code" id="vsc-code-index">
+        <div class="vsc-code-line"><span class="vsc-ln">1</span><span class="vsc-ct"><span class="k">&lt;!DOCTYPE</span> <span class="p">html</span><span class="k">&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">2</span><span class="vsc-ct"><span class="k">&lt;html</span> <span class="p">lang</span>=<span class="s">"zh-CN"</span><span class="k">&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">3</span><span class="vsc-ct"><span class="k">&lt;head&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">4</span><span class="vsc-ct">  <span class="k">&lt;meta</span> <span class="p">charset</span>=<span class="s">"UTF-8"</span><span class="k">&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">5</span><span class="vsc-ct">  <span class="k">&lt;meta</span> <span class="p">name</span>=<span class="s">"viewport"</span> <span class="p">content</span>=<span class="s">"width=device-width, initial-scale=1.0"</span><span class="k">&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">6</span><span class="vsc-ct">  <span class="k">&lt;title&gt;</span>SAVC Studio · 统一交互工作台<span class="k">&lt;/title&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">7</span><span class="vsc-ct">  <span class="k">&lt;link</span> <span class="p">rel</span>=<span class="s">"preconnect"</span> <span class="p">href</span>=<span class="s">"https://fonts.googleapis.com"</span><span class="k">&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">8</span><span class="vsc-ct">  <span class="k">&lt;style&gt;</span></span></div>
+        <div class="vsc-code-line hi"><span class="vsc-ln">9</span><span class="vsc-ct">    <span class="c">/* ─── Design Tokens ─── */</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">10</span><span class="vsc-ct">    <span class="t">:root</span> {</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">11</span><span class="vsc-ct">      <span class="p">--sidebar-bg</span>:     <span class="n">#1E1710</span>;</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">12</span><span class="vsc-ct">      <span class="p">--main-bg</span>:        <span class="n">#F7F3EE</span>;</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">13</span><span class="vsc-ct">      <span class="p">--accent</span>:         <span class="n">#C8571E</span>;</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">14</span><span class="vsc-ct">      <span class="p">--text-dark</span>:      <span class="n">#2C1F14</span>;</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">15</span><span class="vsc-ct">      <span class="p">--font-ui</span>:  <span class="s">'Inter'</span>, <span class="s">'Noto Sans SC'</span>, sans-serif;</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">16</span><span class="vsc-ct">      <span class="p">--font-display</span>: <span class="s">'DM Serif Display'</span>, Georgia, serif;</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">17</span><span class="vsc-ct">    }</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">18</span><span class="vsc-ct"></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">19</span><span class="vsc-ct">    <span class="c">/* ─── Sidebar ─── */</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">20</span><span class="vsc-ct">    <span class="t">#sidebar</span> {</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">21</span><span class="vsc-ct">      <span class="p">width</span>: <span class="n">240px</span>;</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">22</span><span class="vsc-ct">      <span class="p">background</span>: <span class="k">var</span>(<span class="p">--sidebar-bg</span>);</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">23</span><span class="vsc-ct">      <span class="p">transition</span>: <span class="p">width</span> <span class="n">280ms</span> <span class="f">cubic-bezier</span>(<span class="n">.25</span>,<span class="n">.46</span>,<span class="n">.45</span>,<span class="n">.94</span>);</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">24</span><span class="vsc-ct">    }</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">25</span><span class="vsc-ct">  <span class="k">&lt;/style&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">26</span><span class="vsc-ct"><span class="k">&lt;/head&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">27</span><span class="vsc-ct"><span class="k">&lt;body&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">28</span><span class="vsc-ct">  <span class="k">&lt;nav</span> <span class="p">id</span>=<span class="s">"sidebar"</span><span class="k">&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">29</span><span class="vsc-ct">    <span class="c">&lt;!-- Header --&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">30</span><span class="vsc-ct">    <span class="k">&lt;div</span> <span class="p">class</span>=<span class="s">"sidebar-header"</span><span class="k">&gt;</span></span></div>
+      </div>
+      <div class="vsc-code" id="vsc-code-music" style="display:none">
+        <div class="vsc-code-line"><span class="vsc-ln">1</span><span class="vsc-ct"><span class="k">&lt;!DOCTYPE</span> <span class="p">html</span><span class="k">&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">2</span><span class="vsc-ct"><span class="k">&lt;html</span> <span class="p">lang</span>=<span class="s">"zh-CN"</span><span class="k">&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">3</span><span class="vsc-ct"><span class="k">&lt;head&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">4</span><span class="vsc-ct">  <span class="k">&lt;title&gt;</span>媛媛 · Music MVP<span class="k">&lt;/title&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">5</span><span class="vsc-ct">  <span class="c">&lt;!-- Music player UI prototype --&gt;</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">6</span><span class="vsc-ct">  <span class="k">&lt;style&gt;</span></span></div>
+        <div class="vsc-code-line hi"><span class="vsc-ln">7</span><span class="vsc-ct">    <span class="t">body</span> { <span class="p">background</span>: <span class="n">#0a0a0f</span>; <span class="p">color</span>: <span class="n">#fff</span>; }</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">8</span><span class="vsc-ct">    <span class="t">.player-card</span> {</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">9</span><span class="vsc-ct">      <span class="p">border-radius</span>: <span class="n">20px</span>;</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">10</span><span class="vsc-ct">      <span class="p">backdrop-filter</span>: <span class="f">blur</span>(<span class="n">20px</span>);</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">11</span><span class="vsc-ct">    }</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">12</span><span class="vsc-ct">  <span class="k">&lt;/style&gt;</span></span></div>
+      </div>
+      <div class="vsc-code" id="vsc-code-openclaw" style="display:none">
+        <div class="vsc-code-line"><span class="vsc-ln">1</span><span class="vsc-ct"><span class="c">// openclaw.mjs — SAVC Runtime Entry</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">2</span><span class="vsc-ct"><span class="k">import</span> { <span class="f">createServer</span> } <span class="k">from</span> <span class="s">'http'</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">3</span><span class="vsc-ct"><span class="k">import</span> { <span class="t">AgentRegistry</span> } <span class="k">from</span> <span class="s">'./savc-core/registry.mjs'</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">4</span><span class="vsc-ct"><span class="k">import</span> { <span class="f">setupGateway</span> } <span class="k">from</span> <span class="s">'./openclaw/gateway.mjs'</span></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">5</span><span class="vsc-ct"></span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">6</span><span class="vsc-ct"><span class="k">const</span> <span class="p">PORT</span> = <span class="f">parseInt</span>(<span class="t">process</span>.<span class="p">env</span>.<span class="p">PORT</span> ?? <span class="s">'5174'</span>)</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">7</span><span class="vsc-ct"><span class="k">const</span> <span class="p">registry</span> = <span class="k">new</span> <span class="t">AgentRegistry</span>()</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">8</span><span class="vsc-ct"></span></div>
+        <div class="vsc-code-line hi"><span class="vsc-ln">9</span><span class="vsc-ct"><span class="k">async function</span> <span class="f">main</span>() {</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">10</span><span class="vsc-ct">  <span class="k">await</span> registry.<span class="f">loadAll</span>()</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">11</span><span class="vsc-ct">  <span class="k">const</span> server = <span class="f">createServer</span>()</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">12</span><span class="vsc-ct">  <span class="f">setupGateway</span>(server, registry)</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">13</span><span class="vsc-ct">  server.<span class="f">listen</span>(<span class="p">PORT</span>, () => {</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">14</span><span class="vsc-ct">    <span class="t">console</span>.<span class="f">log</span>(<span class="s">`SAVC gateway :${PORT}`</span>)</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">15</span><span class="vsc-ct">  })</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">16</span><span class="vsc-ct">}</span></div>
+        <div class="vsc-code-line"><span class="vsc-ln">17</span><span class="vsc-ct"><span class="f">main</span>().<span class="f">catch</span>(<span class="t">console</span>.<span class="p">error</span>)</span></div>
+      </div>
+
+      <!-- CodeMirror 6 editor mount (active when savc-ui running) -->
+      <div id="vsc-cm-mount" style="display:none"></div>
+
+      <!-- Bottom panel (terminal) -->
+      <div class="vsc-panel" id="vsc-panel-term">
+        <div class="vsc-panel-tabs">
+          <div class="vsc-panel-tab active">终端</div>
+          <div class="vsc-panel-tab">输出</div>
+          <div class="vsc-panel-tab">问题</div>
+          <div style="margin-left:auto;display:flex;align-items:center;padding-right:8px">
+            <button class="vsc-tb-btn" onclick="toggleVscPanel(event)" title="关闭面板">×</button>
+          </div>
+        </div>
+        <div class="vsc-terminal" id="vsc-term-mock">
+          <div class="tl"><span class="tp">xiaoming@SAVC</span> <span style="color:#569cd6">~/ITEM/SAVC/Self-aware-virtual-companion</span> <span style="color:#fff">main</span></div>
+          <div class="tl"><span class="tp">❯</span> <span style="color:#d4d4d4">pnpm --dir savc-ui exec tsc -p tsconfig.json --noEmit</span></div>
+          <div class="tl to">  No errors found.</div>
+          <div class="tl"></div>
+          <div class="tl"><span class="tp">❯</span> <span style="color:#d4d4d4">git status</span></div>
+          <div class="tl tw">On branch main</div>
+          <div class="tl tw">Changes not staged for commit:</div>
+          <div class="tl to">  modified:   openclaw/openclaw.mjs</div>
+          <div class="tl to">  modified:   pnpm-lock.yaml</div>
+          <div class="tl to">  modified:   scripts/setup.sh</div>
+          <div class="tl" style="color:#73c991">Untracked files:</div>
+          <div class="tl to">  .claude/</div>
+          <div class="tl to">  docs/worklog/claude/</div>
+          <div class="tl to">  tests/Claude-ui-test/</div>
+          <div class="tl"></div>
+          <div class="tl"><span class="tp">❯</span> <span class="k" style="color:#d4d4d4">█</span></div>
+        </div>
+        <!-- xterm.js mount — shown when savc-ui PTY is available -->
+        <div id="xterm-mount" style="display:none;flex:1;overflow:hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="vsc-statusbar">
+    <span class="vsc-sb" id="vsc-sb-branch">⎇ main</span>
+    <span class="vsc-sb" id="vsc-sb-errors">⊗ 0  ⚠ 2</span>
+    <span class="vsc-sb vsc-sb-r" id="vsc-sb-lang">HTML</span>
+    <span class="vsc-sb">UTF-8</span>
+    <span class="vsc-sb">Ln 9, Col 5</span>
+    <span class="vsc-sb">Spaces: 2</span>
+  </div>
+</div>
+
+<!-- CodeMirror 6 via esm.sh CDN — only active when savc-ui is running -->
+<script type="module">
+(async () => {
+  try {
+    const { EditorView, minimalSetup } = await import('https://esm.sh/codemirror@6?bundle');
+    const { javascript }   = await import('https://esm.sh/@codemirror/lang-javascript@6?bundle');
+    const { html: lHtml }  = await import('https://esm.sh/@codemirror/lang-html@6?bundle');
+    const { css: lCss }    = await import('https://esm.sh/@codemirror/lang-css@6?bundle');
+    const { markdown: lMd } = await import('https://esm.sh/@codemirror/lang-markdown@6?bundle');
+    const { json: lJson }  = await import('https://esm.sh/@codemirror/lang-json@6?bundle');
+    const { yaml: lYaml }  = await import('https://esm.sh/@codemirror/lang-yaml@6?bundle');
+    const { EditorState, Compartment } = await import('https://esm.sh/@codemirror/state@6?bundle');
+    const { keymap } = await import('https://esm.sh/@codemirror/view@6?bundle');
+    const { defaultKeymap, indentWithTab } = await import('https://esm.sh/@codemirror/commands@6?bundle');
+
+    const warmTheme = EditorView.theme({
+      '&': { background: '#1A1510', color: '#D4C4A8', height: '100%' },
+      '.cm-content': { fontFamily: '"JetBrains Mono","Fira Code","Courier New",monospace', fontSize: '12px', caretColor: '#C8571E' },
+      '.cm-cursor,.cm-dropCursor': { borderLeftColor: '#C8571E !important' },
+      '.cm-activeLine': { backgroundColor: 'rgba(200,87,30,0.07)' },
+      '&.cm-focused .cm-selectionBackground,.cm-selectionBackground,.cm-content ::selection': { backgroundColor: 'rgba(200,87,30,0.22) !important' },
+      '.cm-gutters': { background: '#140F0A', borderRight: '1px solid #3A2E1E', color: '#6B5A40' },
+      '.cm-lineNumbers .cm-gutterElement': { color: '#6B5A40', paddingRight: '8px' },
+      '.cm-activeLineGutter': { backgroundColor: 'rgba(200,87,30,0.1) !important', color: '#C8A880' },
+    }, { dark: true });
+
+    const langComp = new Compartment();
+    const langMap = {
+      typescript: javascript({ typescript: true }), javascript: javascript(),
+      html: lHtml(), css: lCss(), markdown: lMd(), json: lJson(), yaml: lYaml(),
+    };
+
+    let cmView = null;
+    const mount = document.getElementById('vsc-cm-mount');
+
+    window.vscCM = {
+      open(content, language) {
+        if (cmView) { cmView.destroy(); cmView = null; }
+        const lang = langMap[language] || [];
+        cmView = new EditorView({
+          state: EditorState.create({
+            doc: content,
+            extensions: [
+              minimalSetup, warmTheme,
+              langComp.of(Array.isArray(lang) ? lang : [lang]),
+              keymap.of([...defaultKeymap, indentWithTab]),
+              EditorView.lineWrapping,
+            ],
+          }),
+          parent: mount,
+        });
+      },
+      getContent() { return cmView ? cmView.state.doc.toString() : null; },
+      setLang(language) {
+        if (!cmView) return;
+        const lang = langMap[language] || [];
+        cmView.dispatch({ effects: langComp.reconfigure(Array.isArray(lang) ? lang : [lang]) });
+      },
+    };
+    console.log('[SAVC] CodeMirror 6 loaded');
+  } catch (e) {
+    console.warn('[SAVC] CodeMirror unavailable (offline mode):', e.message);
+  }
+})();
+</script>
+
+<!-- xterm.js via CDN — PTY terminal, only active when savc-ui is running -->
+<script type="module">
+(async () => {
+  const WS_URL = 'ws://localhost:5174/__savc/terminal';
+  const mount  = document.getElementById('xterm-mount');
+  const mock   = document.getElementById('vsc-term-mock');
+  if (!mount) return;
+  try {
+    const { Terminal } = await import('https://esm.sh/xterm@5');
+    const { FitAddon } = await import('https://esm.sh/xterm-addon-fit@0.8');
+
+    const term = new Terminal({
+      fontFamily: '"JetBrains Mono","Fira Code","Courier New",monospace',
+      fontSize: 12, lineHeight: 1.35,
+      cursorBlink: true, cursorStyle: 'bar',
+      allowProposedApi: true,
+      theme: {
+        background: '#140F0A', foreground: '#D4C4A8',
+        cursor: '#C8571E', cursorAccent: '#140F0A',
+        selectionBackground: 'rgba(200,87,30,0.3)',
+        black: '#1A1510', red: '#C8571E', green: '#73C991',
+        yellow: '#E8C080', blue: '#7B9EC4', magenta: '#B8758A',
+        cyan: '#6ABFB8', white: '#D4C4A8',
+        brightBlack: '#4A3520', brightRed: '#E8824A', brightGreen: '#8ED9A0',
+        brightYellow: '#F0D090', brightBlue: '#9AB8D8',
+        brightMagenta: '#D0909E', brightCyan: '#8AD4CE', brightWhite: '#F0E8DE',
+      },
+    });
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+
+    let ws = null;
+    let xtermActive = false;
+
+    function connectPTY() {
+      ws = new WebSocket(WS_URL);
+      ws.binaryType = 'arraybuffer';
+      ws.onopen = () => {
+        if (!xtermActive) {
+          // First connection — mount xterm and hide mock
+          term.open(mount);
+          if (mock) mock.style.display = 'none';
+          mount.style.display = '';
+          xtermActive = true;
+          window.vscXterm = term;
+        }
+        fitAddon.fit();
+        term.writeln('\x1b[33m[SAVC Terminal · 已连接]\x1b[0m');
+      };
+      ws.onmessage = e => {
+        term.write(new Uint8Array(e.data));
+      };
+      ws.onclose = () => {
+        term.writeln('\r\n\x1b[31m[连接已断开 — 点击此处重连]\x1b[0m');
+      };
+      ws.onerror = () => {
+        term.writeln('\r\n\x1b[31m[PTY 连接失败]\x1b[0m');
+      };
+      term.onData(data => {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(data);
+      });
+    }
+
+    // Attempt connection when widget expands
+    const origExpand = window.expandVSCode;
+    window.expandVSCode = function() {
+      if (origExpand) origExpand();
+      if (!xtermActive) {
+        setTimeout(() => { try { connectPTY(); } catch { /* offline */ } }, 200);
+      } else {
+        setTimeout(() => fitAddon.fit(), 50);
+      }
+    };
+
+    // Resize on window change
+    window.addEventListener('resize', () => { if (xtermActive) fitAddon.fit(); });
+
+    console.log('[SAVC] xterm.js loaded');
+  } catch (e) {
+    console.warn('[SAVC] xterm.js unavailable:', e.message);
+  }
+})();
+</script>
+
+</body>
+</html>

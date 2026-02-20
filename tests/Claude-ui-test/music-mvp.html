@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yuanyuan MixLab · 个性化音乐 MVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #07111f;
+      --surface: #101d31;
+      --surface-soft: #162845;
+      --ink: #edf3ff;
+      --ink-soft: #a9b8d8;
+      --brand: #ff5b7f;
+      --brand-2: #2ee8d7;
+      --warn: #f6c445;
+      --ok: #4ae38c;
+      --line: rgba(255, 255, 255, 0.12);
+      --radius: 16px;
+      --shadow: 0 16px 44px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 85% 10%, rgba(255, 91, 127, 0.25), transparent 35%),
+        radial-gradient(circle at 5% 30%, rgba(46, 232, 215, 0.2), transparent 40%),
+        linear-gradient(140deg, #040b14 0%, #07111f 45%, #0b1c34 100%);
+      font-family: "Manrope", "Noto Sans SC", sans-serif;
+      overflow-x: hidden;
+    }
+
+    .ambient {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.55;
+      background:
+        repeating-linear-gradient(
+          to right,
+          transparent 0 28px,
+          rgba(255, 255, 255, 0.03) 28px 29px
+        );
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      padding: 24px 22px 132px;
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-family: "Bebas Neue", sans-serif;
+      letter-spacing: 0.08em;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 0.95;
+      font-weight: 400;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 12px;
+      color: var(--ink-soft);
+      backdrop-filter: blur(8px);
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr) 320px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(22, 40, 69, 0.88), rgba(13, 25, 43, 0.9));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .panel-head {
+      padding: 14px 14px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .panel-body {
+      padding: 12px 14px 14px;
+    }
+
+    .field {
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--ink-soft);
+      margin-bottom: 7px;
+    }
+
+    .field small {
+      font-size: 11px;
+      color: var(--brand-2);
+    }
+
+    select,
+    input[type="range"],
+    button {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(8, 15, 28, 0.72);
+      color: var(--ink);
+      font: inherit;
+    }
+
+    select,
+    button {
+      min-height: 42px;
+      padding: 0 12px;
+    }
+
+    input[type="range"] {
+      min-height: 34px;
+      accent-color: var(--brand);
+      cursor: pointer;
+    }
+
+    .button-row {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+      margin-top: 14px;
+    }
+
+    .btn-main {
+      background: linear-gradient(135deg, var(--brand), #ff7d52);
+      border: none;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #fff;
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+      box-shadow: 0 10px 28px rgba(255, 91, 127, 0.35);
+    }
+
+    .btn-main:hover { transform: translateY(-2px); }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+
+    .recommend-body {
+      min-height: 620px;
+      max-height: calc(100vh - 290px);
+      overflow: auto;
+      padding: 8px 12px 12px;
+    }
+
+    .recommend-body::-webkit-scrollbar,
+    .insight-body::-webkit-scrollbar,
+    .queue::-webkit-scrollbar { width: 6px; }
+
+    .recommend-body::-webkit-scrollbar-thumb,
+    .insight-body::-webkit-scrollbar-thumb,
+    .queue::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+    }
+
+    .track {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(9, 20, 38, 0.6));
+      margin-bottom: 10px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 70px minmax(0, 1fr);
+      gap: 12px;
+      animation: fade-slide 340ms ease both;
+    }
+
+    .cover {
+      border-radius: 10px;
+      background: linear-gradient(145deg, rgba(255, 91, 127, 0.78), rgba(46, 232, 215, 0.78));
+      display: grid;
+      place-items: center;
+      font-family: "Bebas Neue", sans-serif;
+      letter-spacing: 0.1em;
+      font-size: 22px;
+      color: rgba(255, 255, 255, 0.95);
+      min-height: 70px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+    }
+
+    .meta-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .artist {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: var(--ink-soft);
+    }
+
+    .score {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(46, 232, 215, 0.14);
+      color: var(--brand-2);
+      border: 1px solid rgba(46, 232, 215, 0.4);
+      white-space: nowrap;
+    }
+
+    .tags {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink-soft);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .why {
+      margin-top: 8px;
+      color: #d9e4fb;
+      font-size: 12px;
+      line-height: 1.42;
+    }
+
+    .actions {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .actions button {
+      min-height: 34px;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0 8px;
+    }
+
+    .actions button:hover { border-color: rgba(255, 255, 255, 0.42); }
+
+    .actions .play { background: rgba(46, 232, 215, 0.15); color: var(--brand-2); }
+    .actions .like { background: rgba(74, 227, 140, 0.15); color: var(--ok); }
+    .actions .skip { background: rgba(246, 196, 69, 0.15); color: var(--warn); }
+
+    .insight-body {
+      min-height: 620px;
+      max-height: calc(100vh - 290px);
+      overflow: auto;
+      padding: 10px 12px 14px;
+    }
+
+    .block {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: rgba(4, 10, 20, 0.35);
+    }
+
+    .block h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--brand-2);
+    }
+
+    .list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--ink-soft);
+    }
+
+    .queue-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--ink-soft);
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+    }
+
+    .queue-item button {
+      width: auto;
+      min-height: 28px;
+      padding: 0 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .player {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10;
+      border-top: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(8, 15, 28, 0.75), rgba(4, 9, 18, 0.95));
+      backdrop-filter: blur(12px);
+      padding: 12px 20px;
+    }
+
+    .player-inner {
+      max-width: 1500px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr) 260px;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .now {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .now strong {
+      font-size: 13px;
+      letter-spacing: 0.02em;
+    }
+
+    .now span {
+      font-size: 11px;
+      color: var(--ink-soft);
+    }
+
+    .player audio {
+      width: 100%;
+      height: 38px;
+      filter: hue-rotate(320deg) saturate(120%);
+    }
+
+    .player-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .player-actions button {
+      width: auto;
+      min-height: 34px;
+      padding: 0 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--ink-soft);
+      margin-top: 8px;
+      line-height: 1.45;
+    }
+
+    @keyframes fade-slide {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1180px) {
+      .shell { grid-template-columns: 1fr; }
+      .recommend-body, .insight-body { max-height: none; min-height: 0; }
+      .player-inner { grid-template-columns: 1fr; gap: 10px; }
+      .player-actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient"></div>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>YUANYUAN MIXLAB</h1>
+        <p>Web 个性化音乐推荐 MVP（测试版）</p>
+      </div>
+      <div class="stats">
+        <span class="stat" id="statPlays">播放 0</span>
+        <span class="stat" id="statLikes">喜欢 0</span>
+        <span class="stat" id="statSkips">跳过 0</span>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>你的音乐画像</h2>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="mood">当前情绪</label>
+            <select id="mood">
+              <option value="calm">平静</option>
+              <option value="happy">开心</option>
+              <option value="focused">专注</option>
+              <option value="sad">低落</option>
+              <option value="confident">自信</option>
+              <option value="romantic">浪漫</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="scene">使用场景</label>
+            <select id="scene">
+              <option value="coding">编码</option>
+              <option value="commute">通勤</option>
+              <option value="reading">阅读</option>
+              <option value="workout">运动</option>
+              <option value="night">夜间放松</option>
+              <option value="coffee">咖啡时段</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="language">语言偏好</label>
+            <select id="language">
+              <option value="mix">混合</option>
+              <option value="zh">中文</option>
+              <option value="en">英文</option>
+              <option value="jp">日语</option>
+              <option value="instrumental">纯音乐</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="energy">能量值 <small id="energyValue">58</small></label>
+            <input id="energy" type="range" min="0" max="100" value="58" />
+          </div>
+
+          <div class="field">
+            <label for="novelty">探索强度 <small id="noveltyValue">42</small></label>
+            <input id="novelty" type="range" min="0" max="100" value="42" />
+          </div>
+
+          <div class="button-row">
+            <button id="generateBtn" class="btn-main" type="button">生成个性化推荐</button>
+            <button id="resetBtn" class="btn-ghost" type="button">重置偏好与行为记忆</button>
+          </div>
+
+          <p class="hint">MVP 说明: 推荐算法会结合情绪、场景、能量值、历史喜欢/跳过行为。数据保存在浏览器 localStorage，仅用于本地测试。</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>为你推荐</h2>
+          <span class="stat" id="recommendCount">0 首</span>
+        </div>
+        <div class="recommend-body" id="recommendations"></div>
+      </section>
+
+      <aside class="panel">
+        <div class="panel-head">
+          <h2>Taste Memory</h2>
+        </div>
+        <div class="insight-body">
+          <div class="block">
+            <h3>偏好标签 Top5</h3>
+            <ul class="list" id="likedTags"></ul>
+          </div>
+
+          <div class="block">
+            <h3>易跳过标签</h3>
+            <ul class="list" id="skippedTags"></ul>
+          </div>
+
+          <div class="block queue">
+            <h3>播放队列</h3>
+            <div id="queueList"></div>
+          </div>
+
+          <div class="block">
+            <h3>最近播放</h3>
+            <ul class="list" id="recentList"></ul>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <footer class="player">
+    <div class="player-inner">
+      <div class="now">
+        <strong id="nowTitle">未播放</strong>
+        <span id="nowMeta">点击推荐卡片中的“播放”开始测试</span>
+      </div>
+
+      <audio id="audio" controls preload="none"></audio>
+
+      <div class="player-actions">
+        <button id="nowLike" type="button">喜欢当前</button>
+        <button id="nowSkip" type="button">跳过当前</button>
+        <button id="playNext" type="button">播放下一首</button>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const STORAGE_KEY = "savc_music_mvp_v1";
+
+    const TRACKS = [
+      { id: "t1", title: "晨雾信号", artist: "Yuan Studio", mood: ["calm", "focused"], scene: ["coding", "reading", "coffee"], energy: 36, language: "instrumental", bpm: 82, tags: ["ambient", "lofi", "soft"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+      { id: "t2", title: "Neon Sprint", artist: "Low Orbit", mood: ["confident", "happy"], scene: ["workout", "commute"], energy: 82, language: "en", bpm: 126, tags: ["electro", "drive", "upbeat"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+      { id: "t3", title: "月台倒影", artist: "Aki Sora", mood: ["sad", "calm"], scene: ["night", "commute"], energy: 28, language: "jp", bpm: 70, tags: ["citypop", "nostalgia", "slow"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+      { id: "t4", title: "白噪咖啡馆", artist: "Room 09", mood: ["focused", "calm"], scene: ["coding", "reading", "coffee"], energy: 42, language: "instrumental", bpm: 96, tags: ["jazzhop", "study", "warm"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+      { id: "t5", title: "晴朗偏差", artist: "Mia Lin", mood: ["happy", "romantic"], scene: ["commute", "coffee"], energy: 62, language: "zh", bpm: 108, tags: ["indie", "female", "bright"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
+      { id: "t6", title: "Code After Rain", artist: "Null Pointer", mood: ["focused", "confident"], scene: ["coding", "night"], energy: 68, language: "en", bpm: 114, tags: ["synth", "dark", "precision"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
+      { id: "t7", title: "微光慢拍", artist: "柳川", mood: ["romantic", "calm"], scene: ["night", "reading"], energy: 34, language: "zh", bpm: 78, tags: ["acoustic", "warm", "soft"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
+      { id: "t8", title: "Velocity Bloom", artist: "Nova Unit", mood: ["happy", "confident"], scene: ["workout", "coding"], energy: 88, language: "en", bpm: 132, tags: ["futurebass", "neon", "high"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
+      { id: "t9", title: "雨夜書店", artist: "Kuroi", mood: ["sad", "focused"], scene: ["reading", "night"], energy: 25, language: "jp", bpm: 66, tags: ["piano", "cinematic", "slow"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
+      { id: "t10", title: "花火低频", artist: "四季码头", mood: ["happy", "romantic"], scene: ["night", "commute"], energy: 57, language: "zh", bpm: 102, tags: ["dream", "pulse", "city"], audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" }
+    ];
+
+    const defaultState = {
+      profile: {
+        mood: "focused",
+        scene: "coding",
+        language: "mix",
+        energy: 58,
+        novelty: 42
+      },
+      likes: {},
+      skips: {},
+      plays: {},
+      queue: [],
+      recent: [],
+      currentTrackId: null
+    };
+
+    const els = {
+      mood: document.getElementById("mood"),
+      scene: document.getElementById("scene"),
+      language: document.getElementById("language"),
+      energy: document.getElementById("energy"),
+      novelty: document.getElementById("novelty"),
+      energyValue: document.getElementById("energyValue"),
+      noveltyValue: document.getElementById("noveltyValue"),
+      generateBtn: document.getElementById("generateBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      recommendCount: document.getElementById("recommendCount"),
+      recommendations: document.getElementById("recommendations"),
+      likedTags: document.getElementById("likedTags"),
+      skippedTags: document.getElementById("skippedTags"),
+      queueList: document.getElementById("queueList"),
+      recentList: document.getElementById("recentList"),
+      statPlays: document.getElementById("statPlays"),
+      statLikes: document.getElementById("statLikes"),
+      statSkips: document.getElementById("statSkips"),
+      nowTitle: document.getElementById("nowTitle"),
+      nowMeta: document.getElementById("nowMeta"),
+      audio: document.getElementById("audio"),
+      nowLike: document.getElementById("nowLike"),
+      nowSkip: document.getElementById("nowSkip"),
+      playNext: document.getElementById("playNext")
+    };
+
+    const readState = () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(defaultState);
+        const parsed = JSON.parse(raw);
+        return {
+          ...structuredClone(defaultState),
+          ...parsed,
+          profile: {
+            ...defaultState.profile,
+            ...(parsed.profile || {})
+          }
+        };
+      } catch {
+        return structuredClone(defaultState);
+      }
+    };
+
+    let state = readState();
+
+    const saveState = () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    };
+
+    const getTrack = (id) => TRACKS.find((t) => t.id === id);
+
+    const scoreTrack = (track, profile) => {
+      let score = 24;
+      const reasons = [];
+
+      if (track.mood.includes(profile.mood)) {
+        score += 26;
+        reasons.push(`情绪匹配: ${profile.mood}`);
+      }
+
+      if (track.scene.includes(profile.scene)) {
+        score += 22;
+        reasons.push(`场景适配: ${profile.scene}`);
+      }
+
+      const energyDiff = Math.abs(track.energy - profile.energy);
+      const energyScore = Math.max(0, 20 - energyDiff * 0.35);
+      score += energyScore;
+      reasons.push(`能量接近度: ${Math.round(energyScore)}`);
+
+      if (profile.language === "mix" || track.language === profile.language || track.language === "instrumental") {
+        score += 10;
+        reasons.push("语言偏好吻合");
+      }
+
+      const likeBoost = Number(state.likes[track.id] || 0) * 18;
+      if (likeBoost > 0) {
+        score += Math.min(36, likeBoost);
+        reasons.push("历史喜欢加权");
+      }
+
+      const skipPenalty = Number(state.skips[track.id] || 0) * 16;
+      if (skipPenalty > 0) {
+        score -= Math.min(40, skipPenalty);
+        reasons.push("历史跳过惩罚");
+      }
+
+      const playCount = Number(state.plays[track.id] || 0);
+      const novelty = profile.novelty;
+      if (novelty >= 60) {
+        score += playCount === 0 ? 12 : -Math.min(12, playCount * 4);
+        reasons.push("高探索偏好");
+      } else if (novelty <= 35) {
+        score += playCount > 0 ? Math.min(14, playCount * 4) : -4;
+        reasons.push("稳定偏好");
+      }
+
+      const likedTagScore = track.tags.reduce((sum, tag) => sum + (state.likes[`tag:${tag}`] || 0), 0);
+      if (likedTagScore > 0) {
+        score += Math.min(22, likedTagScore * 3);
+        reasons.push("喜爱标签增强");
+      }
+
+      return {
+        score: Math.max(0, Math.round(score)),
+        reasons
+      };
+    };
+
+    const buildRecommendations = () => {
+      const profile = state.profile;
+      return TRACKS
+        .map((track) => {
+          const { score, reasons } = scoreTrack(track, profile);
+          return { track, score, reasons };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8);
+    };
+
+    const addRecent = (id) => {
+      state.recent = [id, ...state.recent.filter((item) => item !== id)].slice(0, 10);
+    };
+
+    const playTrack = (id) => {
+      const track = getTrack(id);
+      if (!track) return;
+      state.currentTrackId = id;
+      state.plays[id] = Number(state.plays[id] || 0) + 1;
+      addRecent(id);
+      saveState();
+      renderStats();
+      renderInsights();
+      updateNowPlaying();
+
+      els.audio.src = track.audio;
+      els.audio.play().catch(() => {
+        els.nowMeta.textContent = "浏览器拦截了自动播放，请手动点击播放按钮";
+      });
+    };
+
+    const likeTrack = (id) => {
+      const track = getTrack(id);
+      if (!track) return;
+      state.likes[id] = Number(state.likes[id] || 0) + 1;
+      track.tags.forEach((tag) => {
+        const key = `tag:${tag}`;
+        state.likes[key] = Number(state.likes[key] || 0) + 1;
+      });
+      saveState();
+      renderAll();
+    };
+
+    const skipTrack = (id) => {
+      const track = getTrack(id);
+      if (!track) return;
+      state.skips[id] = Number(state.skips[id] || 0) + 1;
+      track.tags.forEach((tag) => {
+        const key = `tag:${tag}`;
+        state.skips[key] = Number(state.skips[key] || 0) + 1;
+      });
+      saveState();
+      renderAll();
+    };
+
+    const queueTrack = (id) => {
+      if (!state.queue.includes(id)) state.queue.push(id);
+      saveState();
+      renderInsights();
+    };
+
+    const playNext = () => {
+      const nextId = state.queue.shift();
+      if (nextId) {
+        playTrack(nextId);
+      }
+      saveState();
+      renderInsights();
+    };
+
+    const getTopTagPairs = (source, limit = 5) => {
+      return Object.entries(source)
+        .filter(([key]) => key.startsWith("tag:"))
+        .map(([key, value]) => [key.replace("tag:", ""), Number(value)])
+        .filter(([, value]) => value > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit);
+    };
+
+    const renderRecommendations = () => {
+      const recs = buildRecommendations();
+      els.recommendCount.textContent = `${recs.length} 首`;
+      els.recommendations.innerHTML = recs.map((item, idx) => {
+        const { track, score, reasons } = item;
+        return `
+          <article class="track" style="animation-delay:${idx * 40}ms">
+            <div class="cover">${track.title.slice(0, 1)}</div>
+            <div>
+              <div class="meta-top">
+                <div>
+                  <h3 class="title">${track.title}</h3>
+                  <p class="artist">${track.artist} · ${track.bpm} BPM</p>
+                </div>
+                <span class="score">匹配度 ${score}</span>
+              </div>
+              <div class="tags">${track.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
+              <div class="why">${reasons.slice(0, 3).join(" · ")}</div>
+              <div class="actions">
+                <button class="play" data-action="play" data-id="${track.id}">播放</button>
+                <button class="like" data-action="like" data-id="${track.id}">喜欢</button>
+                <button class="skip" data-action="skip" data-id="${track.id}">跳过</button>
+                <button data-action="queue" data-id="${track.id}">加队列</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      els.recommendations.querySelectorAll("button[data-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const id = button.dataset.id;
+          const action = button.dataset.action;
+          if (action === "play") playTrack(id);
+          if (action === "like") likeTrack(id);
+          if (action === "skip") skipTrack(id);
+          if (action === "queue") queueTrack(id);
+        });
+      });
+    };
+
+    const renderStats = () => {
+      const totalPlays = Object.values(state.plays).reduce((sum, value) => sum + Number(value || 0), 0);
+      const totalLikes = Object.entries(state.likes)
+        .filter(([key]) => !key.startsWith("tag:"))
+        .reduce((sum, [, value]) => sum + Number(value || 0), 0);
+      const totalSkips = Object.entries(state.skips)
+        .filter(([key]) => !key.startsWith("tag:"))
+        .reduce((sum, [, value]) => sum + Number(value || 0), 0);
+
+      els.statPlays.textContent = `播放 ${totalPlays}`;
+      els.statLikes.textContent = `喜欢 ${totalLikes}`;
+      els.statSkips.textContent = `跳过 ${totalSkips}`;
+    };
+
+    const renderInsights = () => {
+      const likedTagPairs = getTopTagPairs(state.likes);
+      const skippedTagPairs = getTopTagPairs(state.skips);
+
+      els.likedTags.innerHTML = likedTagPairs.length
+        ? likedTagPairs.map(([tag, score]) => `<li>${tag} · 偏好 +${score}</li>`).join("")
+        : "<li>暂无偏好积累</li>";
+
+      els.skippedTags.innerHTML = skippedTagPairs.length
+        ? skippedTagPairs.map(([tag, score]) => `<li>${tag} · 避让 ${score}</li>`).join("")
+        : "<li>暂无跳过标签</li>";
+
+      els.queueList.innerHTML = state.queue.length
+        ? state.queue.map((id, idx) => {
+            const track = getTrack(id);
+            if (!track) return "";
+            return `<div class="queue-item"><span>${idx + 1}. ${track.title}</span><button data-qplay="${track.id}">播放</button></div>`;
+          }).join("")
+        : '<div class="queue-item"><span>队列为空</span></div>';
+
+      els.queueList.querySelectorAll("button[data-qplay]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const id = button.dataset.qplay;
+          state.queue = state.queue.filter((item) => item !== id);
+          saveState();
+          playTrack(id);
+          renderInsights();
+        });
+      });
+
+      els.recentList.innerHTML = state.recent.length
+        ? state.recent.map((id) => {
+            const track = getTrack(id);
+            return track ? `<li>${track.title} · ${track.artist}</li>` : "";
+          }).join("")
+        : "<li>暂无播放记录</li>";
+    };
+
+    const updateNowPlaying = () => {
+      const current = getTrack(state.currentTrackId);
+      if (!current) {
+        els.nowTitle.textContent = "未播放";
+        els.nowMeta.textContent = "点击推荐卡片中的“播放”开始测试";
+        return;
+      }
+      els.nowTitle.textContent = current.title;
+      els.nowMeta.textContent = `${current.artist} · ${current.language.toUpperCase()} · ${current.bpm} BPM`;
+    };
+
+    const syncControlsFromState = () => {
+      els.mood.value = state.profile.mood;
+      els.scene.value = state.profile.scene;
+      els.language.value = state.profile.language;
+      els.energy.value = String(state.profile.energy);
+      els.novelty.value = String(state.profile.novelty);
+      els.energyValue.textContent = String(state.profile.energy);
+      els.noveltyValue.textContent = String(state.profile.novelty);
+    };
+
+    const syncStateFromControls = () => {
+      state.profile = {
+        mood: els.mood.value,
+        scene: els.scene.value,
+        language: els.language.value,
+        energy: Number(els.energy.value),
+        novelty: Number(els.novelty.value)
+      };
+      saveState();
+    };
+
+    const renderAll = () => {
+      renderStats();
+      renderRecommendations();
+      renderInsights();
+      updateNowPlaying();
+    };
+
+    els.energy.addEventListener("input", () => {
+      els.energyValue.textContent = els.energy.value;
+    });
+
+    els.novelty.addEventListener("input", () => {
+      els.noveltyValue.textContent = els.novelty.value;
+    });
+
+    els.generateBtn.addEventListener("click", () => {
+      syncStateFromControls();
+      renderAll();
+    });
+
+    els.resetBtn.addEventListener("click", () => {
+      if (!confirm("确认清空本地偏好和行为记录吗？")) return;
+      state = structuredClone(defaultState);
+      saveState();
+      syncControlsFromState();
+      renderAll();
+      els.audio.removeAttribute("src");
+      els.audio.load();
+    });
+
+    els.nowLike.addEventListener("click", () => {
+      if (state.currentTrackId) likeTrack(state.currentTrackId);
+    });
+
+    els.nowSkip.addEventListener("click", () => {
+      if (state.currentTrackId) skipTrack(state.currentTrackId);
+    });
+
+    els.playNext.addEventListener("click", () => {
+      playNext();
+    });
+
+    els.audio.addEventListener("ended", () => {
+      playNext();
+    });
+
+    syncControlsFromState();
+    renderAll();
+  </script>
+</body>
+</html>

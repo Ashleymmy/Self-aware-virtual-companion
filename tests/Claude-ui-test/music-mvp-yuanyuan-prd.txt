@@ -1,0 +1,27 @@
+1) 功能清单
+- 登录/匿名：获取基础画像（地区、时间、设备、偏好）
+- 首次偏好采集：选择风格/歌手/情绪与“喜欢/不喜欢”若干首
+- 推荐页：为你推荐列表+可播放（30s预览/整曲占位）
+- 反馈闭环：喜欢/不喜欢/跳过/收藏（实时影响下一批）
+- 运营配置：曲库导入、标签管理、简单榜单/人工置顶
+
+2) 数据结构
+- User(id, createdAt, region, device, timezone)
+- Track(id, title, artist, duration, popularity, audioUrl)
+- TrackTag(trackId, tagType{genre/mood/tempo}, tag, weight)
+- Event(userId, trackId, type{play/like/dislike/skip/fav}, ts, playSec)
+- UserProfile(userId, prefTags{tag:score}, lastActive, coldStartDone)
+
+3) 评分公式
+- Score(u,t)=0.45*TagMatch+0.25*Behavior+0.15*Popularity+0.10*Recency+0.05*Explore
+- TagMatch=Σ(profile.prefTags[tag]*trackTag.weight)
+- Behavior=+1*like +0.5*fav -1*dislike -0.6*skip(<=10s)
+- Recency=exp(-days/7)（近期行为权重更高）
+- Explore=随机扰动/新歌加成，控制同质化
+
+4) 开发步骤
+- 需求确认&原型：3页（采集/推荐/播放）+埋点定义
+- 后端基础：用户、曲库、标签、事件写入API；推荐API(TopN)
+- 推荐逻辑v1：冷启动（热门+偏好）+在线更新画像（事件→prefTags）
+- 前端实现：登录/采集/推荐列表/播放器/反馈按钮；A/B开关占位
+- 验收与迭代：核心指标（CTR、like率、完播率）+标签/权重调参工具
