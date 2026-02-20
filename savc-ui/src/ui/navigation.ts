@@ -26,6 +26,30 @@ export type Tab =
   | "logs"
   | "progressHub";
 
+export type ExternalNavLinkId = "taskRuntime" | "openclawControl";
+
+export type ExternalNavLink = {
+  id: ExternalNavLinkId;
+  groupLabel: "navGroups.system";
+  label: string;
+  icon: IconName;
+};
+
+export const EXTERNAL_NAV_LINKS: ExternalNavLink[] = [
+  {
+    id: "taskRuntime",
+    groupLabel: "navGroups.system",
+    label: "links.taskRuntime",
+    icon: "activity",
+  },
+  {
+    id: "openclawControl",
+    groupLabel: "navGroups.system",
+    label: "links.openclawControl",
+    icon: "globe",
+  },
+];
+
 export function iconForTab(tab: Tab): IconName {
   switch (tab) {
     case "dashboard":

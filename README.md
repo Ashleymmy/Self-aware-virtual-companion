@@ -60,7 +60,7 @@ Self-aware-virtual-companion/
 │   ├── privacy.yaml        #   隐私策略
 │   └── proactive.yaml      #   主动引擎与调度配置
 ├── docs/                    # 方案设计文档
-├── openclaw/                # OpenClaw 框架 (git submodule)
+├── openclaw/                # OpenClaw 框架源码目录（当前仓库内维护）
 │   └── extensions/
 │       └── savc-orchestrator/  # 多 Agent 编排插件 (TypeScript)
 ├── savc-core/               # SAVC 核心系统
@@ -98,8 +98,8 @@ Self-aware-virtual-companion/
 ### 安装
 
 ```bash
-# 克隆仓库（含子模块）
-git clone --recurse-submodules https://github.com/Ashleymmy/Self-aware-virtual-companion.git
+# 克隆仓库
+git clone https://github.com/Ashleymmy/Self-aware-virtual-companion.git
 cd Self-aware-virtual-companion
 
 # 安装依赖
@@ -118,6 +118,91 @@ cp config/.env.example config/.env.local
 4. **主动引擎** — 在 `config/proactive.yaml` 中设置定时任务和安静时段
 5. **会话隔离（默认已开启）** — `scripts/setup.sh`/`scripts/llm_enable_failover.sh` 会写入 `session.dmScope=per-channel-peer` 与 `agents.defaults.heartbeat.session=heartbeat-main`，避免心跳与私聊串会话
 
+### 内置开发环境基线
+
+```bash
+# 1) 预检环境（Node/pnpm/env/openclaw/docker）
+pnpm dev:check
+
+# 2) 初始化运行配置（首次或更换密钥后）
+pnpm setup
+
+# 3) 启动开发态（gateway watch + savc-ui）
+pnpm dev
+
+# 4) 触发一次“自我开发升级”闭环（工具学习 + 反思 + 人格微调预览）
+pnpm dev:self-upgrade
+
+# 5) 将自我升级闭环接入 Phase3 日任务（按需）
+SAVC_SELF_UPGRADE_LOOP=1 bash scripts/phase3_run_daily.sh
+```
+
+### Yuanyuan 自主开发模式（改代码 + 验证）
+
+```bash
+# 1) 一次性打开 yuanyuan autodev 能力（workspaceAccess/coding tools/default channel）
+pnpm yuanyuan:enable-autodev
+
+# 2) 让 yuanyuan 执行真实开发任务（不是只输出方案）
+pnpm yuanyuan:autodev --task "修复 scripts/test_phase_status.sh 在 macOS 下的兼容性并更新 README" \
+  --channel telegram \
+  --verify "bash scripts/test_phase_status.sh --quick" \
+  --verify "pnpm -s dev:check"
+```
+
+- 运行证据会落盘到 `tests/artifacts/yuanyuan-autodev/<session-id>/`。
+- 若提示 `autodev readiness check failed`，先执行 `pnpm yuanyuan:enable-autodev` 再重试。
+
+### 任务运行态事件流（联调）
+
+- 入口页面：`http://127.0.0.1:5174/progress-hub/task-runtime.html`
+- 用途：实时观察 yuanyuan 的任务创建、执行、重试、成功/失败状态流，验证“调度者 + 实时反馈”链路。
+
+```bash
+# 创建任务
+curl -X POST http://127.0.0.1:5174/__savc/task-runtime/create \\
+  -H 'content-type: application/json' \\
+  -d '{"title":"验证 agent 编排链路","owner":"yuanyuan","channel":"telegram"}'
+
+# 推进任务状态（running/retry/succeeded/failed/canceled）
+curl -X POST http://127.0.0.1:5174/__savc/task-runtime/control \\
+  -H 'content-type: application/json' \\
+  -d '{"taskId":"<task-id>","action":"running","progress":35,"message":"子任务执行中"}'
+
+# 获取快照 / 订阅 SSE
+curl http://127.0.0.1:5174/__savc/task-runtime/snapshot
+curl -N http://127.0.0.1:5174/__savc/task-runtime/stream
+```
+
+### 容器化预留（后续上云）
+
+```bash
+# 1) 初始化容器环境变量模板
+pnpm dev:container:init
+
+# 2) 编辑 infra/docker/.env 后启动容器
+pnpm dev:container:up
+
+# 3) 查看状态/日志
+pnpm dev:container:ps
+pnpm dev:container:logs
+
+# 4) 关闭容器
+pnpm dev:container:down
+```
+
+- 容器模板文件位于 `infra/docker/`，当前用于开发与云部署前置预留。
+- 默认入口是 `infra/docker/docker-compose.cloud.yml`，会在容器首次启动时写入 `openclaw.container.json`。
+- 生产上云前建议补充：镜像仓库发布、只读根文件系统、外部密钥管理、持久卷与健康探针策略。
+
+### 安全与凭据管理
+
+1. 凭据仅保存在 `config/.env.local`，禁止提交到 Git。
+2. 若出现泄露风险，立即轮换所有密钥并清空本地旧值。
+3. 提交前执行 `pnpm security:scan:staged`，全仓检查执行 `pnpm security:scan`。
+4. 可执行 `pnpm hooks:install` 启用 pre-commit 自动扫描。
+5. 详细规范见 `docs/密钥轮换与本地凭据管理.md`。
+
 ## 开发进度
 
 | 阶段 | 名称 | 状态 |
@@ -132,6 +217,27 @@ cp config/.env.example config/.env.local
 | Phase 5d | 实时语音交互 | ✅ 完成 |
 | Phase 5e | 视觉能力 | ✅ 完成 |
 | Phase 6 | Live2D 虚拟形象 | 🚧 进行中（M-F1~M-F5 管理界面闭环已落地，生产级通道联调中） |
+
+> 最近脚本校准（2026-02-19）：
+> `test_phase4b` PASS、`test_phase5c` PASS、`test_phase5d` PASS、`test_phase5e` PASS（live smoke 默认跳过告警）。
+
+## 最小可复现验收命令
+
+```bash
+# 环境
+node -v
+pnpm -v
+bash --version
+
+# 阶段验收
+bash scripts/test_phase4b.sh
+bash scripts/test_phase5c.sh
+bash scripts/test_phase5d.sh
+bash scripts/test_phase5e.sh
+
+# 状态汇总（macOS bash 3.2 兼容）
+bash scripts/test_phase_status.sh --quick
+```
 
 ## 记忆系统
 

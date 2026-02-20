@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SAVC 任务运行态联调台</title>
+    <link rel="stylesheet" href="./task-runtime.css" />
+  </head>
+  <body>
+    <div class="bg-glow" aria-hidden="true"></div>
+    <main class="runtime-shell">
+      <header class="runtime-header panel">
+        <div>
+          <p class="kicker">SAVC Runtime Event Console</p>
+          <h1>任务运行态联调台</h1>
+          <p class="sub">用于验证 yuanyuan 调度链路的实时反馈、重试与状态可视化。</p>
+        </div>
+        <div class="header-meta">
+          <a class="ghost-btn" href="./index.html">返回推进看板</a>
+          <button class="ghost-btn" id="refreshBtn" type="button">刷新快照</button>
+          <span class="pill" id="connectionPill">连接中</span>
+          <span class="meta">最后事件：<strong id="lastEventAt">--</strong></span>
+        </div>
+      </header>
+
+      <section class="runtime-grid">
+        <article class="panel create-panel">
+          <h2>创建任务</h2>
+          <form id="createForm" class="stack">
+            <label>
+              <span>任务标题</span>
+              <input name="title" required placeholder="例如：修复 telegram 通道回复超时" />
+            </label>
+            <label>
+              <span>负责人</span>
+              <input name="owner" value="yuanyuan" />
+            </label>
+            <label>
+              <span>渠道</span>
+              <select name="channel">
+                <option value="telegram">telegram</option>
+                <option value="discord">discord</option>
+                <option value="web">web</option>
+              </select>
+            </label>
+            <label>
+              <span>最大重试次数</span>
+              <input name="maxAttempts" type="number" min="1" max="9" value="3" />
+            </label>
+            <label>
+              <span>标签（逗号分隔）</span>
+              <input name="tags" placeholder="dev, runtime, yuanyuan" />
+            </label>
+            <button class="primary-btn" type="submit">创建任务</button>
+          </form>
+
+          <h3>Demo 回放</h3>
+          <div class="demo-actions">
+            <button type="button" data-mode="success" class="ghost-btn demo-btn">成功链路</button>
+            <button type="button" data-mode="retry-success" class="ghost-btn demo-btn">重试后成功</button>
+            <button type="button" data-mode="fail" class="ghost-btn demo-btn">失败链路</button>
+          </div>
+        </article>
+
+        <article class="panel task-panel">
+          <div class="panel-head split">
+            <h2>任务列表</h2>
+            <div class="toolbar">
+              <label>
+                订阅过滤
+                <select id="streamFilter">
+                  <option value="">全部任务</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="task-stats" id="taskStats"></div>
+          <div id="taskList" class="task-list"></div>
+        </article>
+
+        <article class="panel event-panel">
+          <h2>事件流</h2>
+          <div id="eventList" class="event-list"></div>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./task-runtime.js"></script>
+  </body>
+</html>

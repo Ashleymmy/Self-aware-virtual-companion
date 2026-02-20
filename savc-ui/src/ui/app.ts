@@ -2,7 +2,7 @@ import { LitElement, html, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { renderShell } from "./app-render.js";
 import { defaultViewState, type AppViewState } from "./app-view-state.js";
-import { type Tab } from "./navigation.js";
+import { type ExternalNavLinkId, type Tab } from "./navigation.js";
 import { type ThemeMode, resolveTheme, applyTheme } from "./theme.js";
 import { loadSettings, saveSettings } from "./storage.js";
 import { t } from "./i18n/index.js";
@@ -193,11 +193,7 @@ export class SavcApp extends LitElement {
 
   private _onTabClick = (tab: Tab) => {
     if (tab === "progressHub") {
-      const target = new URL("/progress-hub/index.html", window.location.origin);
-      const popup = window.open(target.toString(), "_blank", "noopener,noreferrer");
-      if (!popup) {
-        window.location.assign(target.toString());
-      }
+      this._openExternal(new URL("/progress-hub/index.html", window.location.origin));
       return;
     }
     if (tab === this._state.activeTab) return;
@@ -209,6 +205,20 @@ export class SavcApp extends LitElement {
     saveSettings({ lastTab: tab });
     if (tab === "logs") {
       activateLogsView(this._requestUpdate);
+    }
+  };
+
+  private _openExternal(target: URL) {
+    window.open(target.toString(), "_blank", "noopener,noreferrer");
+  }
+
+  private _onExternalNavClick = (linkId: ExternalNavLinkId) => {
+    if (linkId === "taskRuntime") {
+      this._openExternal(new URL("/progress-hub/task-runtime.html", window.location.origin));
+      return;
+    }
+    if (linkId === "openclawControl") {
+      this._openExternal(new URL("http://127.0.0.1:18789/"));
     }
   };
 
@@ -262,6 +272,7 @@ export class SavcApp extends LitElement {
     return renderShell(this._state, this._renderView, {
       onToggleNav: this._onToggleNav,
       onTabClick: this._onTabClick,
+      onExternalNavClick: this._onExternalNavClick,
       onTheme: this._onTheme,
     });
   }

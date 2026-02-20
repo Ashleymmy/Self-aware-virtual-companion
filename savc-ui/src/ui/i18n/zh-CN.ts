@@ -55,6 +55,12 @@ export const zhCN = {
     progressHub: "独立项目推进页面，聚合日志/计划/甘特图",
   },
 
+  // 外部导航入口
+  links: {
+    taskRuntime: "任务运行态联调台",
+    openclawControl: "OpenClaw Control",
+  },
+
   // 仪表盘
   dashboard: {
     status: "系统状态",

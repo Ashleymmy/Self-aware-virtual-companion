@@ -404,6 +404,12 @@
   white-space: nowrap;
 }
 
+.nav-item__external {
+  margin-left: auto;
+  opacity: 0.65;
+  font-size: 11px;
+}
+
 .nav-item:hover {
   color: var(--text);
   background: var(--bg-hover);

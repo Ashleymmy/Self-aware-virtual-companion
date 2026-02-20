@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { keyed } from "lit/directives/keyed.js";
 import { t } from "./i18n/index.js";
-import { TAB_GROUPS, iconForTab, titleForTab, subtitleForTab, type Tab } from "./navigation.js";
+import { EXTERNAL_NAV_LINKS, TAB_GROUPS, iconForTab, titleForTab, subtitleForTab, type ExternalNavLinkId, type Tab } from "./navigation.js";
 import { renderIcon, icons } from "./icons.js";
 import type { AppViewState } from "./app-view-state.js";
 import type { ThemeMode } from "./theme.js";
@@ -68,6 +68,7 @@ function renderTopbar(
 function renderNav(
   state: AppViewState,
   onTabClick: (tab: Tab) => void,
+  onExternalNavClick: (linkId: ExternalNavLinkId) => void,
 ): TemplateResult {
   return html`
     <nav class="savc-nav nav ${state.navCollapsed ? "nav--collapsed" : ""}">
@@ -88,10 +89,19 @@ function renderNav(
                   >
                     ${renderIcon(iconForTab(tab as Tab))}
                     <span class="nav-item__text">${titleForTab(tab as Tab)}</span>
-                    ${isExternal ? html`<span style="margin-left: auto; opacity: 0.65; font-size: 11px;">↗</span>` : nothing}
+                    ${isExternal ? html`<span class="nav-item__external">↗</span>` : nothing}
                   </button>
                 `;
                 },
+              )}
+              ${EXTERNAL_NAV_LINKS.filter((item) => item.groupLabel === group.label).map(
+                (item) => html`
+                  <button class="nav-item nav-item--external" @click=${() => onExternalNavClick(item.id)}>
+                    ${renderIcon(item.icon)}
+                    <span class="nav-item__text">${t(item.label)}</span>
+                    <span class="nav-item__external">↗</span>
+                  </button>
+                `,
               )}
             </div>
           </div>
@@ -139,6 +149,7 @@ export function renderShell(
   callbacks: {
     onToggleNav: () => void;
     onTabClick: (tab: Tab) => void;
+    onExternalNavClick: (linkId: ExternalNavLinkId) => void;
     onTheme: (mode: ThemeMode, e: MouseEvent) => void;
   },
 ): TemplateResult {
@@ -153,7 +164,7 @@ export function renderShell(
     return html`
       <div class="savc-shell ${shellClass}">
         ${renderTopbar(state, callbacks.onToggleNav, callbacks.onTheme)}
-        ${renderNav(state, callbacks.onTabClick)}
+        ${renderNav(state, callbacks.onTabClick, callbacks.onExternalNavClick)}
         <main class="savc-content content">
           <div class="config-loading">
             <div class="config-loading__spinner"></div>
@@ -167,7 +178,7 @@ export function renderShell(
   return html`
     <div class="savc-shell ${shellClass}">
       ${renderTopbar(state, callbacks.onToggleNav, callbacks.onTheme)}
-      ${renderNav(state, callbacks.onTabClick)}
+      ${renderNav(state, callbacks.onTabClick, callbacks.onExternalNavClick)}
       ${renderContent(state.activeTab, renderView)}
     </div>
   `;
