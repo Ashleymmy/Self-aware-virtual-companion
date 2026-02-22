@@ -27,6 +27,10 @@ Thumbs.db
 # IDE
 .vscode/settings.json
 .idea/
+.claude/
+
+# Local prototype drafts
+docs/原型.html
 
 # SAVC memory (default local-only, may contain private data)
 savc-core/memory/**
@@ -54,3 +58,6 @@ savc-core/memory/**
 
 # Runtime artifacts
 .runtime/
+
+# Global storage runtime data (SQLite/YAML backup)
+config/storage/

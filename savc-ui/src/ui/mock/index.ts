@@ -22,6 +22,8 @@ export type {
   AgentNode,
   RoutingRule,
   DispatchRecord,
+  StorageStatus,
+  StorageRuntimeLog,
 } from "./types.js";
 
 import type {
@@ -32,6 +34,8 @@ import type {
   PersonaTrait,
   RecentActivity,
   RoutingRule,
+  StorageRuntimeLog,
+  StorageStatus,
   ValueItem,
   VoiceVariant,
   YuanyuanStatus,
@@ -501,20 +505,94 @@ function parseRoutingRulesFromConfig(config: JsonRecord): RoutingRule[] {
   return rules;
 }
 
+function fallbackStorageStatus(): StorageStatus {
+  return {
+    generatedAt: new Date().toISOString(),
+    mode: {
+      primary: "memory",
+      cache: "memory",
+      backup: "yaml",
+    },
+    components: {
+      sqlite: {
+        name: "sqlite",
+        engine: "node:sqlite",
+        configured: true,
+        state: "offline",
+        message: "storage service unavailable",
+        latencyMs: null,
+      },
+      cache: {
+        name: "cache",
+        engine: "memory",
+        configured: true,
+        state: "degraded",
+        message: "fallback cache",
+        latencyMs: null,
+      },
+      mysql: {
+        name: "mysql",
+        engine: "mysql",
+        configured: false,
+        state: "disabled",
+        message: "reserved",
+        latencyMs: null,
+      },
+      yaml: {
+        name: "yaml",
+        engine: "yaml",
+        configured: true,
+        state: "degraded",
+        message: "backup status unknown",
+        latencyMs: null,
+      },
+    },
+    metrics: {
+      runtimeLogCount: 0,
+      kvCount: 0,
+      cacheEntries: 0,
+    },
+    paths: {
+      sqlite: "-",
+      yamlBackup: "-",
+    },
+  };
+}
+
+function fallbackStorageLogs(): StorageRuntimeLog[] {
+  return [
+    {
+      id: 0,
+      level: "warn",
+      subsystem: "storage",
+      message: "storage logs unavailable",
+      context: {},
+      createdAt: new Date().toISOString(),
+    },
+  ];
+}
+
 class GatewayDataClient {
   private client: GatewayBrowserClient | null = null;
   private connectPromise: Promise<GatewayBrowserClient> | null = null;
   private snapshotCache: { at: number; data: GatewaySnapshot } | null = null;
   private memoryCache: { at: number; items: MemoryItem[] } | null = null;
+  private storageStatusCache: { at: number; data: StorageStatus } | null = null;
+  private storageLogsCache: { at: number; data: StorageRuntimeLog[] } | null = null;
 
-  invalidateCache(options?: { snapshot?: boolean; memory?: boolean }) {
+  invalidateCache(options?: { snapshot?: boolean; memory?: boolean; storage?: boolean }) {
     const clearSnapshot = !options || options.snapshot !== false;
     const clearMemory = !options || options.memory !== false;
+    const clearStorage = !options || options.storage !== false;
     if (clearSnapshot) {
       this.snapshotCache = null;
     }
     if (clearMemory) {
       this.memoryCache = null;
+    }
+    if (clearStorage) {
+      this.storageStatusCache = null;
+      this.storageLogsCache = null;
     }
   }
 
@@ -593,6 +671,19 @@ class GatewayDataClient {
       }
       throw error;
     }
+  }
+
+  private async requestStorageJson<T = JsonRecord>(path: string): Promise<T> {
+    const response = await withTimeout(fetch(path, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    }), REQUEST_TIMEOUT_MS, path);
+
+    if (!response.ok) {
+      throw new Error(`${path} failed (${response.status})`);
+    }
+    return await response.json() as T;
   }
 
   private async loadSnapshot(): Promise<GatewaySnapshot> {
@@ -1303,6 +1394,95 @@ class GatewayDataClient {
       throw new Error(`tts file fetch failed (${response.status})`);
     }
     return await response.blob();
+  }
+
+  async getStorageStatus(): Promise<StorageStatus> {
+    const now = Date.now();
+    if (this.storageStatusCache && now - this.storageStatusCache.at < 3_000) {
+      return this.storageStatusCache.data;
+    }
+    try {
+      const payload = await this.requestStorageJson<JsonRecord>("/__savc/storage/status");
+      const status = asRecord(payload) ?? {};
+      const modeObj = asRecord(status.mode) ?? {};
+      const componentsObj = asRecord(status.components) ?? {};
+      const metricsObj = asRecord(status.metrics) ?? {};
+      const pathsObj = asRecord(status.paths) ?? {};
+      const pickComponent = (key: string, engine: string): StorageStatus["components"]["sqlite"] => {
+        const row = asRecord(componentsObj[key]) ?? {};
+        const stateRaw = asString(row.state);
+        const state: StorageStatus["components"]["sqlite"]["state"] =
+          stateRaw === "online" || stateRaw === "degraded" || stateRaw === "offline" || stateRaw === "disabled"
+            ? stateRaw
+            : "offline";
+        return {
+          name: asString(row.name) || key,
+          engine: asString(row.engine) || engine,
+          configured: row.configured !== false,
+          state,
+          message: asString(row.message) || "",
+          latencyMs: asNumber(row.latencyMs),
+        };
+      };
+      const snapshot: StorageStatus = {
+        generatedAt: asString(status.generatedAt) || new Date().toISOString(),
+        mode: {
+          primary: asString(modeObj.primary) === "sqlite" ? "sqlite" : "memory",
+          cache: asString(modeObj.cache) === "redis" ? "redis" : "memory",
+          backup: "yaml",
+        },
+        components: {
+          sqlite: pickComponent("sqlite", "node:sqlite"),
+          cache: pickComponent("cache", "memory"),
+          mysql: pickComponent("mysql", "mysql"),
+          yaml: pickComponent("yaml", "yaml"),
+        },
+        metrics: {
+          runtimeLogCount: Math.max(0, Math.floor(asNumber(metricsObj.runtimeLogCount) ?? 0)),
+          kvCount: Math.max(0, Math.floor(asNumber(metricsObj.kvCount) ?? 0)),
+          cacheEntries: Math.max(0, Math.floor(asNumber(metricsObj.cacheEntries) ?? 0)),
+        },
+        paths: {
+          sqlite: asString(pathsObj.sqlite) || "-",
+          yamlBackup: asString(pathsObj.yamlBackup) || "-",
+        },
+      };
+      this.storageStatusCache = { at: now, data: snapshot };
+      return snapshot;
+    } catch {
+      const fallback = fallbackStorageStatus();
+      this.storageStatusCache = { at: now, data: fallback };
+      return fallback;
+    }
+  }
+
+  async getStorageRuntimeLogs(limit = 60): Promise<StorageRuntimeLog[]> {
+    const now = Date.now();
+    const safeLimit = clamp(Math.floor(limit), 1, 200);
+    if (this.storageLogsCache && now - this.storageLogsCache.at < 2_500) {
+      return this.storageLogsCache.data.slice(0, safeLimit);
+    }
+    try {
+      const payload = await this.requestStorageJson<JsonRecord>(`/__savc/storage/logs?limit=${safeLimit}`);
+      const logs = asArray(payload.logs)
+        .map((item) => asRecord(item))
+        .filter((item): item is JsonRecord => Boolean(item))
+        .map((item, index) => ({
+          id: Math.floor(asNumber(item.id) ?? index + 1),
+          level: asString(item.level) || "info",
+          subsystem: asString(item.subsystem) || "system",
+          message: asString(item.message) || "-",
+          context: asRecord(item.context) ?? {},
+          createdAt: asString(item.createdAt) || new Date().toISOString(),
+        } satisfies StorageRuntimeLog));
+      const rows = logs.length > 0 ? logs : fallbackStorageLogs();
+      this.storageLogsCache = { at: now, data: rows };
+      return rows.slice(0, safeLimit);
+    } catch {
+      const fallback = fallbackStorageLogs();
+      this.storageLogsCache = { at: now, data: fallback };
+      return fallback.slice(0, safeLimit);
+    }
   }
 
   async sendChatMessage(message: string): Promise<string> {

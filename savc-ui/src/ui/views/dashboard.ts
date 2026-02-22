@@ -1,9 +1,18 @@
 import { html, type TemplateResult } from "lit";
-import { gateway, type DashboardStats, type YuanyuanStatus, type RecentActivity } from "../data/index.js";
+import {
+  gateway,
+  type DashboardStats,
+  type YuanyuanStatus,
+  type RecentActivity,
+  type StorageRuntimeLog,
+  type StorageStatus,
+} from "../data/index.js";
 
 let _stats: DashboardStats | null = null;
 let _yuanyuan: YuanyuanStatus | null = null;
 let _activities: RecentActivity[] = [];
+let _storageStatus: StorageStatus | null = null;
+let _storageLogs: StorageRuntimeLog[] = [];
 let _loaded = false;
 let _loading = false;
 let _lastLoadedAt = "";
@@ -15,10 +24,12 @@ async function loadData(force = false) {
     if (force) {
       gateway.invalidateCache();
     }
-    [_stats, _yuanyuan, _activities] = await Promise.all([
+    [_stats, _yuanyuan, _activities, _storageStatus, _storageLogs] = await Promise.all([
       gateway.getDashboardStats(),
       gateway.getYuanyuanStatus(),
       gateway.getRecentActivities(),
+      gateway.getStorageStatus(),
+      gateway.getStorageRuntimeLogs(8),
     ]);
     _loaded = true;
     _lastLoadedAt = new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -36,6 +47,20 @@ function activityIcon(type: RecentActivity["type"]): string {
   }
 }
 
+function stateLabel(state: "online" | "degraded" | "offline" | "disabled"): string {
+  if (state === "online") return "在线";
+  if (state === "degraded") return "降级";
+  if (state === "disabled") return "未启用";
+  return "离线";
+}
+
+function stateColor(state: "online" | "degraded" | "offline" | "disabled"): string {
+  if (state === "online") return "var(--ok)";
+  if (state === "degraded") return "var(--warn)";
+  if (state === "disabled") return "var(--muted)";
+  return "var(--danger)";
+}
+
 export function renderDashboard(requestUpdate: () => void): TemplateResult {
   if (!_loaded) {
     if (!_loading) {
@@ -51,6 +76,16 @@ export function renderDashboard(requestUpdate: () => void): TemplateResult {
 
   const stats = _stats!;
   const yy = _yuanyuan!;
+  const storage = _storageStatus;
+  const storageLogs = _storageLogs.slice(0, 5);
+  const components = storage
+    ? [
+        storage.components.sqlite,
+        storage.components.cache,
+        storage.components.mysql,
+        storage.components.yaml,
+      ]
+    : [];
 
   return html`
     <div class="card" style="margin-bottom: 14px; animation: rise 0.3s var(--ease-out) backwards;">
@@ -132,6 +167,66 @@ export function renderDashboard(requestUpdate: () => void): TemplateResult {
               </div>
             `,
           )}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2">
+      <div class="card" style="animation: rise 0.4s var(--ease-out) 0.25s backwards">
+        <div class="card-title">数据库与存储服务</div>
+        <div class="card-sub">SQLite 主存 · Cache(${storage?.mode.cache ?? "memory"}) · MySQL 预留 · YAML 容灾</div>
+        <div class="status-list" style="margin-top: 12px;">
+          ${components.length > 0
+            ? components.map((row) => html`
+                <div>
+                  <span class="muted">${row.name} (${row.engine})</span>
+                  <span style="display:inline-flex;align-items:center;gap:6px;">
+                    <span style="width:6px;height:6px;border-radius:50%;background:${stateColor(row.state)};"></span>
+                    <span>${stateLabel(row.state)}</span>
+                    ${row.latencyMs != null ? html`<span class="mono" style="font-size:11px;">${row.latencyMs}ms</span>` : ""}
+                  </span>
+                </div>
+              `)
+            : html`<div><span class="muted">storage</span><span>未加载</span></div>`}
+        </div>
+        ${storage
+          ? html`
+              <div style="margin-top:10px;font-size:12px;color:var(--muted);display:grid;gap:4px;">
+                <div>日志条目: <span class="mono">${storage.metrics.runtimeLogCount}</span> · KV: <span class="mono">${storage.metrics.kvCount}</span></div>
+                <div>SQLite: <span class="mono">${storage.paths.sqlite}</span></div>
+                <div>YAML: <span class="mono">${storage.paths.yamlBackup}</span></div>
+              </div>
+            `
+          : ""}
+      </div>
+
+      <div class="card" style="animation: rise 0.4s var(--ease-out) 0.3s backwards">
+        <div class="card-title">存储运行日志</div>
+        <div class="card-sub">来自 /__savc/storage/logs</div>
+        <div class="list" style="margin-top: 12px;">
+          ${storageLogs.length > 0
+            ? storageLogs.map((item) => html`
+                <div class="list-item" style="grid-template-columns:1fr;">
+                  <div class="list-main">
+                    <div class="list-title" style="display:flex;gap:8px;align-items:center;">
+                      <span class="chip" style="padding:2px 8px;font-size:11px;">${item.level}</span>
+                      <span>${item.message}</span>
+                    </div>
+                    <div class="list-sub">
+                      <span class="mono">${item.subsystem}</span>
+                      ${new Date(item.createdAt).toLocaleTimeString("zh-CN", { hour12: false })}
+                    </div>
+                  </div>
+                </div>
+              `)
+            : html`
+                <div class="list-item" style="grid-template-columns:1fr;">
+                  <div class="list-main">
+                    <div class="list-title">暂无日志</div>
+                    <div class="list-sub">等待存储服务产生事件</div>
+                  </div>
+                </div>
+              `}
         </div>
       </div>
     </div>

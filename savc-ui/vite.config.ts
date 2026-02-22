@@ -1,10 +1,11 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { IncomingMessage, ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import { SavcGlobalStorageService } from "./storage/global-storage.js";
 // @lydell/node-pty — only imported when Phase 3 PTY endpoint is active
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let nodePty: any = null;
@@ -15,6 +16,18 @@ const repoRoot = path.resolve(here, "..");
 const docsRoot = path.resolve(repoRoot, "docs");
 const worklogRoot = path.resolve(docsRoot, "worklog");
 const planBoardPath = path.resolve(docsRoot, "project-plan-board.md");
+const studioWorkspaceRoot = (() => {
+  const raw = String(
+    process.env.SAVC_STUDIO_WORKSPACE_ROOT
+    || process.env.SAVC_STUDIO_WORKSPACE
+    || ".runtime/studio-workspace",
+  ).trim();
+  if (!raw) {
+    return path.resolve(repoRoot, ".runtime", "studio-workspace");
+  }
+  return path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(repoRoot, raw);
+})();
+const studioWorkspaceName = path.basename(studioWorkspaceRoot) || "studio-workspace";
 
 const AUDIO_EXTENSIONS = new Set([".mp3", ".opus", ".ogg", ".wav", ".m4a"]);
 const MAX_DOC_BYTES = 512 * 1024;
@@ -370,6 +383,137 @@ function asString(value: unknown, fallback = ""): string {
   return fallback;
 }
 
+function asBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") {
+      return false;
+    }
+  }
+  return fallback;
+}
+
+function stripAnsi(input: string): string {
+  return input.replace(/\u001b\[[0-9;]*m/g, "");
+}
+
+function parseJsonFromMixedOutput(raw: string): unknown {
+  const text = stripAnsi(raw).trim();
+  if (!text) {
+    throw new Error("empty_output");
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    // OpenClaw CLI can emit warnings before JSON; parse trailing JSON object.
+  }
+
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first >= 0 && last > first) {
+    const candidate = text.slice(first, last + 1);
+    return JSON.parse(candidate);
+  }
+
+  throw new Error("json_not_found");
+}
+
+function collapseReplySegments(segments: string[]): string {
+  const rows = segments.map((item) => item.trim()).filter(Boolean);
+  if (!rows.length) return "";
+  if (rows.length === 1) return rows[0] || "";
+
+  let cumulative = true;
+  for (let idx = 1; idx < rows.length; idx += 1) {
+    if (!rows[idx]?.startsWith(rows[idx - 1] || "")) {
+      cumulative = false;
+      break;
+    }
+  }
+  if (cumulative) return rows[rows.length - 1] || "";
+
+  const uniq: string[] = [];
+  for (const row of rows) {
+    if (!uniq.includes(row)) uniq.push(row);
+  }
+  return uniq.join("\n\n").trim();
+}
+
+function extractReplyTextFromAgentPayload(payload: Record<string, unknown>): string {
+  const direct = asString(payload.text) || asString(payload.reply);
+  if (direct) return direct;
+
+  const payloads = Array.isArray(payload.payloads) ? payload.payloads : [];
+  const segments: string[] = [];
+  for (const entry of payloads) {
+    const row = asRecord(entry);
+    const messageObj = asRecord(row.message);
+    const text = asString(row.text) || asString(row.content) || asString(messageObj.text);
+    if (text) segments.push(text);
+  }
+  return collapseReplySegments(segments);
+}
+
+function splitReplyIntoStreamChunks(replyText: string, maxChunkChars = 42): string[] {
+  const text = String(replyText || "");
+  if (!text) return [];
+  const chunks: string[] = [];
+  const paragraphs = text.split(/(\n{2,})/g).filter((part) => part.length > 0);
+  for (const part of paragraphs) {
+    if (part.length <= maxChunkChars) {
+      chunks.push(part);
+      continue;
+    }
+    const tokens = part.split(/(\s+)/g).filter((token) => token.length > 0);
+    let buffer = "";
+    for (const token of tokens) {
+      if (!buffer) {
+        buffer = token;
+        continue;
+      }
+      if ((buffer + token).length > maxChunkChars) {
+        chunks.push(buffer);
+        buffer = token;
+      } else {
+        buffer += token;
+      }
+    }
+    if (buffer) chunks.push(buffer);
+  }
+  return chunks.length ? chunks : [text];
+}
+
+function parseAgentReplyFromStdout(stdout: string, sessionIdSafe: string, startedAt: number): {
+  text: string;
+  provider: string;
+  model: string;
+  durationMs: number;
+  sessionId: string;
+} | null {
+  const payload = asRecord(parseJsonFromMixedOutput(stdout));
+  const replyText = extractReplyTextFromAgentPayload(payload);
+  if (!replyText) return null;
+  const meta = asRecord(payload.meta);
+  const agentMeta = asRecord(meta.agentMeta);
+  return {
+    text: replyText,
+    provider: asString(agentMeta.provider, ""),
+    model: asString(agentMeta.model, ""),
+    durationMs: asNumber(meta.durationMs, Date.now() - startedAt),
+    sessionId: asString(agentMeta.sessionId, sessionIdSafe),
+  };
+}
+
 function asNumber(value: unknown, fallback = 0): number {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -422,6 +566,45 @@ function safeStat(filePath: string): { mtimeMs: number; isFile: boolean } {
 
 function relPath(filePath: string): string {
   return path.relative(repoRoot, filePath).replace(/\\/g, "/");
+}
+
+function studioRelPath(filePath: string): string {
+  return path.relative(studioWorkspaceRoot, filePath).replace(/\\/g, "/");
+}
+
+function isWithinRoot(baseDir: string, targetPath: string): boolean {
+  const base = path.resolve(baseDir);
+  const target = path.resolve(targetPath);
+  return target === base || target.startsWith(`${base}${path.sep}`);
+}
+
+function resolveStudioWorkspacePath(inputPath: string, fallback = "."): string | null {
+  const normalized = (inputPath || fallback).trim();
+  if (!normalized || normalized.includes("\0")) return null;
+  const absolute = path.resolve(studioWorkspaceRoot, normalized);
+  if (!isWithinRoot(studioWorkspaceRoot, absolute)) return null;
+  return absolute;
+}
+
+function ensureStudioWorkspace(): void {
+  if (!existsSync(studioWorkspaceRoot)) {
+    mkdirSync(studioWorkspaceRoot, { recursive: true });
+  }
+  const readmePath = path.resolve(studioWorkspaceRoot, "README.md");
+  if (!existsSync(readmePath)) {
+    writeFileSync(
+      readmePath,
+      [
+        "# SAVC Studio Workspace",
+        "",
+        "- This directory is the default isolated workspace for Studio.",
+        `- Root: ${studioWorkspaceRoot}`,
+        "- Core SAVC repository files are intentionally not exposed here by default.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+  }
 }
 
 function resolveAllowedDocsMarkdownPath(requestedPath: string): string | null {
@@ -593,10 +776,10 @@ function readPlanDocs(): PlanDocItem[] {
   return items.sort((a, b) => Date.parse(b.updatedAt || "0") - Date.parse(a.updatedAt || "0"));
 }
 
-function runGit(args: string[]): string {
+function runGitInDir(args: string[], cwd: string): string {
   try {
     return execFileSync("git", args, {
-      cwd: repoRoot,
+      cwd,
       stdio: ["ignore", "pipe", "ignore"],
       encoding: "utf8",
       maxBuffer: 1024 * 1024,
@@ -604,6 +787,56 @@ function runGit(args: string[]): string {
   } catch {
     return "";
   }
+}
+
+function runGit(args: string[]): string {
+  return runGitInDir(args, repoRoot);
+}
+
+function studioWorkspaceHasOwnGitRepo(): boolean {
+  const topLevel = runGitInDir(["rev-parse", "--show-toplevel"], studioWorkspaceRoot);
+  if (!topLevel) return false;
+  return path.resolve(topLevel) === path.resolve(studioWorkspaceRoot);
+}
+
+function execFileTextAsync(
+  command: string,
+  args: string[],
+  options: {
+    cwd: string;
+    timeout: number;
+    maxBuffer: number;
+  },
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      command,
+      args,
+      {
+        cwd: options.cwd,
+        encoding: "utf-8",
+        timeout: options.timeout,
+        maxBuffer: options.maxBuffer,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          const enriched = error as NodeJS.ErrnoException & {
+            stdout?: string;
+            stderr?: string;
+            status?: number;
+          };
+          enriched.stdout = typeof stdout === "string" ? stdout : String(stdout ?? "");
+          enriched.stderr = typeof stderr === "string" ? stderr : String(stderr ?? "");
+          reject(enriched);
+          return;
+        }
+        resolve({
+          stdout: typeof stdout === "string" ? stdout : String(stdout ?? ""),
+          stderr: typeof stderr === "string" ? stderr : String(stderr ?? ""),
+        });
+      },
+    );
+  });
 }
 
 function readRepoStatus(): SnapshotRepo {
@@ -961,16 +1194,62 @@ export default defineConfig({
     {
       name: "savc-dev-progress-hub",
       configureServer(server) {
+        const LOCAL_ONLY_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
+        const normalizeRemoteAddress = (address: string): string => {
+          const lowered = address.trim().toLowerCase();
+          if (!lowered) return "";
+          const noZone = lowered.includes("%") ? lowered.split("%")[0] || lowered : lowered;
+          return noZone.startsWith("::ffff:") ? noZone.slice("::ffff:".length) : noZone;
+        };
+        const isLocalRequest = (req: IncomingMessage): boolean => {
+          const remote = normalizeRemoteAddress(req.socket.remoteAddress || "");
+          return LOCAL_ONLY_HOSTS.has(remote);
+        };
+        const rejectIfNotLocal = (req: IncomingMessage, res: ServerResponse): boolean => {
+          if (isLocalRequest(req)) return false;
+          json(res, 403, { ok: false, error: "forbidden_remote" });
+          return true;
+        };
+
         server.middlewares.use((req, res, next) => {
           const rawUrl = req.url || "";
           const pathname = rawUrl.split("?")[0];
-          if (pathname === "/progress-hub" || pathname === "/progress-hub/") {
+          const redirectMap: Record<string, string> = {
+            "/studio": "/studio/index.html",
+            "/studio/": "/studio/index.html",
+            "/workbench": "/studio/index.html",
+            "/workbench/": "/studio/index.html",
+            "/workbench/index.html": "/studio/index.html",
+            "/progress-hub": "/progress-hub/index.html",
+            "/progress-hub/": "/progress-hub/index.html",
+          };
+          const location = redirectMap[pathname];
+          if (location) {
             res.statusCode = 302;
-            res.setHeader("Location", "/progress-hub/index.html");
+            res.setHeader("Location", location);
             res.end();
             return;
           }
           next();
+        });
+
+        ensureStudioWorkspace();
+        const storageService = new SavcGlobalStorageService(repoRoot);
+        storageService.init();
+        const storageLog = (
+          level: string,
+          subsystem: string,
+          message: string,
+          context: Record<string, unknown> = {},
+        ) => {
+          try {
+            storageService.logRuntime(level, subsystem, message, context);
+          } catch {
+            // no-op
+          }
+        };
+        storageLog("info", "server", "savc-ui storage service booted", {
+          pid: process.pid,
         });
 
         const clients = new Set<ServerResponse>();
@@ -1123,6 +1402,14 @@ export default defineConfig({
           if (runtimeEvents.length > TASK_EVENT_BUFFER_LIMIT) {
             runtimeEvents.splice(TASK_EVENT_BUFFER_LIMIT);
           }
+          storageLog("info", "runtime", event.message, {
+            taskId: event.taskId,
+            state: event.state,
+            progress: event.progress,
+            actor: event.actor,
+            source: event.source,
+            channel: event.channel,
+          });
           broadcastRuntimeEvent(event);
           return event;
         };
@@ -1249,6 +1536,127 @@ export default defineConfig({
           } catch (error) {
             json(res, 500, {
               error: "snapshot_failed",
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        });
+
+        server.middlewares.use("/__savc/storage/status", async (req, res) => {
+          if ((req.method || "GET").toUpperCase() !== "GET") {
+            res.statusCode = 405;
+            res.end("method not allowed");
+            return;
+          }
+          try {
+            const snapshot = await storageService.getStatus();
+            json(res, 200, {
+              ok: true,
+              ...snapshot,
+            });
+          } catch (error) {
+            json(res, 500, {
+              ok: false,
+              error: "storage_status_failed",
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        });
+
+        server.middlewares.use("/__savc/storage/logs", (req, res) => {
+          if ((req.method || "GET").toUpperCase() !== "GET") {
+            res.statusCode = 405;
+            res.end("method not allowed");
+            return;
+          }
+          try {
+            const url = new URL(req.url || "", "http://127.0.0.1");
+            const limit = clamp(asNumber(url.searchParams.get("limit"), 80), 1, 200);
+            const logs = storageService.listRuntimeLogs(limit);
+            json(res, 200, {
+              ok: true,
+              generatedAt: new Date().toISOString(),
+              count: logs.length,
+              logs,
+            });
+          } catch (error) {
+            json(res, 500, {
+              ok: false,
+              error: "storage_logs_failed",
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        });
+
+        server.middlewares.use("/__savc/storage/kv", async (req, res) => {
+          const method = (req.method || "GET").toUpperCase();
+          if (method === "GET") {
+            try {
+              const url = new URL(req.url || "", "http://127.0.0.1");
+              const key = asString(url.searchParams.get("key"));
+              if (!key) {
+                json(res, 400, { ok: false, error: "missing_key" });
+                return;
+              }
+              const value = await storageService.getKv(key);
+              json(res, 200, { ok: true, key, value });
+              return;
+            } catch (error) {
+              json(res, 500, {
+                ok: false,
+                error: "storage_kv_get_failed",
+                message: error instanceof Error ? error.message : String(error),
+              });
+              return;
+            }
+          }
+
+          if (method === "POST") {
+            if (rejectIfNotLocal(req, res)) {
+              return;
+            }
+            try {
+              const bodyRaw = await readRequestBody(req);
+              const body = bodyRaw ? asRecord(JSON.parse(bodyRaw)) : {};
+              const key = asString(body.key);
+              if (!key) {
+                json(res, 400, { ok: false, error: "missing_key" });
+                return;
+              }
+              await storageService.setKv(key, body.value, asString(body.source) || "api");
+              storageLog("info", "storage.kv", "kv updated", { key, source: asString(body.source) || "api" });
+              json(res, 200, { ok: true, key });
+              return;
+            } catch (error) {
+              json(res, 500, {
+                ok: false,
+                error: "storage_kv_set_failed",
+                message: error instanceof Error ? error.message : String(error),
+              });
+              return;
+            }
+          }
+
+          res.statusCode = 405;
+          res.end("method not allowed");
+        });
+
+        server.middlewares.use("/__savc/storage/backup", (req, res) => {
+          if ((req.method || "GET").toUpperCase() !== "POST") {
+            res.statusCode = 405;
+            res.end("method not allowed");
+            return;
+          }
+          if (rejectIfNotLocal(req, res)) {
+            return;
+          }
+          try {
+            storageService.writeDisasterBackup("manual_api");
+            storageLog("info", "storage", "manual yaml backup triggered", {});
+            json(res, 200, { ok: true, message: "backup triggered" });
+          } catch (error) {
+            json(res, 500, {
+              ok: false,
+              error: "storage_backup_failed",
               message: error instanceof Error ? error.message : String(error),
             });
           }
@@ -1389,6 +1797,7 @@ export default defineConfig({
             }
             const source = normalizeTaskEventSource(body.source, "api");
             const task = createRuntimeTask(body, source);
+            await storageService.setKv(`runtime.task.${task.id}`, task, "task_create");
             json(res, 200, {
               ok: true,
               task,
@@ -1472,6 +1881,7 @@ export default defineConfig({
               actor: asString(body.actor, "api"),
               source: normalizeTaskEventSource(body.source, "api"),
             });
+            await storageService.setKv(`runtime.task.${task.id}`, task, "task_control");
             json(res, 200, {
               ok: true,
               task,
@@ -1604,14 +2014,14 @@ export default defineConfig({
             const url = new URL(req.url || "", "http://127.0.0.1");
             const relBase = url.searchParams.get("path")?.trim() || ".";
             const maxDepth = Math.min(parseInt(url.searchParams.get("depth") || "3", 10), 4);
-            const absBase = path.resolve(repoRoot, relBase);
-            if (!absBase.startsWith(repoRoot)) {
+            const absBase = resolveStudioWorkspacePath(relBase, ".");
+            if (!absBase) {
               json(res, 403, { ok: false, error: "forbidden" }); return;
             }
 
             const statusMap: Record<string, string> = {};
             try {
-              const porcelain = runGit(["status", "--porcelain=v1"]).trim();
+              const porcelain = runGitInDir(["status", "--porcelain=v1"], studioWorkspaceRoot).trim();
               for (const line of porcelain.split("\n")) {
                 if (!line) continue;
                 const x = line[0], y = line[1];
@@ -1649,7 +2059,16 @@ export default defineConfig({
               return nodes;
             }
 
-            json(res, 200, { ok: true, tree: buildTree(absBase, relBase === "." ? "" : relBase, maxDepth) });
+            const relBaseSafe = studioRelPath(absBase);
+            json(res, 200, {
+              ok: true,
+              workspace: {
+                root: studioWorkspaceRoot,
+                name: studioWorkspaceName,
+                isGitRepo: studioWorkspaceHasOwnGitRepo(),
+              },
+              tree: buildTree(absBase, relBaseSafe || "", maxDepth),
+            });
           } catch (error) {
             json(res, 500, { ok: false, error: "tree_failed", message: error instanceof Error ? error.message : String(error) });
           }
@@ -1664,8 +2083,8 @@ export default defineConfig({
             const url = new URL(req.url || "", "http://127.0.0.1");
             const reqPath = url.searchParams.get("path")?.trim() || "";
             if (!reqPath) { json(res, 400, { ok: false, error: "missing_path" }); return; }
-            const absPath = path.resolve(repoRoot, reqPath);
-            if (!absPath.startsWith(repoRoot)) { json(res, 403, { ok: false, error: "forbidden" }); return; }
+            const absPath = resolveStudioWorkspacePath(reqPath);
+            if (!absPath) { json(res, 403, { ok: false, error: "forbidden" }); return; }
             if (!existsSync(absPath)) { json(res, 404, { ok: false, error: "not_found" }); return; }
             const st = statSync(absPath);
             if (!st.isFile()) { json(res, 400, { ok: false, error: "not_a_file" }); return; }
@@ -1683,6 +2102,7 @@ export default defineConfig({
               content: readFileSync(absPath, "utf-8"),
               language: EXT_LANG[ext] || "plaintext",
               size: st.size, updatedAt: new Date(st.mtimeMs).toISOString(),
+              workspace: studioWorkspaceName,
             });
           } catch (error) {
             json(res, 500, { ok: false, error: "read_failed", message: error instanceof Error ? error.message : String(error) });
@@ -1695,10 +2115,24 @@ export default defineConfig({
             res.statusCode = 405; res.end("method not allowed"); return;
           }
           try {
-            const branch = runGit(["rev-parse", "--abbrev-ref", "HEAD"]).trim();
+            if (!studioWorkspaceHasOwnGitRepo()) {
+              json(res, 200, {
+                ok: true,
+                branch: "",
+                head: "",
+                staged: [],
+                unstaged: [],
+                untracked: [],
+                isGitRepo: false,
+                workspace: studioWorkspaceName,
+                workspaceRoot: studioWorkspaceRoot,
+              });
+              return;
+            }
+            const branch = runGitInDir(["rev-parse", "--abbrev-ref", "HEAD"], studioWorkspaceRoot).trim();
             let head = "";
-            try { head = runGit(["rev-parse", "--short", "HEAD"]).trim(); } catch { /* empty repo */ }
-            const porcelain = runGit(["status", "--porcelain=v1"]).trim();
+            try { head = runGitInDir(["rev-parse", "--short", "HEAD"], studioWorkspaceRoot).trim(); } catch { /* empty repo */ }
+            const porcelain = runGitInDir(["status", "--porcelain=v1"], studioWorkspaceRoot).trim();
             const staged: string[] = [], unstaged: string[] = [], untracked: string[] = [];
             for (const line of porcelain.split("\n")) {
               if (!line) continue;
@@ -1708,7 +2142,17 @@ export default defineConfig({
               if (x && x !== " ") staged.push(file);
               if (y && y !== " ") unstaged.push(file);
             }
-            json(res, 200, { ok: true, branch, head, staged, unstaged, untracked });
+            json(res, 200, {
+              ok: true,
+              branch,
+              head,
+              staged,
+              unstaged,
+              untracked,
+              isGitRepo: true,
+              workspace: studioWorkspaceName,
+              workspaceRoot: studioWorkspaceRoot,
+            });
           } catch (error) {
             json(res, 500, { ok: false, error: "git_status_failed", message: error instanceof Error ? error.message : String(error) });
           }
@@ -1720,9 +2164,27 @@ export default defineConfig({
             res.statusCode = 405; res.end("method not allowed"); return;
           }
           try {
+            if (!studioWorkspaceHasOwnGitRepo()) {
+              json(res, 200, { ok: true, commits: [], isGitRepo: false, workspace: studioWorkspaceName });
+              return;
+            }
             const url = new URL(req.url || "", "http://127.0.0.1");
             const n = Math.min(parseInt(url.searchParams.get("n") || "20", 10), 100);
-            json(res, 200, { ok: true, commits: readCommits(n) });
+            const log = runGitInDir(["log", `--max-count=${n}`, "--date=iso-strict", "--pretty=format:%h\t%cI\t%an\t%s"], studioWorkspaceRoot);
+            const commits = !log
+              ? []
+              : log.split(/\r?\n/)
+                .map((line) => {
+                  const [hash = "", date = "", author = "", ...subjectParts] = line.split("\t");
+                  return {
+                    hash,
+                    date,
+                    author,
+                    subject: subjectParts.join("\t"),
+                  };
+                })
+                .filter((row) => row.hash && row.date);
+            json(res, 200, { ok: true, commits, isGitRepo: true, workspace: studioWorkspaceName });
           } catch (error) {
             json(res, 500, { ok: false, error: "git_log_failed", message: error instanceof Error ? error.message : String(error) });
           }
@@ -1734,10 +2196,14 @@ export default defineConfig({
             res.statusCode = 405; res.end("method not allowed"); return;
           }
           try {
+            if (!studioWorkspaceHasOwnGitRepo()) {
+              json(res, 200, { ok: true, diff: "", isGitRepo: false, workspace: studioWorkspaceName });
+              return;
+            }
             const url = new URL(req.url || "", "http://127.0.0.1");
             const reqPath = url.searchParams.get("path")?.trim() || "";
             const args = reqPath ? ["diff", "HEAD", "--", reqPath] : ["diff", "HEAD"];
-            json(res, 200, { ok: true, diff: runGit(args) });
+            json(res, 200, { ok: true, diff: runGitInDir(args, studioWorkspaceRoot), isGitRepo: true, workspace: studioWorkspaceName });
           } catch (error) {
             json(res, 500, { ok: false, error: "git_diff_failed", message: error instanceof Error ? error.message : String(error) });
           }
@@ -1752,14 +2218,17 @@ export default defineConfig({
           if ((req.method || "GET").toUpperCase() !== "POST") {
             res.statusCode = 405; res.end("method not allowed"); return;
           }
+          if (rejectIfNotLocal(req, res)) {
+            return;
+          }
           try {
             const bodyRaw = await readRequestBody(req);
             const body = bodyRaw ? JSON.parse(bodyRaw) as Record<string, unknown> : {};
             const reqPath = typeof body.path === "string" ? body.path.trim() : "";
             const content = typeof body.content === "string" ? body.content : null;
             if (!reqPath || content === null) { json(res, 400, { ok: false, error: "missing_path_or_content" }); return; }
-            const absPath = path.resolve(repoRoot, reqPath);
-            if (!absPath.startsWith(repoRoot)) { json(res, 403, { ok: false, error: "forbidden" }); return; }
+            const absPath = resolveStudioWorkspacePath(reqPath);
+            if (!absPath) { json(res, 403, { ok: false, error: "forbidden" }); return; }
             const ext = path.extname(absPath).slice(1).toLowerCase();
             if (!WRITE_EXT_ALLOW.has(ext)) { json(res, 400, { ok: false, error: "extension_not_allowed" }); return; }
             if (content.length > 2 * 1024 * 1024) { json(res, 413, { ok: false, error: "content_too_large" }); return; }
@@ -1778,16 +2247,26 @@ export default defineConfig({
           if ((req.method || "GET").toUpperCase() !== "POST") {
             res.statusCode = 405; res.end("method not allowed"); return;
           }
+          if (rejectIfNotLocal(req, res)) {
+            return;
+          }
           try {
             const bodyRaw = await readRequestBody(req);
             const body = bodyRaw ? JSON.parse(bodyRaw) as Record<string, unknown> : {};
             const paths = Array.isArray(body.paths) ? body.paths.filter((p): p is string => typeof p === "string") : [];
             if (!paths.length) { json(res, 400, { ok: false, error: "missing_paths" }); return; }
-            // Validate all paths stay in repoRoot
-            for (const p of paths) {
-              if (!path.resolve(repoRoot, p).startsWith(repoRoot)) { json(res, 403, { ok: false, error: "forbidden", path: p }); return; }
+            if (!studioWorkspaceHasOwnGitRepo()) {
+              json(res, 409, { ok: false, error: "workspace_not_git_repo", workspace: studioWorkspaceName });
+              return;
             }
-            execFileSync("git", ["add", "--", ...paths], { cwd: repoRoot });
+            // Validate all paths stay in studioWorkspaceRoot
+            for (const p of paths) {
+              if (!isWithinRoot(studioWorkspaceRoot, path.resolve(studioWorkspaceRoot, p))) {
+                json(res, 403, { ok: false, error: "forbidden", path: p });
+                return;
+              }
+            }
+            execFileSync("git", ["add", "--", ...paths], { cwd: studioWorkspaceRoot });
             json(res, 200, { ok: true });
           } catch (error) {
             json(res, 500, { ok: false, error: "git_add_failed", message: error instanceof Error ? error.message : String(error) });
@@ -1799,13 +2278,20 @@ export default defineConfig({
           if ((req.method || "GET").toUpperCase() !== "POST") {
             res.statusCode = 405; res.end("method not allowed"); return;
           }
+          if (rejectIfNotLocal(req, res)) {
+            return;
+          }
           try {
             const bodyRaw = await readRequestBody(req);
             const body = bodyRaw ? JSON.parse(bodyRaw) as Record<string, unknown> : {};
             const message = typeof body.message === "string" ? body.message.trim() : "";
             if (!message) { json(res, 400, { ok: false, error: "missing_message" }); return; }
-            const out = execFileSync("git", ["commit", "-m", message], { cwd: repoRoot, encoding: "utf-8" });
-            const hash = runGit(["rev-parse", "--short", "HEAD"]).trim();
+            if (!studioWorkspaceHasOwnGitRepo()) {
+              json(res, 409, { ok: false, error: "workspace_not_git_repo", workspace: studioWorkspaceName });
+              return;
+            }
+            const out = execFileSync("git", ["commit", "-m", message], { cwd: studioWorkspaceRoot, encoding: "utf-8" });
+            const hash = runGitInDir(["rev-parse", "--short", "HEAD"], studioWorkspaceRoot).trim();
             json(res, 200, { ok: true, hash, output: out });
           } catch (error) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -1823,10 +2309,20 @@ export default defineConfig({
             const q = url.searchParams.get("q")?.trim() || "";
             const searchPath = url.searchParams.get("path")?.trim() || ".";
             if (!q) { json(res, 400, { ok: false, error: "missing_q" }); return; }
-            if (!path.resolve(repoRoot, searchPath).startsWith(repoRoot)) { json(res, 403, { ok: false, error: "forbidden" }); return; }
+            const resolvedSearchPath = resolveStudioWorkspacePath(searchPath, ".");
+            if (!resolvedSearchPath) { json(res, 403, { ok: false, error: "forbidden" }); return; }
+            const relSearchPath = studioRelPath(resolvedSearchPath) || ".";
             let raw = "";
             try {
-              raw = execFileSync("git", ["grep", "-n", "-i", q, "--", searchPath], { cwd: repoRoot, encoding: "utf-8", maxBuffer: 1024 * 512 });
+              if (!studioWorkspaceHasOwnGitRepo()) {
+                json(res, 200, { ok: true, results: [], isGitRepo: false, workspace: studioWorkspaceName });
+                return;
+              }
+              raw = execFileSync("git", ["grep", "-n", "-i", q, "--", relSearchPath], {
+                cwd: studioWorkspaceRoot,
+                encoding: "utf-8",
+                maxBuffer: 1024 * 512,
+              });
             } catch (e: unknown) {
               // exit code 1 = no matches (not an error)
               if ((e as NodeJS.ErrnoException).status !== 1) throw e;
@@ -1842,6 +2338,256 @@ export default defineConfig({
           }
         });
 
+        // POST /__savc/llm/chat   body: { message, sessionId?, scope?, timeoutMs? }
+        server.middlewares.use("/__savc/llm/chat", async (req, res) => {
+          if ((req.method || "GET").toUpperCase() !== "POST") {
+            res.statusCode = 405; res.end("method not allowed"); return;
+          }
+          if (rejectIfNotLocal(req, res)) {
+            return;
+          }
+          try {
+            const bodyRaw = await readRequestBody(req);
+            const body = bodyRaw ? JSON.parse(bodyRaw) as Record<string, unknown> : {};
+            const message = asString(body.message);
+            if (!message) {
+              json(res, 400, { ok: false, error: "missing_message" });
+              return;
+            }
+            if (message.length > 4000) {
+              json(res, 413, { ok: false, error: "message_too_large" });
+              return;
+            }
+
+            const scope = asString(body.scope, "companion") || "companion";
+            const sessionIdRaw = asString(body.sessionId);
+            const sessionIdSafe = (sessionIdRaw || `studio-${scope}-${Date.now().toString(36)}`)
+              .replace(/[^a-zA-Z0-9_.:-]/g, "-")
+              .slice(0, 96);
+            const timeoutMs = Math.max(3000, Math.min(asNumber(body.timeoutMs, 60000), 180000));
+            const streamMode = asBoolean(body.stream, false);
+
+            const cliArgs = [
+              path.resolve(repoRoot, "openclaw", "openclaw.mjs"),
+              "agent",
+              "--local",
+              "--session-id", sessionIdSafe,
+              "--message", message,
+              "--json",
+            ];
+
+            if (streamMode) {
+              res.statusCode = 200;
+              res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+              res.setHeader("Cache-Control", "no-cache, no-transform");
+              res.setHeader("Connection", "keep-alive");
+              res.setHeader("X-Accel-Buffering", "no");
+              res.flushHeaders?.();
+              sseWrite(res, "start", {
+                ok: true,
+                scope,
+                sessionId: sessionIdSafe,
+              });
+
+              const startedAt = Date.now();
+              const child = spawn("node", cliArgs, {
+                cwd: repoRoot,
+                stdio: ["ignore", "pipe", "pipe"],
+              });
+              const stdoutChunks: Buffer[] = [];
+              const stderrChunks: Buffer[] = [];
+              let timeoutHit = false;
+              const timeoutTimer = setTimeout(() => {
+                timeoutHit = true;
+                child.kill("SIGTERM");
+                setTimeout(() => {
+                  if (!child.killed) {
+                    child.kill("SIGKILL");
+                  }
+                }, 900);
+              }, timeoutMs);
+              const heartbeat = setInterval(() => {
+                if (!res.writableEnded && !res.destroyed) {
+                  sseWrite(res, "ping", { at: new Date().toISOString() });
+                }
+              }, Math.min(SSE_HEARTBEAT_MS, 8_000));
+              let cleaned = false;
+              const cleanup = () => {
+                if (cleaned) return;
+                cleaned = true;
+                clearTimeout(timeoutTimer);
+                clearInterval(heartbeat);
+                req.off("close", onClose);
+              };
+              const onClose = () => {
+                child.kill("SIGTERM");
+                cleanup();
+              };
+              req.on("close", onClose);
+
+              child.stdout.on("data", (chunk: Buffer | string) => {
+                stdoutChunks.push(Buffer.from(chunk));
+              });
+              child.stderr.on("data", (chunk: Buffer | string) => {
+                const text = stripAnsi(Buffer.from(chunk).toString("utf-8"));
+                stderrChunks.push(Buffer.from(text, "utf-8"));
+                const compact = text.trim().slice(0, 220);
+                if (compact && !res.writableEnded && !res.destroyed) {
+                  sseWrite(res, "status", {
+                    stage: "running",
+                    message: compact,
+                  });
+                }
+              });
+              child.on("error", (error) => {
+                cleanup();
+                if (!res.writableEnded && !res.destroyed) {
+                  sseWrite(res, "error", {
+                    ok: false,
+                    error: "llm_spawn_failed",
+                    message: error instanceof Error ? error.message : String(error),
+                  });
+                  res.end();
+                }
+              });
+              child.on("close", (code) => {
+                cleanup();
+                const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
+                const stderr = Buffer.concat(stderrChunks).toString("utf-8");
+                let parsed = null as ReturnType<typeof parseAgentReplyFromStdout> | null;
+                try {
+                  parsed = parseAgentReplyFromStdout(stdout, sessionIdSafe, startedAt);
+                } catch {
+                  parsed = null;
+                }
+
+                if (parsed) {
+                  let emittedChars = 0;
+                  for (const chunk of splitReplyIntoStreamChunks(parsed.text)) {
+                    emittedChars += chunk.length;
+                    if (res.writableEnded || res.destroyed) break;
+                    sseWrite(res, "delta", {
+                      delta: chunk,
+                      chars: emittedChars,
+                    });
+                  }
+                  storageLog("info", "llm", "llm chat succeeded", {
+                    scope,
+                    sessionId: parsed.sessionId,
+                    provider: parsed.provider,
+                    model: parsed.model,
+                    durationMs: parsed.durationMs,
+                    messageChars: message.length,
+                    replyChars: parsed.text.length,
+                  });
+                  if (!res.writableEnded && !res.destroyed) {
+                    sseWrite(res, "done", {
+                      ok: true,
+                      reply: {
+                        text: parsed.text,
+                        provider: parsed.provider,
+                        model: parsed.model,
+                        durationMs: parsed.durationMs,
+                        sessionId: parsed.sessionId,
+                      },
+                    });
+                    res.end();
+                  }
+                  return;
+                }
+
+                const errMsg = stripAnsi((stderr || stdout || (timeoutHit ? "llm_timeout" : "llm_call_failed"))).trim();
+                storageLog("error", "llm", "llm chat failed", {
+                  scope,
+                  exitCode: code ?? (timeoutHit ? 124 : 1),
+                  message: errMsg.slice(0, 320),
+                });
+                if (!res.writableEnded && !res.destroyed) {
+                  sseWrite(res, "error", {
+                    ok: false,
+                    error: timeoutHit ? "llm_timeout" : "llm_call_failed",
+                    message: errMsg.slice(0, 500),
+                    exitCode: code ?? (timeoutHit ? 124 : 1),
+                  });
+                  res.end();
+                }
+              });
+              return;
+            }
+
+            const startedAt = Date.now();
+            const { stdout } = await execFileTextAsync("node", cliArgs, {
+              cwd: repoRoot,
+              timeout: timeoutMs,
+              maxBuffer: 2 * 1024 * 1024,
+            });
+            const parsed = parseAgentReplyFromStdout(stdout, sessionIdSafe, startedAt);
+            if (!parsed) {
+              json(res, 502, { ok: false, error: "empty_reply" });
+              return;
+            }
+            storageLog("info", "llm", "llm chat succeeded", {
+              scope,
+              sessionId: parsed.sessionId,
+              provider: parsed.provider,
+              model: parsed.model,
+              durationMs: parsed.durationMs,
+              messageChars: message.length,
+              replyChars: parsed.text.length,
+            });
+            json(res, 200, {
+              ok: true,
+              reply: {
+                text: parsed.text,
+                provider: parsed.provider,
+                model: parsed.model,
+                durationMs: parsed.durationMs,
+                sessionId: parsed.sessionId,
+              },
+            });
+          } catch (error) {
+            const e = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string; status?: number };
+            const stdout = typeof e.stdout === "string" ? e.stdout : "";
+            const stderr = typeof e.stderr === "string" ? e.stderr : "";
+            let parsedReply = null as ReturnType<typeof parseAgentReplyFromStdout> | null;
+            try {
+              parsedReply = parseAgentReplyFromStdout(stdout, "", Date.now());
+            } catch {
+              // ignore parse fallback errors
+            }
+            if (parsedReply) {
+              storageLog("warn", "llm", "llm chat partial fallback response used", {
+                sessionId: parsedReply.sessionId,
+                provider: parsedReply.provider,
+                model: parsedReply.model,
+                replyChars: parsedReply.text.length,
+              });
+              json(res, 200, {
+                ok: true,
+                reply: {
+                  text: parsedReply.text,
+                  provider: parsedReply.provider,
+                  model: parsedReply.model,
+                  durationMs: parsedReply.durationMs,
+                  sessionId: parsedReply.sessionId,
+                },
+              });
+              return;
+            }
+            const message = stripAnsi((stderr || stdout || e.message || "llm_call_failed")).trim();
+            storageLog("error", "llm", "llm chat failed", {
+              exitCode: e.status ?? 1,
+              message: message.slice(0, 320),
+            });
+            json(res, 502, {
+              ok: false,
+              error: "llm_call_failed",
+              message: message.slice(0, 500),
+              exitCode: e.status ?? 1,
+            });
+          }
+        });
+
         // ─── Phase 3: Interactive Terminal (WebSocket PTY) ────────────────
 
         // POST /__savc/terminal/exec   body: { cmd, cwd?, timeoutMs? }
@@ -1850,6 +2596,9 @@ export default defineConfig({
           if ((req.method || "GET").toUpperCase() !== "POST") {
             res.statusCode = 405; res.end("method not allowed"); return;
           }
+          if (rejectIfNotLocal(req, res)) {
+            return;
+          }
           try {
             const bodyRaw = await readRequestBody(req);
             const body = bodyRaw ? JSON.parse(bodyRaw) as Record<string, unknown> : {};
@@ -1857,13 +2606,24 @@ export default defineConfig({
             if (!cmd.length) { json(res, 400, { ok: false, error: "missing_cmd" }); return; }
             const ALLOWED_CMDS = new Set(["git","pnpm","node","ls","cat","echo","which","pwd","curl","wc","head","tail"]);
             if (!ALLOWED_CMDS.has(cmd[0])) { json(res, 403, { ok: false, error: "cmd_not_allowed" }); return; }
-            const cwd = typeof body.cwd === "string" && body.cwd ? path.resolve(repoRoot, body.cwd) : repoRoot;
-            if (!cwd.startsWith(repoRoot)) { json(res, 403, { ok: false, error: "forbidden_cwd" }); return; }
+            const requestedCwd = typeof body.cwd === "string" ? body.cwd : "";
+            const cwd = resolveStudioWorkspacePath(requestedCwd || ".", ".");
+            if (!cwd) { json(res, 403, { ok: false, error: "forbidden_cwd" }); return; }
             const timeoutMs = typeof body.timeoutMs === "number" ? Math.min(body.timeoutMs, 30000) : 15000;
             const stdout = execFileSync(cmd[0], cmd.slice(1), { cwd, encoding: "utf-8", timeout: timeoutMs, maxBuffer: 512 * 1024 });
+            storageLog("info", "terminal.exec", "terminal exec succeeded", {
+              cmd: cmd[0],
+              cwd: studioRelPath(cwd),
+              timeoutMs,
+              stdoutBytes: stdout.length,
+            });
             json(res, 200, { ok: true, stdout, stderr: "", exitCode: 0 });
           } catch (error) {
             const e = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string; status?: number };
+            storageLog("error", "terminal.exec", "terminal exec failed", {
+              message: e.message,
+              exitCode: e.status ?? 1,
+            });
             json(res, 200, { ok: false, stdout: e.stdout || "", stderr: e.stderr || e.message || "", exitCode: e.status ?? 1 });
           }
         });
@@ -1873,13 +2633,12 @@ export default defineConfig({
           const ptyMap = new Map<import("node:http").IncomingMessage, ReturnType<typeof nodePty.spawn>>();
           const MAX_PTY = 3;
 
-          server.httpServer.on("upgrade", (req: IncomingMessage, socket: import("node:net").Socket, head: Buffer) => {
+          server.httpServer.on("upgrade", async (req: IncomingMessage, socket: import("node:net").Socket, head: Buffer) => {
             const urlPath = req.url?.split("?")[0] || "";
             if (urlPath !== "/__savc/terminal") return;
 
             // Only from localhost
-            const remoteAddr = req.socket.remoteAddress || "";
-            if (!remoteAddr.includes("127.0.0.1") && !remoteAddr.includes("::1") && !remoteAddr.includes("localhost")) {
+            if (!isLocalRequest(req)) {
               socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
               socket.destroy();
               return;
@@ -1904,12 +2663,25 @@ export default defineConfig({
             ].join("\r\n"));
 
             // Spawn PTY
-            const shell = os.platform() === "win32" ? "cmd.exe" : (process.env.SHELL || "/bin/zsh");
-            const pty = nodePty.spawn(shell, [], {
-              name: "xterm-256color", cols: 220, rows: 50, cwd: repoRoot,
-              env: { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" },
+            const isWin = os.platform() === "win32";
+            const shell = isWin
+              ? "cmd.exe"
+              : (process.env.SAVC_PTY_SHELL || "/bin/bash");
+            const shellArgs = isWin
+              ? []
+              : (process.env.SAVC_PTY_SHELL_ARGS
+                ? process.env.SAVC_PTY_SHELL_ARGS.split(/\s+/).filter(Boolean)
+                : ["-il"]);
+            const pty = nodePty.spawn(shell, shellArgs, {
+              name: "xterm-256color", cols: 220, rows: 50, cwd: studioWorkspaceRoot,
+              env: { ...process.env, SHELL: shell, TERM: "xterm-256color", COLORTERM: "truecolor" },
             });
             ptyMap.set(req, pty);
+            storageLog("info", "terminal.ws", "terminal websocket connected", {
+              shell,
+              shellArgs,
+              activePty: ptyMap.size,
+            });
 
             // PTY → WS (frame data as binary)
             pty.onData((data: string) => {
@@ -1931,6 +2703,9 @@ export default defineConfig({
 
             pty.onExit(() => {
               ptyMap.delete(req);
+              storageLog("info", "terminal.ws", "terminal pty exited", {
+                activePty: ptyMap.size,
+              });
               try {
                 const closeFrame = Buffer.from([0x88, 0x02, 0x03, 0xe8]); // 1000 normal close
                 socket.write(closeFrame);
@@ -1960,8 +2735,21 @@ export default defineConfig({
               }
             });
 
-            socket.on("close", () => { try { pty.destroy(); } catch { /* already destroyed */ } ptyMap.delete(req); });
-            socket.on("error", () => { try { pty.destroy(); } catch { /* */ } ptyMap.delete(req); });
+            socket.on("close", () => {
+              try { pty.destroy(); } catch { /* already destroyed */ }
+              ptyMap.delete(req);
+              storageLog("info", "terminal.ws", "terminal websocket closed", {
+                activePty: ptyMap.size,
+              });
+            });
+            socket.on("error", (error) => {
+              try { pty.destroy(); } catch { /* */ }
+              ptyMap.delete(req);
+              storageLog("error", "terminal.ws", "terminal websocket error", {
+                activePty: ptyMap.size,
+                message: error instanceof Error ? error.message : String(error),
+              });
+            });
           });
         }
 

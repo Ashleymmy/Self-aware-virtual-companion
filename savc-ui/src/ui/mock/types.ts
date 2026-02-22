@@ -85,3 +85,45 @@ export interface DispatchRecord {
   duration: string;
   result: "success" | "failed" | "pending";
 }
+
+export interface StorageComponentHealth {
+  name: string;
+  engine: string;
+  configured: boolean;
+  state: "online" | "degraded" | "offline" | "disabled";
+  message: string;
+  latencyMs: number | null;
+}
+
+export interface StorageStatus {
+  generatedAt: string;
+  mode: {
+    primary: "sqlite" | "memory";
+    cache: "redis" | "memory";
+    backup: "yaml";
+  };
+  components: {
+    sqlite: StorageComponentHealth;
+    cache: StorageComponentHealth;
+    mysql: StorageComponentHealth;
+    yaml: StorageComponentHealth;
+  };
+  metrics: {
+    runtimeLogCount: number;
+    kvCount: number;
+    cacheEntries: number;
+  };
+  paths: {
+    sqlite: string;
+    yamlBackup: string;
+  };
+}
+
+export interface StorageRuntimeLog {
+  id: number;
+  level: string;
+  subsystem: string;
+  message: string;
+  context: Record<string, unknown>;
+  createdAt: string;
+}

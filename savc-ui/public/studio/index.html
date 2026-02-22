@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAVC Studio · 统一交互工作台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./studio.css">
+</head>
+<body>
+
+<!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+<nav id="sidebar">
+  <!-- Header -->
+  <div class="sidebar-header">
+    <div class="sidebar-wordmark">SAVC Studio</div>
+    <div class="sidebar-subtitle">Unified Workbench</div>
+  </div>
+
+  <!-- Avatar -->
+  <div class="sidebar-avatar-section">
+    <div class="avatar-wrapper">
+      <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="faceGrad" cx="50%" cy="45%" r="55%">
+            <stop offset="0%" stop-color="#F5C89A"/>
+            <stop offset="100%" stop-color="#E8A070"/>
+          </radialGradient>
+        </defs>
+        <circle cx="26" cy="26" r="26" fill="url(#faceGrad)"/>
+        <!-- eyes -->
+        <ellipse cx="19" cy="24" rx="2.5" ry="3" fill="#3C2010"/>
+        <ellipse cx="33" cy="24" rx="2.5" ry="3" fill="#3C2010"/>
+        <circle cx="20" cy="23" r="0.8" fill="#fff" opacity="0.7"/>
+        <circle cx="34" cy="23" r="0.8" fill="#fff" opacity="0.7"/>
+        <!-- eyebrows -->
+        <path d="M16 20 Q19 18.5 22 20" stroke="#7A4820" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <path d="M30 20 Q33 18.5 36 20" stroke="#7A4820" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <!-- nose -->
+        <ellipse cx="26" cy="29" rx="1.5" ry="1" fill="#D0845A" opacity="0.6"/>
+        <!-- mouth -->
+        <path d="M22 33 Q26 36.5 30 33" stroke="#C0603A" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <!-- blush -->
+        <ellipse cx="15" cy="31" rx="4" ry="2.5" fill="#E88060" opacity="0.25"/>
+        <ellipse cx="37" cy="31" rx="4" ry="2.5" fill="#E88060" opacity="0.25"/>
+        <!-- hair top -->
+        <path d="M6 24 Q6 4 26 4 Q46 4 46 24 Q44 12 26 12 Q8 12 6 24Z" fill="#3C2010"/>
+        <!-- ear -->
+        <ellipse cx="4" cy="28" rx="3" ry="4" fill="#E8A070"/>
+        <ellipse cx="48" cy="28" rx="3" ry="4" fill="#E8A070"/>
+      </svg>
+      <div class="online-dot"></div>
+    </div>
+    <div class="avatar-name">媛媛</div>
+    <div class="avatar-status">● 在线</div>
+  </div>
+
+  <!-- Scene Pills -->
+  <div class="sidebar-scenes">
+    <div class="scenes-label">模式</div>
+    <div class="scenes-grid">
+      <button class="scene-pill" onclick="switchView('companion')">陪伴</button>
+      <button class="scene-pill active" id="pill-dev" onclick="switchView('dev')">开发</button>
+      <button class="scene-pill" onclick="switchView('debug')">排障</button>
+      <button class="scene-pill" onclick="switchView('plan')">计划</button>
+    </div>
+  </div>
+
+  <hr class="sidebar-divider">
+
+  <!-- Monitor Button -->
+  <button class="monitor-btn" id="monitor-btn" onclick="switchView('monitor')">
+    <span>📊 监控大盘</span>
+    <span class="monitor-btn-arrow">›</span>
+  </button>
+
+  <hr class="sidebar-divider">
+
+  <!-- Sessions -->
+  <div class="sidebar-sessions">
+    <div class="sessions-label">会话</div>
+    <div id="session-list">
+      <div class="session-item active">
+        <span class="session-channel-badge badge-web">Web</span>
+        <div class="session-info">
+          <div class="session-name">加载中</div>
+          <div class="session-preview">正在拉取任务会话...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <div class="footer-dot"></div>
+    <span id="studio-server-status">在线 · 初始化中</span>
+  </div>
+</nav>
+
+<button id="sidebar-toggle" onclick="toggleSidebar()" title="折叠 / 展开侧栏">
+  <span class="toggle-icon">‹</span>
+</button>
+
+<!-- ═══════════════════════ MAIN ═══════════════════════ -->
+<div id="main">
+
+  <!-- ─── VIEW 1: COMPANION ─── -->
+  <div class="view" id="view-companion">
+    <!-- Presence Panel -->
+    <div class="companion-presence">
+      <div class="companion-avatar-wrap">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="cpFaceGrad" cx="50%" cy="45%" r="55%">
+              <stop offset="0%" stop-color="#F5C89A"/>
+              <stop offset="100%" stop-color="#E8A070"/>
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="50" fill="url(#cpFaceGrad)"/>
+          <ellipse cx="35" cy="46" rx="5" ry="6" fill="#3C2010"/>
+          <ellipse cx="65" cy="46" rx="5" ry="6" fill="#3C2010"/>
+          <circle cx="37" cy="44" r="1.5" fill="#fff" opacity="0.7"/>
+          <circle cx="67" cy="44" r="1.5" fill="#fff" opacity="0.7"/>
+          <path d="M29 38 Q35 35 41 38" stroke="#7A4820" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M59 38 Q65 35 71 38" stroke="#7A4820" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <ellipse cx="50" cy="57" rx="3" ry="2" fill="#D0845A" opacity="0.6"/>
+          <path d="M41 65 Q50 72 59 65" stroke="#C0603A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <ellipse cx="27" cy="60" rx="8" ry="5" fill="#E88060" opacity="0.25"/>
+          <ellipse cx="73" cy="60" rx="8" ry="5" fill="#E88060" opacity="0.25"/>
+          <path d="M10 46 Q10 5 50 5 Q90 5 90 46 Q86 20 50 20 Q14 20 10 46Z" fill="#3C2010"/>
+          <ellipse cx="7" cy="52" rx="6" ry="8" fill="#E8A070"/>
+          <ellipse cx="93" cy="52" rx="6" ry="8" fill="#E8A070"/>
+        </svg>
+      </div>
+      <div class="companion-name">媛媛</div>
+      <div class="companion-subtitle" id="companion-subtitle">
+        <span class="agent-state-dot state-idle" id="companion-status-dot"></span>
+        <span id="companion-status-text">正在倾听...</span>
+      </div>
+
+      <!-- Emotion Ring -->
+      <div class="emotion-ring">
+        <svg width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="36" fill="none" stroke="#E8DDD2" stroke-width="6"/>
+          <circle cx="45" cy="45" r="36" fill="none" stroke="#C8571E" stroke-width="6"
+            stroke-dasharray="170 56" stroke-dashoffset="-28"
+            stroke-linecap="round"
+            style="transform-origin:45px 45px; transform:rotate(-90deg)"/>
+          <text x="45" y="49" text-anchor="middle" font-size="14" font-family="Inter,sans-serif" fill="#7B6651">75%</text>
+        </svg>
+        <div class="emotion-ring-label">专注度</div>
+      </div>
+
+      <!-- Memories -->
+      <div class="memories-section">
+        <div class="memories-label">最近记忆</div>
+        <div class="memory-chips" id="companion-memory-chips">
+          <span class="memory-chip">加载中...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live2D Panel -->
+    <div class="companion-live2d">
+      <div class="live2d-header">
+        <span class="live2d-header-title">Live2D</span>
+        <span class="live2d-badge" id="l2d-badge">Mock 模式</span>
+      </div>
+
+      <!-- Canvas Area -->
+      <div class="live2d-canvas-area">
+        <!-- Character figure (placeholder until real WebGL canvas is mounted) -->
+        <div class="live2d-figure">
+          <!-- Head -->
+          <div class="live2d-head">
+            <svg width="140" height="140" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="l2dFaceGrad" cx="50%" cy="45%" r="55%">
+                  <stop offset="0%" stop-color="#F5C89A"/>
+                  <stop offset="100%" stop-color="#E8A070"/>
+                </radialGradient>
+              </defs>
+              <circle cx="50" cy="50" r="50" fill="url(#l2dFaceGrad)"/>
+              <!-- eyes -->
+              <ellipse cx="35" cy="46" rx="5" ry="6" fill="#3C2010"/>
+              <ellipse cx="65" cy="46" rx="5" ry="6" fill="#3C2010"/>
+              <circle cx="37" cy="44" r="1.5" fill="#fff" opacity="0.7"/>
+              <circle cx="67" cy="44" r="1.5" fill="#fff" opacity="0.7"/>
+              <!-- eyebrows -->
+              <path d="M29 38 Q35 35 41 38" stroke="#7A4820" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <path d="M59 38 Q65 35 71 38" stroke="#7A4820" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <!-- nose -->
+              <ellipse cx="50" cy="57" rx="3" ry="2" fill="#D0845A" opacity="0.6"/>
+              <!-- mouth (smile) -->
+              <path d="M41 65 Q50 72 59 65" stroke="#C0603A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <!-- blush -->
+              <ellipse cx="27" cy="60" rx="8" ry="5" fill="#E88060" opacity="0.25"/>
+              <ellipse cx="73" cy="60" rx="8" ry="5" fill="#E88060" opacity="0.25"/>
+              <!-- hair -->
+              <path d="M10 46 Q10 5 50 5 Q90 5 90 46 Q86 20 50 20 Q14 20 10 46Z" fill="#3C2010"/>
+              <!-- ears -->
+              <ellipse cx="7" cy="52" rx="6" ry="8" fill="#E8A070"/>
+              <ellipse cx="93" cy="52" rx="6" ry="8" fill="#E8A070"/>
+            </svg>
+          </div>
+          <!-- Neck + Body -->
+          <div class="live2d-neck"></div>
+          <div class="live2d-body-shape"></div>
+        </div>
+
+        <!-- Lip sync waveform -->
+        <div class="live2d-waveform" id="l2d-waveform">
+          <div class="wf-bar" style="height:4px"></div>
+          <div class="wf-bar" style="height:8px"></div>
+          <div class="wf-bar" style="height:5px"></div>
+          <div class="wf-bar" style="height:12px"></div>
+          <div class="wf-bar" style="height:6px"></div>
+          <div class="wf-bar" style="height:9px"></div>
+          <div class="wf-bar" style="height:4px"></div>
+        </div>
+
+        <!-- Corner label -->
+        <div class="live2d-canvas-label">canvas:mock · 30fps</div>
+      </div>
+
+      <!-- Controls -->
+      <div class="live2d-controls">
+        <div class="live2d-controls-label">动作触发</div>
+        <div class="live2d-action-btns">
+          <button class="live2d-action-btn" onclick="l2dAction('smile')">微笑</button>
+          <button class="live2d-action-btn" onclick="l2dAction('blink')">眨眼</button>
+          <button class="live2d-action-btn" onclick="l2dAction('wave')">挥手</button>
+          <button class="live2d-action-btn" onclick="l2dAction('think')">思考</button>
+          <button class="live2d-action-btn" onclick="l2dAction('nod')">点头</button>
+        </div>
+        <div class="live2d-mode-row">
+          <span class="live2d-mode-label">渲染模式</span>
+          <div class="live2d-mode-toggle">
+            <div class="live2d-mode-opt" onclick="setL2dMode('gateway',this)">Gateway</div>
+            <div class="live2d-mode-opt active" onclick="setL2dMode('mock',this)">Mock</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+      <!-- Chat Area -->
+      <div class="companion-chat">
+        <div class="companion-messages" id="companion-messages">
+          <div class="msg assistant">
+            <div class="msg-bubble">已接入任务运行态数据，输入消息将创建真实任务。</div>
+            <div class="msg-time">--:--</div>
+          </div>
+        </div>
+      <div class="companion-input-area">
+        <input class="companion-input" id="companion-input" type="text" placeholder="说说你想聊什么..." onkeydown="companionSend(event)">
+        <button class="send-btn" onclick="companionSend({key:'Enter'})">›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 2: DEV ─── -->
+  <div class="view active" id="view-dev">
+    <!-- Main Area -->
+    <div class="dev-main">
+      <!-- Tab Bar -->
+      <div class="dev-tab-bar">
+        <button class="dev-tab-btn active" onclick="switchDevTab('interaction')">交互</button>
+        <button class="dev-tab-btn" onclick="switchDevTab('exec')">执行</button>
+        <button class="dev-tab-btn" onclick="switchDevTab('context')">上下文</button>
+        <button class="dev-tab-btn" onclick="switchDevTab('settings')">设置</button>
+        <div class="dev-touchbar-host" id="vsc-touchbar-anchor">
+          <button type="button" class="vsc-touchbar" id="vsc-touchbar" onclick="toggleVSCodeFromTouchbar()">
+            <span class="vsc-touchbar-dot"></span>
+            <span class="vsc-touchbar-text" id="vsc-touchbar-text">工作台待命</span>
+            <span class="vsc-touchbar-hint" id="vsc-touchbar-hint">点击展开</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab: Interaction -->
+      <div class="dev-tab-content active" id="dev-tab-interaction">
+        <div class="dev-runtime-indicator state-idle" id="dev-runtime-indicator">
+          <span class="agent-state-dot state-idle" id="dev-status-dot"></span>
+          <span id="dev-status-text">等待新任务...</span>
+        </div>
+        <div class="dev-messages" id="dev-messages">
+          <div class="dev-msg assistant">
+            <div class="dev-msg-bubble">运行态事件加载中...</div>
+            <div class="msg-time" style="font-size:10px;color:var(--text-light);margin-top:2px;">--:--</div>
+          </div>
+        </div>
+        <div class="dev-input-area">
+          <input class="dev-input" id="dev-input" type="text" placeholder="输入消息，Enter 发送..." onkeydown="devSend(event)">
+          <button class="dev-send-btn" onclick="devSend({key:'Enter'})">发送</button>
+        </div>
+      </div>
+
+      <!-- Tab: Exec -->
+      <div class="dev-tab-content" id="dev-tab-exec">
+        <div class="tool-list" id="dev-tool-list">
+          <div class="tool-row open">
+            <div class="tool-row-header">
+              <div class="tool-status-icon tool-status-run">●</div>
+              <div class="tool-name">加载中</div>
+              <div class="tool-duration">...</div>
+            </div>
+            <div class="tool-detail">正在拉取 runtime 事件...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Context -->
+      <div class="dev-tab-content" id="dev-tab-context">
+        <div class="context-grid" id="dev-context-grid">
+          <div>
+            <div class="context-col-title">上下文加载中</div>
+            <div class="context-card">
+              <div class="context-card-title">请稍候</div>
+              <div class="context-card-desc">正在拉取 progress 快照...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Settings -->
+      <div class="dev-tab-content" id="dev-tab-settings">
+        <div class="settings-section">
+          <div class="settings-group">
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">主模型</div>
+                <div class="settings-desc">对话与推理核心</div>
+              </div>
+              <select class="settings-select">
+                <option>claude-sonnet-4-6</option>
+                <option>claude-opus-4-6</option>
+                <option>ollama/llama3</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">TTS 引擎</div>
+                <div class="settings-desc">语音合成服务</div>
+              </div>
+              <select class="settings-select">
+                <option>OpenAI TTS (nova)</option>
+                <option>Edge TTS</option>
+                <option>关闭</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">Live2D 渲染</div>
+                <div class="settings-desc">虚拟形象动作同步</div>
+              </div>
+              <select class="settings-select">
+                <option>mock 模式</option>
+                <option>本地渲染器</option>
+                <option>关闭</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">工具调用</div>
+                <div class="settings-desc">允许媛媛使用工具</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">记忆持久化</div>
+                <div class="settings-desc">保存对话记忆到向量库</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">流式输出</div>
+                <div class="settings-desc">启用 SSE 流式响应</div>
+              </div>
+              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-label">调试日志</div>
+                <div class="settings-desc">输出详细运行日志</div>
+              </div>
+              <div class="toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="dev-right-panel">
+      <!-- Session Card -->
+      <div class="panel-card">
+        <div class="panel-card-title">当前会话</div>
+        <div class="session-card-name" id="panel-session-name">加载中...</div>
+        <div class="session-card-meta" id="panel-session-meta">
+          会话 ID: -<br>
+          状态: -<br>
+          事件数: -<br>
+          更新时间: -
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div>
+        <div class="panel-card-title" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-light);margin-bottom:8px;">本日统计</div>
+        <div class="stats-grid" id="dev-stats-grid">
+          <div class="stat-number-card">
+            <div class="stat-num">-</div>
+            <div class="stat-lbl">消息</div>
+          </div>
+          <div class="stat-number-card">
+            <div class="stat-num">-</div>
+            <div class="stat-lbl">工具调用</div>
+          </div>
+          <div class="stat-number-card">
+            <div class="stat-num">-</div>
+            <div class="stat-lbl">会话</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tool Trace -->
+      <div class="panel-card" id="dev-tool-trace">
+        <div class="panel-card-title">工具轨迹</div>
+        <div class="tool-trace-item">
+          <div class="trace-dot" style="background:var(--status-warn)"></div>
+          <span>等待运行态事件...</span>
+        </div>
+      </div>
+
+      <!-- Channel Distribution -->
+      <div class="panel-card" id="dev-channel-distribution">
+        <div class="panel-card-title">渠道分布</div>
+        <div class="channel-bar-row">
+          <div class="channel-bar-label">加载中</div>
+          <div class="channel-bar-track">
+            <div class="channel-bar-fill" style="width:10%;background:#4A90D9"></div>
+          </div>
+          <div class="channel-bar-val">...</div>
+        </div>
+      </div>
+
+      <div class="panel-card" id="storage-service-status">
+        <div class="panel-card-title">数据库服务状态</div>
+        <div class="tool-trace-item"><div class="trace-dot" style="background:var(--status-warn)"></div><span>加载中...</span></div>
+      </div>
+
+      <div class="panel-card" id="storage-runtime-logs">
+        <div class="panel-card-title">存储运行日志</div>
+        <div class="tool-trace-item"><div class="trace-dot" style="background:var(--status-warn)"></div><span>等待日志数据...</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 3: DEBUG ─── -->
+  <div class="view" id="view-debug">
+    <!-- Left Error Tree -->
+    <div class="debug-left" id="debug-tree">
+      <div class="debug-tree-title">错误树</div>
+      <div class="debug-section-label warn">同步中</div>
+      <div class="debug-error-item active">
+        <div class="error-dot dot-yellow"></div>
+        <div>
+          <div class="error-text">正在拉取运行态错误</div>
+          <div class="error-detail">等待 snapshot...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Main -->
+    <div class="debug-right">
+      <!-- Chat -->
+      <div class="debug-chat-area" id="debug-chat">
+        <div class="debug-msg assistant">
+          <div class="debug-msg-bubble">错误详情将根据实时事件自动更新。</div>
+          <div class="debug-msg-time">--:--</div>
+        </div>
+      </div>
+
+      <!-- Resize Handle -->
+      <div class="debug-resize-handle">
+        <div class="debug-resize-dots">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="debug-terminal">
+        <div class="terminal-toolbar">
+          <input class="terminal-search" type="text" placeholder="搜索日志...">
+        </div>
+        <div class="terminal-logs" id="debug-logs">
+          <div class="log-line">
+            <span class="log-ts">--:--:--</span>
+            <span class="log-agent sys">System</span>
+            <span class="log-arrow">›</span>
+            <span class="log-text">等待 runtime 事件流...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 4: PLAN ─── -->
+  <div class="view" id="view-plan">
+    <!-- Outline -->
+    <div class="plan-outline">
+      <div class="plan-outline-title">文档大纲</div>
+      <div class="outline-root">§ SAVC Studio</div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">1.</span> 背景与问题
+      </div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">2.</span> 产品目标
+      </div>
+      <div class="outline-item active" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">3.</span> 信息架构
+      </div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">4.</span> 功能范围
+      </div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">5.</span> 技术架构
+      </div>
+      <div class="outline-item" onclick="setOutlineActive(this)">
+        <span class="outline-item-num">6.</span> 开发计划
+      </div>
+    </div>
+
+    <!-- Kanban -->
+    <div class="plan-kanban">
+      <div class="kanban-title">开发看板</div>
+      <div class="kanban-cols" id="plan-kanban-cols">
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-name">加载中</div>
+            <div class="kanban-col-count">...</div>
+          </div>
+          <div class="kanban-col-cards">
+            <div class="kanban-card">
+              <div class="kanban-card-title">正在拉取模块状态...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Milestone -->
+    <div class="plan-milestone">
+      <div class="milestone-title">里程碑</div>
+      <div class="timeline" id="plan-timeline">
+        <div class="milestone-item">
+          <div class="milestone-dot active"></div>
+          <div class="milestone-info">
+            <div class="milestone-week">加载中</div>
+            <div class="milestone-date">--</div>
+            <div class="milestone-desc">正在同步里程碑...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 5: MONITOR ─── -->
+  <div class="view" id="view-monitor">
+    <!-- Agent Cards -->
+    <div class="monitor-section">
+      <div class="monitor-section-title">Agent 状态</div>
+      <div class="agent-cards-grid" id="monitor-agent-cards">
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-card-name">加载中</div>
+            <div class="agent-status-badge badge-running">sync</div>
+          </div>
+          <div class="agent-card-role">正在同步模块状态...</div>
+          <div class="progress-track">
+            <div class="progress-fill fill-accent" style="width:10%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dependency Graph -->
+    <div class="monitor-section" style="padding-bottom:0">
+      <div class="monitor-section-title">依赖关系图</div>
+      <div class="dep-graph-card">
+        <svg viewBox="0 0 720 180" height="180" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow-run" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#B8640A"/>
+            </marker>
+            <marker id="arrow-err" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#C0392B"/>
+            </marker>
+            <marker id="arrow-idle" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#2D7A47"/>
+            </marker>
+          </defs>
+
+          <!-- Orchestrator (left-center) -->
+          <rect id="dep-node-orch-rect" x="40" y="65" width="140" height="50" rx="8" fill="#FEF3E2" stroke="#B8640A" stroke-width="1.5"/>
+          <text id="dep-node-orch-name" x="110" y="86" text-anchor="middle" font-size="11" font-weight="600" fill="#7A4000" font-family="Menlo,monospace">Orchestrator</text>
+          <text id="dep-node-orch-status" x="110" y="103" text-anchor="middle" font-size="10" fill="#B8640A" font-family="Menlo,monospace">sync</text>
+
+          <!-- Memory (top-right from Orch) -->
+          <rect id="dep-node-memory-rect" x="270" y="20" width="130" height="50" rx="8" fill="#EEF4FB" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="2,4"/>
+          <text id="dep-node-memory-name" x="335" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="#1C4B7A" font-family="Menlo,monospace">Memory</text>
+          <text id="dep-node-memory-status" x="335" y="58" text-anchor="middle" font-size="10" fill="#4A90D9" font-family="Menlo,monospace">sync</text>
+
+          <!-- Voice (bottom-right from Orch) -->
+          <rect id="dep-node-voice-rect" x="270" y="110" width="130" height="50" rx="8" fill="#EEF4FB" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="2,4"/>
+          <text id="dep-node-voice-name" x="335" y="131" text-anchor="middle" font-size="11" font-weight="600" fill="#1C4B7A" font-family="Menlo,monospace">Voice/TTS</text>
+          <text id="dep-node-voice-status" x="335" y="148" text-anchor="middle" font-size="10" fill="#4A90D9" font-family="Menlo,monospace">sync</text>
+
+          <!-- Live2D (far right from Voice) -->
+          <rect id="dep-node-live2d-rect" x="500" y="85" width="130" height="50" rx="8" fill="#EEF4FB" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="2,4"/>
+          <text id="dep-node-live2d-name" x="565" y="106" text-anchor="middle" font-size="11" font-weight="600" fill="#1C4B7A" font-family="Menlo,monospace">Live2D</text>
+          <text id="dep-node-live2d-status" x="565" y="123" text-anchor="middle" font-size="10" fill="#4A90D9" font-family="Menlo,monospace">sync</text>
+
+          <!-- Orch -> Memory -->
+          <path id="dep-link-orch-memory" d="M180 80 C225 80 225 45 270 45" fill="none" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="2,4" marker-end="url(#arrow-idle)"/>
+          <!-- Orch -> Voice -->
+          <path id="dep-link-orch-voice" d="M180 90 C225 90 225 135 270 135" fill="none" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="2,4" marker-end="url(#arrow-idle)"/>
+          <!-- Voice -> Live2D -->
+          <path id="dep-link-voice-live2d" d="M400 135 C445 135 445 110 500 110" fill="none" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="2,4" marker-end="url(#arrow-idle)"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Log Stream -->
+    <div class="monitor-log-card" style="margin-top:16px">
+      <div class="monitor-log-toolbar">
+        <button class="filter-chip active" onclick="setMonitorFilter(this,'all')">全部</button>
+        <button class="filter-chip" onclick="setMonitorFilter(this,'Orchestrator')">Orchestrator</button>
+        <button class="filter-chip" onclick="setMonitorFilter(this,'Memory')">Memory</button>
+        <button class="filter-chip" onclick="setMonitorFilter(this,'Voice')">Voice</button>
+        <button class="filter-chip" onclick="setMonitorFilter(this,'Live2D')">Live2D</button>
+        <button class="clear-btn" onclick="clearMonitorLog()">清除</button>
+      </div>
+      <div class="monitor-log-list" id="monitor-logs">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
+
+</div><!-- end #main -->
+
+<script src="./studio-core.js"></script>
+<!-- ═══════════════════════ FLOATING VSCODE WIDGET ═══════════════════════ -->
+<div id="vscode-widget">
+  <!-- Title bar (drag handle) -->
+  <div class="vsc-titlebar" id="vsc-titlebar">
+    <div class="vsc-traffic">
+      <div class="vsc-dot vsc-dot-close" onclick="collapseVSCode(event)"></div>
+      <div class="vsc-dot vsc-dot-min"   onclick="collapseVSCode(event)"></div>
+      <div class="vsc-dot vsc-dot-max"></div>
+    </div>
+    <div class="vsc-title-text" id="vsc-workspace-title">项目工作区 · 工作区</div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <button class="vsc-tb-btn" onclick="toggleVscPanel(event)" title="切换终端">⊟</button>
+      <button class="vsc-tb-btn" onclick="collapseVSCode(event)" title="缩小">⊡</button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="vsc-body">
+
+    <!-- Activity bar -->
+    <div class="vsc-activitybar">
+      <div class="vsc-ab-icon active" id="vsc-ab-explorer" onclick="switchVscPanel('explorer',this)" title="资源管理器">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M3 3h8l2 2h8v14H3z"/></svg>
+      </div>
+      <div class="vsc-ab-icon" id="vsc-ab-git" onclick="switchVscPanel('git',this)" title="源代码管理">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+          <line x1="12" y1="7" x2="12" y2="12"/><line x1="12" y1="12" x2="5" y2="17"/>
+          <line x1="12" y1="12" x2="19" y2="17"/></svg>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="vsc-sidebar">
+      <div class="vsc-sidebar-title" id="vsc-sidebar-title">资源管理器</div>
+
+      <!-- Explorer panel -->
+      <div class="vsc-sidebar-panel active" id="vsc-panel-explorer">
+        <div class="vsc-tree-row" style="padding-left:4px; font-size:11px; color:#bbbcbd; font-family:var(--font-ui)">
+          <span class="vsc-tree-arrow">▾</span>
+          <span style="font-weight:700;letter-spacing:.02em" id="vsc-workspace-root-label">WORKSPACE</span>
+        </div>
+        <div class="vsc-tree-row" style="padding-left:16px"><span class="vsc-tree-arrow"></span><span class="vsc-tree-ico">ℹ</span><span class="vsc-tree-name">展开后自动加载文件树</span></div>
+      </div>
+
+      <!-- Git panel -->
+      <div class="vsc-sidebar-panel" id="vsc-panel-git">
+        <div class="vsc-git-commit-area">
+          <textarea class="vsc-git-textarea" id="vsc-git-msg" placeholder="消息（Ctrl+Enter 提交到 'main'）"></textarea>
+          <button class="vsc-git-commit-btn" onclick="vscCommit()">✓ 提交</button>
+        </div>
+        <div style="font-size:10px;color:#6B5A48;padding:6px 8px;opacity:.8">展开后自动拉取 Git 状态</div>
+      </div>
+    </div>
+
+    <!-- Editor area -->
+    <div class="vsc-editor-area">
+      <!-- Tabs -->
+      <div class="vsc-tabs">
+        <div class="vsc-tab active" id="vsc-tab-index"><span>welcome.txt</span><span class="vsc-tab-x">×</span></div>
+      </div>
+      <!-- Breadcrumb -->
+      <div class="vsc-breadcrumb" id="vsc-breadcrumb">
+        <span class="vsc-bc-cur">工作区</span>
+      </div>
+      <!-- Code panels (one active at a time) -->
+      <div class="vsc-code" id="vsc-code-index">
+        <div class="vsc-code-line"><span class="vsc-ln">1</span><span class="vsc-ct">等待文件树加载，点击左侧文件开始编辑。</span></div>
+      </div>
+
+      <!-- CodeMirror 6 editor mount (active when savc-ui running) -->
+      <div id="vsc-cm-mount" style="display:none"></div>
+
+      <!-- Bottom panel (terminal) -->
+      <div class="vsc-panel" id="vsc-panel-term">
+        <div class="vsc-panel-tabs">
+          <div class="vsc-panel-tab active">终端</div>
+          <div class="vsc-panel-tab">输出</div>
+          <div class="vsc-panel-tab">问题</div>
+          <div style="margin-left:auto;display:flex;align-items:center;padding-right:8px">
+            <button class="vsc-tb-btn" onclick="toggleVscPanel(event)" title="关闭面板">×</button>
+          </div>
+        </div>
+        <div class="vsc-terminal" id="vsc-term-mock">
+          <div class="tl"><span class="tp">SAVC Terminal</span> <span style="color:#569cd6">等待连接</span></div>
+          <div class="tl"><span class="tp">ℹ</span> 展开工作台后将尝试连接 <span style="color:#d4d4d4">/__savc/terminal</span></div>
+        </div>
+        <!-- xterm.js mount — shown when savc-ui PTY is available -->
+        <div id="xterm-mount" style="display:none;flex:1;overflow:hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="vsc-statusbar">
+    <span class="vsc-sb" id="vsc-sb-branch">⎇ -</span>
+    <span class="vsc-sb" id="vsc-sb-errors">⊗ 0  ⚠ 0</span>
+    <span class="vsc-sb vsc-sb-r" id="vsc-sb-lang">HTML</span>
+    <span class="vsc-sb">UTF-8</span>
+    <span class="vsc-sb">Ln 9, Col 5</span>
+    <span class="vsc-sb">Spaces: 2</span>
+  </div>
+</div>
+
+<!-- CodeMirror 6 via esm.sh CDN — only active when savc-ui is running -->
+<script type="module" src="./studio-codemirror.js"></script>
+
+<!-- xterm.js via CDN — PTY terminal, only active when savc-ui is running -->
+<script type="module" src="./studio-terminal.js"></script>
+
+</body>
+</html>
