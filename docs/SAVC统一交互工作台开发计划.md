@@ -70,7 +70,7 @@
 
 ## 4.1 页面结构
 
-统一工作台作为独立页面，建议路径：`/workbench/`。
+统一工作台作为独立页面，主路径：`/studio/`（兼容别名：`/workbench/`）。
 
 布局采用三栏：
 
@@ -144,7 +144,7 @@
 
 ## 6.2 分层
 
-1. View 层（workbench 页面）
+1. View 层（studio 页面）
 - 只处理渲染、用户交互和轻量 UI 状态。
 
 2. Client Adapter 层
@@ -155,21 +155,30 @@
 - 复用已有接口。
 - 增加工作台专用聚合端点（只读快照、流式更新、偏好保存）。
 
-## 6.3 建议新增接口（不破坏旧接口）
+## 6.3 当前并入接口（2026-02-20）
 
-1. `GET /__savc/workbench/snapshot`
-- 返回：会话摘要、当前任务、工具轨迹、渠道摘要、custom。
+1. `GET /__savc/fs/tree`
+- 返回仓库目录树（带 git 状态徽标）。
 
-2. `GET /__savc/workbench/stream`
-- SSE 推送事件：`session_updated`、`tool_event`、`status_changed`。
+2. `GET /__savc/fs/read`
+- 读取文件内容与语言类型（用于编辑器预览）。
 
-3. `POST /__savc/workbench/preferences`
-- 保存基础 custom（本地文件存储）。
+3. `GET /__savc/git/status`
+- 返回分支、暂存/未暂存/未跟踪文件。
 
-4. `GET /__savc/workbench/preferences`
-- 读取当前 custom。
+4. `POST /__savc/fs/write`（本地回环来源限制）
+- 保存文件内容（扩展名白名单 + 大小限制）。
 
-建议持久化文件：`config/workbench.preferences.json`（本地可版本管理）。
+5. `POST /__savc/git/add`（本地回环来源限制）
+- 暂存指定文件列表。
+
+6. `POST /__savc/git/commit`（本地回环来源限制）
+- 执行 commit 并返回 hash。
+
+7. `WS /__savc/terminal` + `POST /__savc/terminal/exec`（本地回环来源限制）
+- 提供交互式 PTY 与非交互命令执行。
+
+说明：历史 `workbench` 聚合接口保留为兼容方案，当前 `studio` 并入版优先使用上述同源接口。
 
 ---
 
@@ -253,7 +262,7 @@ interface WorkbenchSnapshot {
 ## 9.2 Phase W1: MVP 页面骨架 + 会话主链路
 - 时间: 2026-02-21 ~ 2026-02-23
 - 交付:
-  1. 新增 `/workbench/` 页面（独立入口）
+  1. 新增 `/studio/` 页面（独立入口，兼容 `/workbench/`）
   2. 左栏会话 + 中栏时间线 + 基础发送
   3. 场景切换（companion/dev/debug/plan）
 - 验收:
@@ -296,19 +305,19 @@ interface WorkbenchSnapshot {
 
 建议新增：
 
-1. `savc-ui/public/workbench/index.html`
-2. `savc-ui/public/workbench/styles.css`
-3. `savc-ui/public/workbench/app.js`
+1. `savc-ui/public/studio/index.html`
+2. `savc-ui/public/workbench/index.html`（兼容入口，可选）
+3. `savc-ui/public/workbench/styles.css`（兼容资源，可选）
 4. `savc-ui/src/ui/workbench/adapter.ts`
 5. `savc-ui/src/ui/workbench/types.ts`
 6. `savc-ui/src/ui/workbench/store.ts`
-7. `savc-ui/vite.config.ts`（新增 workbench middleware 路由）
+7. `savc-ui/vite.config.ts`（新增 studio/workbench 入口重定向路由）
 8. `config/workbench.preferences.json`（新增）
 
 建议入口改造：
 
 1. 在 `savc-ui` 侧栏新增 `统一工作台` 跳转项（新标签页）
-2. 地址：`http://localhost:5174/workbench/`
+2. 地址：`http://localhost:5174/studio/`（兼容 `http://localhost:5174/workbench/`）
 
 ---
 
@@ -318,9 +327,9 @@ interface WorkbenchSnapshot {
 
 1. `pnpm --dir savc-ui exec tsc -p tsconfig.json --noEmit`
 2. `pnpm --dir savc-ui build`
-3. `curl http://127.0.0.1:5174/workbench/index.html` 返回 `200`
-4. `curl http://127.0.0.1:5174/__savc/workbench/snapshot` 返回合法 JSON
-5. `curl -N http://127.0.0.1:5174/__savc/workbench/stream` 能收到事件
+3. `curl http://127.0.0.1:5174/studio/index.html` 返回 `200`
+4. `curl 'http://127.0.0.1:5174/__savc/fs/tree?path=.&depth=1'` 返回合法 JSON
+5. `curl http://127.0.0.1:5174/__savc/git/status` 返回合法 JSON
 
 ## 11.2 手工验收
 
@@ -359,4 +368,3 @@ interface WorkbenchSnapshot {
 1. 先把 `W1 + W2` 做完（拿到真正可用的开发主界面）。
 2. 再做 `W3`（custom 与聚合），最后做 `W4`（语音/Live2D 完整联动）。
 3. 每个 phase 独立提交，确保可回滚与可验收。
-

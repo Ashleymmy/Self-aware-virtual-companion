@@ -551,11 +551,25 @@ wscat -c ws://127.0.0.1:18789
 
 # 方法 2: savc-ui Chat Tab
 cd savc-ui && npm run dev
-# 打开 http://localhost:5174，在 Chat Tab 发送消息
+# 打开 http://localhost:5174/studio/，在 Chat Tab 发送消息
 
 # 方法 3: Telegram/Discord
 # 直接在已配置的 Telegram/Discord 频道中发送消息
 ```
+
+**SAVC Studio 接口 smoke（2026-02-20）**:
+
+```bash
+curl 'http://127.0.0.1:5174/__savc/fs/tree?path=.&depth=1'
+curl 'http://127.0.0.1:5174/__savc/fs/read?path=README.md'
+curl 'http://127.0.0.1:5174/__savc/git/status'
+curl -X POST 'http://127.0.0.1:5174/__savc/terminal/exec' \
+  -H 'Content-Type: application/json' \
+  -d '{"cmd":["pwd"]}'
+```
+
+说明：
+- `POST /__savc/fs/write`、`POST /__savc/git/add`、`POST /__savc/git/commit`、`POST /__savc/terminal/exec` 仅允许本地回环来源访问（127.0.0.1/::1/localhost）。
 
 **检查点**:
 
