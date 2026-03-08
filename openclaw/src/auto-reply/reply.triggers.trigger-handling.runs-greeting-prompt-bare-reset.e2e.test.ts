@@ -48,6 +48,18 @@ const modelCatalogMocks = vi.hoisted(() => ({
 
 vi.mock("../agents/model-catalog.js", () => modelCatalogMocks);
 
+const routeReplyMocks = vi.hoisted(() => ({
+  routeReply: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("./reply/route-reply.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./reply/route-reply.js")>();
+  return {
+    ...actual,
+    routeReply: routeReplyMocks.routeReply,
+  };
+});
+
 import { abortEmbeddedPiRun, runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import { getReplyFromConfig } from "./reply.js";
 
@@ -66,6 +78,8 @@ async function withTempHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
     async (home) => {
       vi.mocked(runEmbeddedPiAgent).mockClear();
       vi.mocked(abortEmbeddedPiRun).mockClear();
+      routeReplyMocks.routeReply.mockReset();
+      routeReplyMocks.routeReply.mockResolvedValue(undefined);
       return await fn(home);
     },
     { prefix: "openclaw-triggers-" },
@@ -167,6 +181,70 @@ describe("trigger handling", () => {
       expect(runEmbeddedPiAgent).not.toHaveBeenCalled();
     });
   });
+  it(
+    "queues a rapid followup after bare /reset ack until the reset turn starts",
+    async () => {
+      await withTempHome(async (home) => {
+        let releaseAck: (() => void) | undefined;
+        let signalAckSent: (() => void) | undefined;
+        const ackSent = new Promise<void>((resolve) => {
+          signalAckSent = resolve;
+        });
+        routeReplyMocks.routeReply.mockImplementation(async () => {
+          signalAckSent?.();
+          await new Promise<void>((resolve) => {
+            releaseAck = resolve;
+          });
+        });
+        vi.mocked(runEmbeddedPiAgent).mockResolvedValue({
+          payloads: [{ text: "hello" }],
+          meta: {
+            durationMs: 1,
+            agentMeta: { sessionId: "s", provider: "p", model: "m" },
+          },
+        });
+
+        const cfg = _makeCfg(home);
+        const firstPromise = getReplyFromConfig(
+          {
+            Body: "/reset",
+            From: "+1003",
+            OriginatingChannel: "whatsapp",
+            To: "+2000",
+            CommandAuthorized: true,
+          },
+          {},
+          cfg,
+        );
+
+        await ackSent;
+
+        const second = await getReplyFromConfig(
+          {
+            Body: "哈喽",
+            From: "+1003",
+            OriginatingChannel: "whatsapp",
+            To: "+2000",
+          },
+          {},
+          cfg,
+        );
+
+        expect(second).toBeUndefined();
+        expect(runEmbeddedPiAgent).not.toHaveBeenCalled();
+
+        releaseAck?.();
+
+        const first = await firstPromise;
+        const firstText = Array.isArray(first) ? first[0]?.text : first?.text;
+        expect(firstText).toBe("hello");
+        expect(vi.mocked(runEmbeddedPiAgent).mock.calls[0]?.[0]?.prompt).toContain(
+          "A new session was started via /new or /reset",
+        );
+      });
+    },
+    10_000,
+  );
   it("blocks /reset for non-owner senders", async () => {
     await withTempHome(async (home) => {
       const res = await getReplyFromConfig(

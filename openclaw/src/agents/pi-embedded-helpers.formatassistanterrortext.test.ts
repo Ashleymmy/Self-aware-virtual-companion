@@ -47,6 +47,14 @@ describe("formatAssistantErrorText", () => {
     expect(result).toContain("Message ordering conflict");
     expect(result).not.toContain("400");
   });
+  it("does not misclassify invalid developer-role errors as ordering conflicts", () => {
+    const msg = makeAssistantError(
+      "400 The parameter `messages.role` specified in the request are not valid: invalid value: `developer`",
+    );
+    const result = formatAssistantErrorText(msg);
+    expect(result).not.toContain("Message ordering conflict");
+    expect(result).toContain("developer");
+  });
   it("suppresses raw error JSON payloads that are not otherwise classified", () => {
     const msg = makeAssistantError(
       '{"type":"error","error":{"message":"Something exploded","type":"server_error"}}',

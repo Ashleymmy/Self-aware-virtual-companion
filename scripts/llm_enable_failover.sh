@@ -1,8 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+ENV_FILE="${REPO_ROOT}/config/.env.local"
 CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${HOME}/.openclaw/openclaw.json}"
 DRY_RUN=0
+
+if [[ -f "${ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+  set +a
+fi
+
+VOLCES_API_KEY="${VOLCES_API_KEY:-${volces_API_KEY:-}}"
+VOLCES_BASE_URL="${VOLCES_BASE_URL:-${volces_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}}"
+VOLCES_MODEL="${VOLCES_MODEL:-${volces_MODEL:-${model:-doubao-seed-1-8-251228}}}"
+export VOLCES_API_KEY VOLCES_BASE_URL VOLCES_MODEL
 
 usage() {
   cat <<USAGE
@@ -64,18 +79,37 @@ python3 - "${CONFIG_PATH}" "${DRY_RUN}" <<'PY'
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
 config_path = Path(sys.argv[1])
 dry_run = sys.argv[2] == "1"
 
-PRIMARY = "anyrouter/claude-opus-4-6"
-FALLBACKS = [
+volces_api_key = os.getenv("VOLCES_API_KEY", "").strip()
+volces_base_url = os.getenv("VOLCES_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3").strip() or "https://ark.cn-beijing.volces.com/api/v3"
+volces_model = os.getenv("VOLCES_MODEL", "doubao-seed-1-8-251228").strip() or "doubao-seed-1-8-251228"
+use_volces = bool(volces_api_key)
+
+PRIMARY = f"volces/{volces_model}" if use_volces else "anyrouter/claude-opus-4-6"
+FALLBACKS = ([PRIMARY] if use_volces else []) + [
     "anyrouter/claude-sonnet-4-5-20250929",
     "wzw/claude-sonnet-4-5-20250929",
     "wzw/claude-sonnet-4-20250514",
     "wzw/claude-haiku-4-5-20251001",
+]
+
+VOLCES_MODELS = [
+    {
+        "id": volces_model,
+        "name": f"{volces_model} (volces)",
+        "reasoning": True,
+        "input": ["text"],
+        "compat": {"supportsDeveloperRole": False},
+        "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+        "contextWindow": 256000,
+        "maxTokens": 16384,
+    },
 ]
 
 ANYROUTER_MODELS = [
@@ -197,11 +231,21 @@ ensure_model_alias(defaults_models, "anyrouter/claude-sonnet-4-5-20250929", "son
 ensure_model_alias(defaults_models, "wzw/claude-sonnet-4-5-20250929", "wzw-sonnet")
 ensure_model_alias(defaults_models, "wzw/claude-sonnet-4-20250514", None)
 ensure_model_alias(defaults_models, "wzw/claude-haiku-4-5-20251001", "haiku")
+if use_volces:
+    ensure_model_alias(defaults_models, PRIMARY, "main")
 defaults["models"] = defaults_models
 
 models_cfg = ensure_obj(cfg, "models")
 models_cfg["mode"] = "merge"
 providers = ensure_obj(models_cfg, "providers")
+if use_volces:
+    providers["volces"] = build_provider(
+        providers.get("volces"),
+        base_url=volces_base_url,
+        api_key="${VOLCES_API_KEY}",
+        api="openai-completions",
+        models=VOLCES_MODELS,
+    )
 providers["anyrouter"] = build_provider(
     providers.get("anyrouter"),
     base_url="https://anyrouter.top",

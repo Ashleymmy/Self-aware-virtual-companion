@@ -13,6 +13,12 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
+# Support both canonical VOLCES_* names and the existing local lowercase keys.
+VOLCES_API_KEY="${VOLCES_API_KEY:-${volces_API_KEY:-}}"
+VOLCES_BASE_URL="${VOLCES_BASE_URL:-${volces_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}}"
+VOLCES_MODEL="${VOLCES_MODEL:-${volces_MODEL:-${model:-doubao-seed-1-8-251228}}}"
+export VOLCES_API_KEY VOLCES_BASE_URL VOLCES_MODEL
+
 generate_local_token() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 16
@@ -94,6 +100,9 @@ upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "GGBOOM_API_KEY" "${GGBOOM_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "CODE_API_KEY" "${CODE_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "LAOYOU_API_KEY" "${LAOYOU_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "NEB_API_KEY" "${NEB_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "VOLCES_API_KEY" "${VOLCES_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "VOLCES_BASE_URL" "${VOLCES_BASE_URL:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "VOLCES_MODEL" "${VOLCES_MODEL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_BASE_URL" "${OPENAI_BASE_URL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "DISCORD_BOT_TOKEN" "${DISCORD_BOT_TOKEN:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "TELEGRAM_BOT_TOKEN" "${TELEGRAM_BOT_TOKEN:-}"
@@ -136,6 +145,9 @@ fi
 # ──────────────────────────────────────────────
 OPENCLAW_PORT_EFFECTIVE="${OPENCLAW_PORT:-18789}"
 OPENCLAW_SUBMODULE="${REPO_ROOT}/openclaw"
+VOLCES_BASE_URL_EFFECTIVE="${VOLCES_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}"
+VOLCES_MODEL_EFFECTIVE="${VOLCES_MODEL:-doubao-seed-1-8-251228}"
+PRIMARY_LLM_REF="volces/${VOLCES_MODEL_EFFECTIVE}"
 
 if [[ -n "${SILICON_EMBEDDING_API_KEY:-}" ]]; then
   MEMORY_SEARCH_REMOTE_BLOCK="$(cat <<'JSON'
@@ -263,6 +275,23 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
   "models": {
     "mode": "merge",
     "providers": {
+      "volces": {
+        "baseUrl": "${VOLCES_BASE_URL_EFFECTIVE}",
+        "apiKey": "\${VOLCES_API_KEY}",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "${VOLCES_MODEL_EFFECTIVE}",
+            "name": "${VOLCES_MODEL_EFFECTIVE} (volces)",
+            "reasoning": true,
+            "input": ["text"],
+            "compat": { "supportsDeveloperRole": false },
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 256000,
+            "maxTokens": 16384
+          }
+        ]
+      },
       "anyrouter": {
         "baseUrl": "https://anyrouter.top",
         "apiKey": "\${ANYROUTER_API_KEY}",
@@ -386,8 +415,9 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
   "agents": {
     "defaults": {
       "model": {
-        "primary": "ggboom/gpt-5.2",
+        "primary": "${PRIMARY_LLM_REF}",
         "fallbacks": [
+          "${PRIMARY_LLM_REF}",
           "ggboom/gpt-5.2",
           "anyrouter/claude-sonnet-4-5-20250929",
           "laoyou/claude-sonnet-4-5-20250929",
@@ -396,6 +426,7 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
         ]
       },
       "models": {
+        "${PRIMARY_LLM_REF}": { "alias": "main" },
         "ggboom/gpt-5.2": { "alias": "gpt" },
         "ggboom/gpt-5.3": { "alias": "gpt5" },
         "anyrouter/claude-opus-4-6": { "alias": "opus" },
@@ -439,7 +470,7 @@ ${MAIN_AGENT_TOOLS_BLOCK}
         "name": "companion",
         "workspace": "${WORKSPACE_DIR_ABS}",
         "agentDir": "${OPENCLAW_DIR}/agents/companion/agent",
-        "model": "ggboom/gpt-5.2",
+        "model": "${PRIMARY_LLM_REF}",
         "tools": { "profile": "messaging", "alsoAllow": ["group:memory"] }
       },
       {
@@ -447,7 +478,7 @@ ${MAIN_AGENT_TOOLS_BLOCK}
         "name": "memory",
         "workspace": "${WORKSPACE_DIR_ABS}",
         "agentDir": "${OPENCLAW_DIR}/agents/memory/agent",
-        "model": "ggboom/gpt-5.2",
+        "model": "${PRIMARY_LLM_REF}",
         "tools": { "profile": "messaging", "alsoAllow": ["group:memory"] }
       },
       {
@@ -455,7 +486,7 @@ ${MAIN_AGENT_TOOLS_BLOCK}
         "name": "technical",
         "workspace": "${WORKSPACE_DIR_ABS}",
         "agentDir": "${OPENCLAW_DIR}/agents/technical/agent",
-        "model": "ggboom/gpt-5.2",
+        "model": "${PRIMARY_LLM_REF}",
         "tools": { "profile": "coding", "alsoAllow": ["group:web"] }
       },
       {
@@ -463,7 +494,7 @@ ${MAIN_AGENT_TOOLS_BLOCK}
         "name": "creative",
         "workspace": "${WORKSPACE_DIR_ABS}",
         "agentDir": "${OPENCLAW_DIR}/agents/creative/agent",
-        "model": "ggboom/gpt-5.2",
+        "model": "${PRIMARY_LLM_REF}",
         "tools": { "profile": "messaging", "alsoAllow": ["group:memory"] }
       },
       {
@@ -471,7 +502,7 @@ ${MAIN_AGENT_TOOLS_BLOCK}
         "name": "tooling",
         "workspace": "${WORKSPACE_DIR_ABS}",
         "agentDir": "${OPENCLAW_DIR}/agents/tooling/agent",
-        "model": "ggboom/gpt-5.2",
+        "model": "${PRIMARY_LLM_REF}",
         "tools": { "profile": "coding", "alsoAllow": ["group:web"] }
       },
       {
@@ -479,7 +510,7 @@ ${MAIN_AGENT_TOOLS_BLOCK}
         "name": "voice",
         "workspace": "${WORKSPACE_DIR_ABS}",
         "agentDir": "${OPENCLAW_DIR}/agents/voice/agent",
-        "model": "ggboom/gpt-5.2",
+        "model": "${PRIMARY_LLM_REF}",
         "tools": { "profile": "messaging" }
       },
       {
@@ -487,7 +518,7 @@ ${MAIN_AGENT_TOOLS_BLOCK}
         "name": "vision",
         "workspace": "${WORKSPACE_DIR_ABS}",
         "agentDir": "${OPENCLAW_DIR}/agents/vision/agent",
-        "model": "ggboom/gpt-5.2",
+        "model": "${PRIMARY_LLM_REF}",
         "tools": { "profile": "messaging", "alsoAllow": ["image"] }
       },
       {
@@ -495,7 +526,7 @@ ${MAIN_AGENT_TOOLS_BLOCK}
         "name": "vibe-coder",
         "workspace": "${WORKSPACE_DIR_ABS}",
         "agentDir": "${OPENCLAW_DIR}/agents/vibe-coder/agent",
-        "model": "ggboom/gpt-5.2",
+        "model": "${PRIMARY_LLM_REF}",
         "tools": { "profile": "coding", "alsoAllow": ["group:web"] }
       }
     ]
@@ -504,7 +535,7 @@ ${GLOBAL_TOOLS_BLOCK}
   "messages": {
     "ackReactionScope": "group-mentions",
     "tts": {
-      "auto": "always",
+      "auto": "tagged",
       "mode": "final",
       "openai": { "voice": "alloy" }
     }
@@ -588,6 +619,20 @@ echo "[OK] Copied agent SOUL.md templates (${#AGENTS[@]} agents)"
 cat > "${OPENCLAW_DIR}/agents/main/agent/models.json" <<MJSON
 {
   "providers": {
+    "volces": {
+      "baseUrl": "${VOLCES_BASE_URL_EFFECTIVE}",
+      "apiKey": "${VOLCES_API_KEY:-}",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "${VOLCES_MODEL_EFFECTIVE}", "name": "${VOLCES_MODEL_EFFECTIVE} (volces)",
+          "reasoning": true, "input": ["text"],
+          "compat": { "supportsDeveloperRole": false },
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "contextWindow": 256000, "maxTokens": 16384
+        }
+      ]
+    },
     "anyrouter": {
       "baseUrl": "https://anyrouter.top",
       "apiKey": "${ANYROUTER_API_KEY:-}",
@@ -686,8 +731,9 @@ echo "[OK] Generated main agent models.json"
 for agent in companion memory technical creative tooling voice vision vibe-coder; do
   cat > "${OPENCLAW_DIR}/agents/${agent}/agent/models.json" <<MJSON
 {
-  "primary": "ggboom/gpt-5.2",
+  "primary": "${PRIMARY_LLM_REF}",
   "fallbacks": [
+    "${PRIMARY_LLM_REF}",
     "ggboom/gpt-5.2",
     "anyrouter/claude-sonnet-4-5-20250929",
     "laoyou/claude-sonnet-4-5-20250929",
@@ -707,6 +753,7 @@ for agent in "${AUTH_AGENTS[@]}"; do
 {
   "version": 1,
   "profiles": {
+    "volces:default":    { "type": "api_key", "provider": "volces",    "key": "${VOLCES_API_KEY:-}" },
     "anyrouter:default": { "type": "api_key", "provider": "anyrouter", "key": "${ANYROUTER_API_KEY:-}" },
     "ggboom:default":    { "type": "api_key", "provider": "ggboom",    "key": "${GGBOOM_API_KEY:-}" },
     "laoyou:default":    { "type": "api_key", "provider": "laoyou",    "key": "${LAOYOU_API_KEY:-}" },

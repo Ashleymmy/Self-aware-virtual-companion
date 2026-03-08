@@ -4,10 +4,19 @@ function isOpenAiCompletionsModel(model: Model<Api>): model is Model<"openai-com
   return model.api === "openai-completions";
 }
 
+function needsDeveloperRoleCompat(model: Model<Api>): boolean {
+  const provider = (model.provider ?? "").trim().toLowerCase();
+  const baseUrl = (model.baseUrl ?? "").trim().toLowerCase();
+  return (
+    provider === "zai" ||
+    provider === "volces" ||
+    baseUrl.includes("api.z.ai") ||
+    baseUrl.includes("ark.cn-beijing.volces.com")
+  );
+}
+
 export function normalizeModelCompat(model: Model<Api>): Model<Api> {
-  const baseUrl = model.baseUrl ?? "";
-  const isZai = model.provider === "zai" || baseUrl.includes("api.z.ai");
-  if (!isZai || !isOpenAiCompletionsModel(model)) {
+  if (!needsDeveloperRoleCompat(model) || !isOpenAiCompletionsModel(model)) {
     return model;
   }
 

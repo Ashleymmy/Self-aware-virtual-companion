@@ -60,6 +60,11 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
+VOLCES_API_KEY="${VOLCES_API_KEY:-${volces_API_KEY:-}}"
+VOLCES_BASE_URL="${VOLCES_BASE_URL:-${volces_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}}"
+VOLCES_MODEL="${VOLCES_MODEL:-${volces_MODEL:-${model:-doubao-seed-1-8-251228}}}"
+export VOLCES_API_KEY VOLCES_BASE_URL VOLCES_MODEL
+
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
   if command -v openssl >/dev/null 2>&1; then
     OPENCLAW_GATEWAY_TOKEN="$(openssl rand -hex 16)"
@@ -82,6 +87,9 @@ upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "SILICON_EMBEDDING_API_KEY" "${SILICON_E
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "ANYROUTER_API_KEY" "${ANYROUTER_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "WZW_API_KEY" "${WZW_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "GGBOOM_API_KEY" "${GGBOOM_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "VOLCES_API_KEY" "${VOLCES_API_KEY:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "VOLCES_BASE_URL" "${VOLCES_BASE_URL:-}"
+upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "VOLCES_MODEL" "${VOLCES_MODEL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "LAOYOU_API_KEY" "${LAOYOU_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "CODE_API_KEY" "${CODE_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_API_KEY" "${OPENAI_API_KEY:-}"

@@ -32,7 +32,8 @@ RUN pnpm ui:build
 ENV NODE_ENV=production
 
 # Allow non-root user to write temp files during runtime/tests.
-RUN chown -R node:node /app
+ARG OPENCLAW_DOCKER_SKIP_CHOWN="0"
+RUN if [ "${OPENCLAW_DOCKER_SKIP_CHOWN}" != "1" ]; then chown -R node:node /app; fi
 
 # Security hardening: Run as non-root user
 # The node:22-bookworm image includes a 'node' user (uid 1000)

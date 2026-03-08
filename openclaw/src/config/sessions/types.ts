@@ -30,6 +30,11 @@ export type SessionEntry = {
   lastHeartbeatText?: string;
   /** Timestamp (ms) when lastHeartbeatText was delivered. */
   lastHeartbeatSentAt?: number;
+  /**
+   * Marks the first turn after /new or /reset as still in flight so a rapid
+   * follow-up message is queued instead of racing the session transcript.
+   */
+  pendingResetTurn?: boolean;
   sessionId: string;
   updatedAt: number;
   sessionFile?: string;

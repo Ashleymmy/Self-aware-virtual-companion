@@ -24,6 +24,19 @@ describe("normalizeModelCompat", () => {
     expect(normalized.compat?.supportsDeveloperRole).toBe(false);
   });
 
+  it("forces supportsDeveloperRole off for volces models", () => {
+    const model = {
+      ...baseModel(),
+      id: "doubao-seed-1-8-251228",
+      name: "Doubao Seed 1.8",
+      provider: "volces",
+      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    };
+    delete (model as { compat?: unknown }).compat;
+    const normalized = normalizeModelCompat(model);
+    expect(normalized.compat?.supportsDeveloperRole).toBe(false);
+  });
+
   it("leaves non-zai models untouched", () => {
     const model = {
       ...baseModel(),

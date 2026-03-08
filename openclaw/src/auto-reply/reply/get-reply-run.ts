@@ -19,6 +19,7 @@ import {
   resolveSessionFilePath,
   type SessionEntry,
   updateSessionStore,
+  updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
 import { clearCommandLane, getQueueSize } from "../../process/command-queue.js";
@@ -105,6 +106,42 @@ type RunPreparedReplyParams = {
   workspaceDir: string;
   abortedLastRun: boolean;
 };
+
+async function updatePendingResetTurn(params: {
+  enabled: boolean;
+  sessionEntry?: SessionEntry;
+  sessionStore?: Record<string, SessionEntry>;
+  sessionKey?: string;
+  storePath?: string;
+}): Promise<SessionEntry | undefined> {
+  const { enabled, sessionEntry, sessionStore, sessionKey, storePath } = params;
+  if (!sessionEntry || !sessionKey) {
+    return sessionEntry;
+  }
+  if (sessionEntry.pendingResetTurn === enabled) {
+    return sessionEntry;
+  }
+  const updatedAt = Date.now();
+  const patch = { pendingResetTurn: enabled, updatedAt };
+  const nextEntry = { ...sessionEntry, ...patch };
+  if (sessionStore) {
+    sessionStore[sessionKey] = nextEntry;
+  }
+  if (!storePath) {
+    return nextEntry;
+  }
+  const persisted = await updateSessionStoreEntry({
+    storePath,
+    sessionKey,
+    update: async (entry) => {
+      if (entry.pendingResetTurn === enabled) {
+        return null;
+      }
+      return patch;
+    },
+  });
+  return persisted ?? nextEntry;
+}
 
 export async function runPreparedReply(
   params: RunPreparedReplyParams,
@@ -199,6 +236,7 @@ export async function runPreparedReply(
   const isBareSessionReset =
     isNewSession &&
     ((baseBodyTrimmedRaw.length === 0 && rawBodyTrimmed.length > 0) || isBareNewOrReset);
+  let shouldClearPendingResetTurn = false;
   const baseBodyFinal = isBareSessionReset ? BARE_SESSION_RESET_PROMPT : baseBody;
   const baseBodyTrimmed = baseBodyFinal.trim();
   if (!baseBodyTrimmed) {
@@ -288,6 +326,14 @@ export async function runPreparedReply(
     }
   }
   if (resetTriggered && command.isAuthorizedSender) {
+    sessionEntry = await updatePendingResetTurn({
+      enabled: true,
+      sessionEntry,
+      sessionStore,
+      sessionKey,
+      storePath,
+    });
+    shouldClearPendingResetTurn = true;
     // oxlint-disable-next-line typescript/no-explicit-any
     const channel = ctx.OriginatingChannel || (command.channel as any);
     const to = ctx.OriginatingTo || command.from || command.to;
@@ -327,6 +373,7 @@ export async function runPreparedReply(
     inlineMode: perMessageQueueMode,
     inlineOptions: perMessageQueueOptions,
   });
+  const queueKey = sessionKey ?? sessionIdFinal;
   const sessionLaneKey = resolveEmbeddedSessionLane(sessionKey ?? sessionIdFinal);
   const laneSize = getQueueSize(sessionLaneKey);
   if (resolvedQueue.mode === "interrupt" && laneSize > 0) {
@@ -334,8 +381,11 @@ export async function runPreparedReply(
     const aborted = abortEmbeddedPiRun(sessionIdFinal);
     logVerbose(`Interrupting ${sessionLaneKey} (cleared ${cleared}, aborted=${aborted})`);
   }
-  const queueKey = sessionKey ?? sessionIdFinal;
-  const isActive = isEmbeddedPiRunActive(sessionIdFinal);
+  const hasPendingResetTurn = sessionEntry?.pendingResetTurn === true;
+  const isActive =
+    isEmbeddedPiRunActive(sessionIdFinal) ||
+    laneSize > 0 ||
+    (hasPendingResetTurn && !resetTriggered);
   const isStreaming = isEmbeddedPiRunStreaming(sessionIdFinal);
   const shouldSteer = resolvedQueue.mode === "steer" || resolvedQueue.mode === "steer-backlog";
   const shouldFollowup =
@@ -405,30 +455,42 @@ export async function runPreparedReply(
     },
   };
 
-  return runReplyAgent({
-    commandBody: prefixedCommandBody,
-    followupRun,
-    queueKey,
-    resolvedQueue,
-    shouldSteer,
-    shouldFollowup,
-    isActive,
-    isStreaming,
-    opts,
-    typing,
-    sessionEntry,
-    sessionStore,
-    sessionKey,
-    storePath,
-    defaultModel,
-    agentCfgContextTokens: agentCfg?.contextTokens,
-    resolvedVerboseLevel: resolvedVerboseLevel ?? "off",
-    isNewSession,
-    blockStreamingEnabled,
-    blockReplyChunking,
-    resolvedBlockStreamingBreak,
-    sessionCtx,
-    shouldInjectGroupIntro,
-    typingMode,
-  });
+  try {
+    return await runReplyAgent({
+      commandBody: prefixedCommandBody,
+      followupRun,
+      queueKey,
+      resolvedQueue,
+      shouldSteer,
+      shouldFollowup,
+      isActive,
+      isStreaming,
+      opts,
+      typing,
+      sessionEntry,
+      sessionStore,
+      sessionKey,
+      storePath,
+      defaultModel,
+      agentCfgContextTokens: agentCfg?.contextTokens,
+      resolvedVerboseLevel: resolvedVerboseLevel ?? "off",
+      isNewSession,
+      blockStreamingEnabled,
+      blockReplyChunking,
+      resolvedBlockStreamingBreak,
+      sessionCtx,
+      shouldInjectGroupIntro,
+      typingMode,
+    });
+  } finally {
+    if (shouldClearPendingResetTurn) {
+      sessionEntry = await updatePendingResetTurn({
+        enabled: false,
+        sessionEntry,
+        sessionStore,
+        sessionKey,
+        storePath,
+      });
+    }
+  }
 }

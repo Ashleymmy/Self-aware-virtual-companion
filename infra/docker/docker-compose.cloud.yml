@@ -6,6 +6,8 @@ services:
     build:
       context: ../../openclaw
       dockerfile: Dockerfile
+      args:
+        OPENCLAW_DOCKER_SKIP_CHOWN: "1"
     init: true
     restart: unless-stopped
     working_dir: /app
@@ -16,28 +18,136 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANYROUTER_API_KEY: ${ANYROUTER_API_KEY:-}
+      WZW_API_KEY: ${WZW_API_KEY:-}
       GGBOOM_API_KEY: ${GGBOOM_API_KEY:-}
       CODE_API_KEY: ${CODE_API_KEY:-}
       LAOYOU_API_KEY: ${LAOYOU_API_KEY:-}
+      VOLCES_API_KEY: ${VOLCES_API_KEY:-}
+      VOLCES_BASE_URL: ${VOLCES_BASE_URL:-}
+      VOLCES_MODEL: ${VOLCES_MODEL:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       SILICON_EMBEDDING_API_KEY: ${SILICON_EMBEDDING_API_KEY:-}
     volumes:
       - ../../:/workspace
       - savc_openclaw_state:/home/node/.openclaw
+      - ${OPENCLAW_HOST_CREDENTIALS_DIR:-./bootstrap/empty-credentials}:/bootstrap/openclaw-credentials:ro
     command:
       - sh
       - -lc
       - |
         set -e
         mkdir -p /home/node/.openclaw
-        if [ ! -f /home/node/.openclaw/openclaw.json ]; then
-          cp /workspace/infra/docker/openclaw.container.json /home/node/.openclaw/openclaw.json
+        if [ -d /bootstrap/openclaw-credentials ]; then
+          mkdir -p /home/node/.openclaw/credentials
+          find /bootstrap/openclaw-credentials -maxdepth 1 -type f -name '*.json' \
+            -exec cp -f {} /home/node/.openclaw/credentials/ \;
         fi
-        node dist/index.js gateway --allow-unconfigured --bind lan --port 18789
+        bash /workspace/scripts/setup.sh
+        exec node dist/index.js gateway --bind lan --port 18789
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
+      timeout: 5s
+      retries: 5
+
+  savc-ui:
+    image: node:22-bookworm
+    init: true
+    restart: unless-stopped
+    working_dir: /workspace/savc-ui
+    user: "0:0"
+    depends_on:
+      savc-gateway:
+        condition: service_healthy
+    environment:
+      HOME: /home/node
+      VITE_SAVC_GATEWAY_URL: ${VITE_SAVC_GATEWAY_URL:-http://127.0.0.1:18789}
+      VITE_SAVC_GATEWAY_TOKEN: ${VITE_SAVC_GATEWAY_TOKEN:-${OPENCLAW_GATEWAY_TOKEN}}
+      VITE_SAVC_SESSION_KEY: ${VITE_SAVC_SESSION_KEY:-main}
+      SAVC_REDIS_URL: ${SAVC_REDIS_URL:-}
+      MYSQL_URL: ${MYSQL_URL:-}
+    volumes:
+      - ../../:/workspace
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        corepack enable
+        if [ ! -x /workspace/savc-ui/node_modules/.bin/vite ]; then
+          pnpm --dir /workspace/savc-ui install
+        fi
+        exec pnpm --dir /workspace/savc-ui exec vite --host 0.0.0.0 --port ${SAVC_UI_PORT:-5174}
+    ports:
+      - "${SAVC_UI_PORT:-5174}:${SAVC_UI_PORT:-5174}"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:${SAVC_UI_PORT:-5174}/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  savc-proactive:
+    image: node:22-bookworm
+    profiles: ["automation"]
+    init: true
+    restart: unless-stopped
+    working_dir: /workspace
+    user: "0:0"
+    depends_on:
+      savc-gateway:
+        condition: service_healthy
+    environment:
+      HOME: /home/node
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANYROUTER_API_KEY: ${ANYROUTER_API_KEY:-}
+      WZW_API_KEY: ${WZW_API_KEY:-}
+      GGBOOM_API_KEY: ${GGBOOM_API_KEY:-}
+      CODE_API_KEY: ${CODE_API_KEY:-}
+      LAOYOU_API_KEY: ${LAOYOU_API_KEY:-}
+      VOLCES_API_KEY: ${VOLCES_API_KEY:-}
+      VOLCES_BASE_URL: ${VOLCES_BASE_URL:-}
+      VOLCES_MODEL: ${VOLCES_MODEL:-}
+      SILICON_EMBEDDING_API_KEY: ${SILICON_EMBEDDING_API_KEY:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      DISCORD_CHANNEL_ID: ${DISCORD_CHANNEL_ID:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-}
+      GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON: ${GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON:-}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      OPENWEATHER_LAT: ${OPENWEATHER_LAT:-}
+      OPENWEATHER_LON: ${OPENWEATHER_LON:-}
+    volumes:
+      - ../../:/workspace
+      - savc_openclaw_state:/home/node/.openclaw
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        mkdir -p /home/node/.openclaw
+        corepack enable
+        if [ ! -d /workspace/node_modules ]; then
+          pnpm --dir /workspace install
+        fi
+        if [ ! -x /workspace/openclaw/node_modules/.bin/openclaw ]; then
+          pnpm -C /workspace/openclaw install --frozen-lockfile
+        fi
+        export PATH="/workspace/openclaw/node_modules/.bin:/workspace/node_modules/.bin:${PATH}"
+        bash /workspace/scripts/setup.sh
+        exec node /workspace/scripts/proactive_daemon.mjs run \
+          --repo /workspace \
+          --workspace /workspace/savc-core \
+          --config /workspace/config/proactive.yaml \
+          --channels /workspace/config/channels.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'scripts/proactive_daemon.mjs run' >/dev/null"]
+      interval: 30s
       timeout: 5s
       retries: 5
 

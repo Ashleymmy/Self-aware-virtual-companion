@@ -20,6 +20,7 @@ Usage:
 
 Env:
   SAVC_DOCKER_ENV_FILE=/path/to/.env   # override default infra/docker/.env
+  COMPOSE_PROFILES=automation          # also start savc-proactive
 EOF
 }
 
@@ -61,7 +62,7 @@ case "${cmd}" in
   up)
     require_docker
     ensure_env
-    compose up -d --build
+    compose up -d --build --remove-orphans
     ;;
   down)
     require_docker
@@ -72,13 +73,17 @@ case "${cmd}" in
     require_docker
     ensure_env
     compose down
-    compose up -d --build
+    compose up -d --build --remove-orphans
     ;;
   logs)
     require_docker
     ensure_env
-    service="${2:-savc-gateway}"
-    compose logs -f "${service}"
+    service="${2:-}"
+    if [[ -n "${service}" ]]; then
+      compose logs -f "${service}"
+    else
+      compose logs -f
+    fi
     ;;
   ps)
     require_docker
