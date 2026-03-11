@@ -13,8 +13,8 @@ import { renderPersona } from "./views/persona.js";
 import { renderOrchestrator } from "./views/orchestrator.js";
 import { renderLogs, activateLogsView, deactivateLogsView } from "./views/logs.js";
 import { GatewayBrowserClient } from "./gateway-ws.js";
+import { readUiEnv, resolveGatewayWsUrl } from "./gateway-url.js";
 
-const DEFAULT_GATEWAY_WS_URL = "ws://127.0.0.1:18789";
 const GATEWAY_STATUS_POLL_INTERVAL_MS = 15_000;
 const GATEWAY_REQUEST_TIMEOUT_MS = 8_000;
 
@@ -63,26 +63,8 @@ export class SavcApp extends LitElement {
     deactivateLogsView();
   }
 
-  private _readEnv(name: keyof ImportMetaEnv): string {
-    const raw = import.meta.env[name];
-    return typeof raw === "string" ? raw.trim() : "";
-  }
-
   private _resolveGatewayWsUrl(): string {
-    const configured = this._readEnv("VITE_SAVC_GATEWAY_URL");
-    if (!configured) return DEFAULT_GATEWAY_WS_URL;
-
-    const normalized = configured.replace(/\/+$/, "");
-    if (normalized.startsWith("ws://") || normalized.startsWith("wss://")) {
-      return normalized;
-    }
-    if (normalized.startsWith("http://")) {
-      return `ws://${normalized.slice("http://".length)}`;
-    }
-    if (normalized.startsWith("https://")) {
-      return `wss://${normalized.slice("https://".length)}`;
-    }
-    return `ws://${normalized}`;
+    return resolveGatewayWsUrl(readUiEnv("VITE_SAVC_GATEWAY_URL"));
   }
 
   private _formatUptime(ms: number | null): string {
@@ -134,11 +116,9 @@ export class SavcApp extends LitElement {
   private _startGatewayStatusSync() {
     this._stopGatewayStatusSync();
 
-    const token = this._readEnv("VITE_SAVC_GATEWAY_TOKEN") || undefined;
     const url = this._resolveGatewayWsUrl();
     const client = new GatewayBrowserClient({
       url,
-      token,
       clientName: "savc-ui",
       mode: "webchat",
       onHello: () => {

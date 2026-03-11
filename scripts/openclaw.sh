@@ -7,6 +7,9 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${REPO_ROOT}/config/.env.local"
 
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lib/secret_env.sh"
+
 upsert_env_var() {
   local file="$1"
   local key="$2"
@@ -60,7 +63,17 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
-VOLCES_API_KEY="${VOLCES_API_KEY:-${volces_API_KEY:-}}"
+export_resolved_secret "OPENCLAW_GATEWAY_TOKEN"
+export_resolved_secret "BRAVE_API_KEY"
+export_resolved_secret "SILICON_EMBEDDING_API_KEY"
+export_resolved_secret "ANYROUTER_API_KEY"
+export_resolved_secret "WZW_API_KEY"
+export_resolved_secret "GGBOOM_API_KEY"
+export_resolved_secret "LAOYOU_API_KEY"
+export_resolved_secret "CODE_API_KEY"
+export_resolved_secret "OPENAI_API_KEY"
+export_resolved_secret "OPENAI_BASE_URL"
+VOLCES_API_KEY="$(resolve_secret_value "VOLCES_API_KEY" "${volces_API_KEY:-}")"
 VOLCES_BASE_URL="${VOLCES_BASE_URL:-${volces_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}}"
 VOLCES_MODEL="${VOLCES_MODEL:-${volces_MODEL:-${model:-doubao-seed-1-8-251228}}}"
 export VOLCES_API_KEY VOLCES_BASE_URL VOLCES_MODEL

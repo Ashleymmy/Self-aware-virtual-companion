@@ -1,0 +1,15 @@
+.git
+.runtime
+node_modules
+**/node_modules
+config/.env.local
+infra/docker/.env
+infra/docker/.env.prod
+infra/docker/secrets
+docs/openclaw-customPrmopt
+openclaw-history.bundle
+*.log
+coverage
+dist
+build
+**/*.tsbuildinfo

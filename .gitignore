@@ -2,6 +2,8 @@
 .env
 config/.env.local
 infra/docker/.env
+infra/docker/.env.prod
+infra/docker/secrets/
 
 # Node dependencies
 node_modules/

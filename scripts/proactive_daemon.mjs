@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import cron from 'node-cron';
@@ -75,6 +76,64 @@ async function exists(filePath) {
   } catch {
     return false;
   }
+}
+
+function readEnvString(name) {
+  const raw = process.env[name];
+  return typeof raw === 'string' ? raw.trim() : '';
+}
+
+async function readEnvSecret(name, fileEnvName) {
+  const direct = readEnvString(name);
+  if (direct) {
+    return direct;
+  }
+  const filePath = readEnvString(fileEnvName || `${name}_FILE`);
+  if (!filePath) {
+    return '';
+  }
+  try {
+    return (await fs.readFile(filePath, 'utf8')).trim();
+  } catch {
+    return '';
+  }
+}
+
+const serviceAccountFileCache = new Map();
+
+async function resolveServiceAccountKeyFile(providerConfig) {
+  const fileEnvName =
+    providerConfig.service_account_json_file_env ||
+    `${providerConfig.service_account_json_env || 'GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON'}_FILE`;
+  const configuredFile = readEnvString(fileEnvName);
+  if (configuredFile) {
+    return configuredFile;
+  }
+
+  const fallbackEnvName = providerConfig.service_account_json_env || 'GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON';
+  const configured = readEnvString(fallbackEnvName);
+  if (!configured) {
+    return '';
+  }
+  if (await exists(configured)) {
+    return configured;
+  }
+  if (!configured.startsWith('{')) {
+    return configured;
+  }
+
+  const cacheKey = `${fallbackEnvName}:${configured}`;
+  const cached = serviceAccountFileCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const tempDir = path.join(os.tmpdir(), 'savc-service-account');
+  await fs.mkdir(tempDir, { recursive: true });
+  const tempFile = path.join(tempDir, `${process.pid}-${serviceAccountFileCache.size + 1}.json`);
+  await fs.writeFile(tempFile, configured, 'utf8');
+  serviceAccountFileCache.set(cacheKey, tempFile);
+  return tempFile;
 }
 
 async function loadYaml(filePath) {
@@ -231,9 +290,12 @@ async function readLatestTopic(workspace) {
 }
 
 async function fetchWeather(providerConfig) {
-  const apiKey = process.env[providerConfig.api_key_env || 'OPENWEATHER_API_KEY'];
-  const lat = process.env[providerConfig.lat_env || 'OPENWEATHER_LAT'];
-  const lon = process.env[providerConfig.lon_env || 'OPENWEATHER_LON'];
+  const apiKey = await readEnvSecret(
+    providerConfig.api_key_env || 'OPENWEATHER_API_KEY',
+    providerConfig.api_key_file_env,
+  );
+  const lat = readEnvString(providerConfig.lat_env || 'OPENWEATHER_LAT');
+  const lon = readEnvString(providerConfig.lon_env || 'OPENWEATHER_LON');
   const units = providerConfig.units || 'metric';
 
   if (!apiKey || !lat || !lon) {
@@ -273,8 +335,8 @@ function isWeatherSignificant(current, previous) {
 }
 
 async function fetchCalendar(providerConfig, now) {
-  const calendarId = process.env[providerConfig.calendar_id_env || 'GOOGLE_CALENDAR_ID'];
-  const keyFile = process.env[providerConfig.service_account_json_env || 'GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON'];
+  const calendarId = readEnvString(providerConfig.calendar_id_env || 'GOOGLE_CALENDAR_ID');
+  const keyFile = await resolveServiceAccountKeyFile(providerConfig);
   const lookahead = Number.parseInt(String(providerConfig.lookahead_minutes || 120), 10);
 
   if (!calendarId || !keyFile) {

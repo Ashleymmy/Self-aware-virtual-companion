@@ -1,51 +1,46 @@
-name: savc-cloud
+name: savc-prod
 
 services:
   savc-gateway:
-    image: ${SAVC_GATEWAY_IMAGE:-savc-openclaw:dev}
     build:
-      context: ../../openclaw
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.gateway
       args:
         OPENCLAW_DOCKER_SKIP_CHOWN: "1"
-    init: true
     restart: unless-stopped
-    working_dir: /app
-    user: "0:0"
     environment:
       HOME: /home/node
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      SAVC_AUTODEV_ENABLE: ${SAVC_AUTODEV_ENABLE:-0}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_KEY_FILE: ${OPENAI_API_KEY_FILE:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_API_KEY_FILE: ${ANTHROPIC_API_KEY_FILE:-}
       ANYROUTER_API_KEY: ${ANYROUTER_API_KEY:-}
+      ANYROUTER_API_KEY_FILE: ${ANYROUTER_API_KEY_FILE:-}
       WZW_API_KEY: ${WZW_API_KEY:-}
+      WZW_API_KEY_FILE: ${WZW_API_KEY_FILE:-}
       GGBOOM_API_KEY: ${GGBOOM_API_KEY:-}
+      GGBOOM_API_KEY_FILE: ${GGBOOM_API_KEY_FILE:-}
       CODE_API_KEY: ${CODE_API_KEY:-}
+      CODE_API_KEY_FILE: ${CODE_API_KEY_FILE:-}
       LAOYOU_API_KEY: ${LAOYOU_API_KEY:-}
+      LAOYOU_API_KEY_FILE: ${LAOYOU_API_KEY_FILE:-}
       VOLCES_API_KEY: ${VOLCES_API_KEY:-}
+      VOLCES_API_KEY_FILE: ${VOLCES_API_KEY_FILE:-}
       VOLCES_BASE_URL: ${VOLCES_BASE_URL:-}
       VOLCES_MODEL: ${VOLCES_MODEL:-}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_BOT_TOKEN_FILE: ${DISCORD_BOT_TOKEN_FILE:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_TOKEN_FILE: ${TELEGRAM_BOT_TOKEN_FILE:-}
       SILICON_EMBEDDING_API_KEY: ${SILICON_EMBEDDING_API_KEY:-}
+      SILICON_EMBEDDING_API_KEY_FILE: ${SILICON_EMBEDDING_API_KEY_FILE:-}
     volumes:
-      - ../../:/workspace
       - savc_openclaw_state:/home/node/.openclaw
+      - ${SAVC_HOST_SECRETS_DIR:-./secrets}:${SAVC_SECRETS_MOUNT:-/run/savc-secrets}:ro
       - ${OPENCLAW_HOST_CREDENTIALS_DIR:-./bootstrap/empty-credentials}:/bootstrap/openclaw-credentials:ro
-    command:
-      - sh
-      - -lc
-      - |
-        set -e
-        mkdir -p /home/node/.openclaw
-        if [ -d /bootstrap/openclaw-credentials ]; then
-          mkdir -p /home/node/.openclaw/credentials
-          find /bootstrap/openclaw-credentials -maxdepth 1 -type f -name '*.json' \
-            -exec cp -f {} /home/node/.openclaw/credentials/ \;
-        fi
-        bash /workspace/scripts/setup.sh
-        exec node dist/index.js gateway --bind lan --port 18789
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
     healthcheck:
@@ -55,11 +50,12 @@ services:
       retries: 5
 
   savc-ui:
-    image: node:22-bookworm
-    init: true
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.runtime
+      args:
+        SAVC_RUNTIME_SKIP_CHOWN: "1"
     restart: unless-stopped
-    working_dir: /workspace/savc-ui
-    user: "0:0"
     depends_on:
       savc-gateway:
         condition: service_healthy
@@ -73,16 +69,13 @@ services:
       SAVC_REDIS_URL: ${SAVC_REDIS_URL:-}
       MYSQL_URL: ${MYSQL_URL:-}
     volumes:
-      - ../../:/workspace
+      - ${SAVC_HOST_SECRETS_DIR:-./secrets}:${SAVC_SECRETS_MOUNT:-/run/savc-secrets}:ro
+      - savc_runtime_data:/workspace/.runtime
+      - savc_storage_data:/workspace/config/storage
     command:
       - bash
       - -lc
       - |
-        set -e
-        corepack enable
-        if [ ! -x /workspace/savc-ui/node_modules/.bin/vite ]; then
-          pnpm --dir /workspace/savc-ui install
-        fi
         exec pnpm --dir /workspace/savc-ui exec vite --host 0.0.0.0 --port ${SAVC_UI_PORT:-5174}
     ports:
       - "${SAVC_UI_PORT:-5174}:${SAVC_UI_PORT:-5174}"
@@ -93,34 +86,45 @@ services:
       retries: 5
 
   savc-proactive:
-    image: node:22-bookworm
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.runtime
+      args:
+        SAVC_RUNTIME_SKIP_CHOWN: "1"
     profiles: ["automation"]
-    init: true
     restart: unless-stopped
-    working_dir: /workspace
-    user: "0:0"
     depends_on:
       savc-gateway:
         condition: service_healthy
     environment:
       HOME: /home/node
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      SAVC_AUTODEV_ENABLE: ${SAVC_AUTODEV_ENABLE:-0}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_KEY_FILE: ${OPENAI_API_KEY_FILE:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_API_KEY_FILE: ${ANTHROPIC_API_KEY_FILE:-}
       ANYROUTER_API_KEY: ${ANYROUTER_API_KEY:-}
+      ANYROUTER_API_KEY_FILE: ${ANYROUTER_API_KEY_FILE:-}
       WZW_API_KEY: ${WZW_API_KEY:-}
+      WZW_API_KEY_FILE: ${WZW_API_KEY_FILE:-}
       GGBOOM_API_KEY: ${GGBOOM_API_KEY:-}
+      GGBOOM_API_KEY_FILE: ${GGBOOM_API_KEY_FILE:-}
       CODE_API_KEY: ${CODE_API_KEY:-}
+      CODE_API_KEY_FILE: ${CODE_API_KEY_FILE:-}
       LAOYOU_API_KEY: ${LAOYOU_API_KEY:-}
+      LAOYOU_API_KEY_FILE: ${LAOYOU_API_KEY_FILE:-}
       VOLCES_API_KEY: ${VOLCES_API_KEY:-}
+      VOLCES_API_KEY_FILE: ${VOLCES_API_KEY_FILE:-}
       VOLCES_BASE_URL: ${VOLCES_BASE_URL:-}
       VOLCES_MODEL: ${VOLCES_MODEL:-}
       SILICON_EMBEDDING_API_KEY: ${SILICON_EMBEDDING_API_KEY:-}
+      SILICON_EMBEDDING_API_KEY_FILE: ${SILICON_EMBEDDING_API_KEY_FILE:-}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_BOT_TOKEN_FILE: ${DISCORD_BOT_TOKEN_FILE:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      DISCORD_CHANNEL_ID: ${DISCORD_CHANNEL_ID:-}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_BOT_TOKEN_FILE: ${TELEGRAM_BOT_TOKEN_FILE:-}
       GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-}
       GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON: ${GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON:-}
       GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON_FILE: ${GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON_FILE:-}
@@ -129,22 +133,15 @@ services:
       OPENWEATHER_LAT: ${OPENWEATHER_LAT:-}
       OPENWEATHER_LON: ${OPENWEATHER_LON:-}
     volumes:
-      - ../../:/workspace
       - savc_openclaw_state:/home/node/.openclaw
+      - ${SAVC_HOST_SECRETS_DIR:-./secrets}:${SAVC_SECRETS_MOUNT:-/run/savc-secrets}:ro
+      - savc_runtime_data:/workspace/.runtime
+      - savc_storage_data:/workspace/config/storage
     command:
       - bash
       - -lc
       - |
-        set -e
         mkdir -p /home/node/.openclaw
-        corepack enable
-        if [ ! -d /workspace/node_modules ]; then
-          pnpm --dir /workspace install
-        fi
-        if [ ! -x /workspace/openclaw/node_modules/.bin/openclaw ]; then
-          pnpm -C /workspace/openclaw install --frozen-lockfile
-        fi
-        export PATH="/workspace/openclaw/node_modules/.bin:/workspace/node_modules/.bin:${PATH}"
         bash /workspace/scripts/setup.sh
         exec node /workspace/scripts/proactive_daemon.mjs run \
           --repo /workspace \
@@ -159,3 +156,5 @@ services:
 
 volumes:
   savc_openclaw_state:
+  savc_runtime_data:
+  savc_storage_data:

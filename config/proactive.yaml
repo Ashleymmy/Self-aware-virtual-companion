@@ -13,11 +13,12 @@ providers:
   calendar:
     provider: "google"
     calendar_id_env: "GOOGLE_CALENDAR_ID"
-    service_account_json_env: "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON"
+    service_account_json_file_env: "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON_FILE"
     lookahead_minutes: 120
   weather:
     provider: "openweather"
     api_key_env: "OPENWEATHER_API_KEY"
+    api_key_file_env: "OPENWEATHER_API_KEY_FILE"
     lat_env: "OPENWEATHER_LAT"
     lon_env: "OPENWEATHER_LON"
     units: "metric"

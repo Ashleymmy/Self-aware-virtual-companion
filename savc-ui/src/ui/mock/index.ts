@@ -1,4 +1,5 @@
 import { GatewayBrowserClient } from "../gateway-ws.js";
+import { readUiEnv, resolveGatewayWsUrl as resolveGatewayWsUrlFromEnv } from "../gateway-url.js";
 import { dashboardStats, yuanyuanStatus, recentActivities } from "./dashboard-data.js";
 import { memories } from "./memory-data.js";
 import {
@@ -73,7 +74,6 @@ type GatewaySnapshot = {
   config: JsonRecord;
 };
 
-const DEFAULT_GATEWAY_WS_URL = "ws://127.0.0.1:18789";
 const DEFAULT_SESSION_KEY = "main";
 const REQUEST_TIMEOUT_MS = 12_000;
 const CHAT_REPLY_TIMEOUT_MS = 45_000;
@@ -91,31 +91,12 @@ const AGENT_COLORS = [
   "#06b6d4",
 ];
 
-function readEnv(name: keyof ImportMetaEnv): string {
-  const raw = import.meta.env[name];
-  return typeof raw === "string" ? raw.trim() : "";
-}
-
 function resolveGatewayWsUrl(): string {
-  const configured = readEnv("VITE_SAVC_GATEWAY_URL");
-  if (!configured) {
-    return DEFAULT_GATEWAY_WS_URL;
-  }
-  const normalized = configured.replace(/\/+$/, "");
-  if (normalized.startsWith("ws://") || normalized.startsWith("wss://")) {
-    return normalized;
-  }
-  if (normalized.startsWith("http://")) {
-    return `ws://${normalized.slice("http://".length)}`;
-  }
-  if (normalized.startsWith("https://")) {
-    return `wss://${normalized.slice("https://".length)}`;
-  }
-  return `ws://${normalized}`;
+  return resolveGatewayWsUrlFromEnv(readUiEnv("VITE_SAVC_GATEWAY_URL"));
 }
 
 function defaultSessionKey(): string {
-  return readEnv("VITE_SAVC_SESSION_KEY") || DEFAULT_SESSION_KEY;
+  return readUiEnv("VITE_SAVC_SESSION_KEY") || DEFAULT_SESSION_KEY;
 }
 
 function wait(ms: number): Promise<void> {
@@ -613,7 +594,6 @@ class GatewayDataClient {
     }
 
     const url = resolveGatewayWsUrl();
-    const token = readEnv("VITE_SAVC_GATEWAY_TOKEN") || undefined;
 
     this.connectPromise = new Promise<GatewayBrowserClient>((resolve, reject) => {
       let settled = false;
@@ -626,7 +606,6 @@ class GatewayDataClient {
 
       const client = new GatewayBrowserClient({
         url,
-        token,
         clientName: "savc-ui",
         mode: "webchat",
         onHello: () => {

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import { WebSocket, WebSocketServer } from "ws";
 import { SavcGlobalStorageService } from "./storage/global-storage.js";
 // @lydell/node-pty — only imported when Phase 3 PTY endpoint is active
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1135,6 +1136,105 @@ async function readRequestBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+function readRuntimeEnv(name: string): string {
+  const raw = process.env[name];
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+function readRuntimeSecret(name: string): string {
+  const direct = readRuntimeEnv(name);
+  if (direct) {
+    return direct;
+  }
+  const filePath = readRuntimeEnv(`${name}_FILE`);
+  if (!filePath) {
+    return "";
+  }
+  try {
+    return readFileSync(filePath, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
+function resolveGatewayProxyBaseUrl(): string {
+  return readRuntimeEnv("SAVC_GATEWAY_INTERNAL_URL") || "http://127.0.0.1:18789";
+}
+
+function resolveGatewayProxyHttpUrl(rawUrl: string): string {
+  const incoming = new URL(rawUrl, "http://127.0.0.1");
+  const upstreamBase = new URL(resolveGatewayProxyBaseUrl());
+  const upstreamPath = incoming.pathname.replace(/^\/gateway(?=\/|$)/, "") || "/";
+  return new URL(`${upstreamPath}${incoming.search}`, upstreamBase).toString();
+}
+
+function resolveGatewayProxyWsUrl(rawUrl: string): string {
+  const incoming = new URL(rawUrl, "http://127.0.0.1");
+  const upstreamBase = new URL(resolveGatewayProxyBaseUrl());
+  const protocol = upstreamBase.protocol === "https:" ? "wss:" : "ws:";
+  upstreamBase.protocol = protocol;
+  const upstreamPath = incoming.pathname.replace(/^\/gateway(?=\/|$)/, "") || "/";
+  return new URL(`${upstreamPath}${incoming.search}`, upstreamBase).toString();
+}
+
+function injectGatewayConnectAuth(raw: string, sharedToken: string): string {
+  if (!sharedToken) {
+    return raw;
+  }
+  try {
+    const parsed = JSON.parse(raw) as {
+      type?: string;
+      method?: string;
+      params?: { auth?: { token?: string; password?: string } | null } | null;
+    };
+    if (parsed.type !== "req" || parsed.method !== "connect") {
+      return raw;
+    }
+    const params =
+      parsed.params && typeof parsed.params === "object" ? { ...parsed.params } : ({} as Record<string, unknown>);
+    const auth =
+      params.auth && typeof params.auth === "object" ? { ...(params.auth as Record<string, unknown>) } : {};
+    if (typeof auth.token === "string" && auth.token.trim()) {
+      return raw;
+    }
+    if (typeof auth.password === "string" && auth.password.trim()) {
+      return raw;
+    }
+    auth.token = sharedToken;
+    parsed.params = { ...params, auth } as typeof parsed.params;
+    return JSON.stringify(parsed);
+  } catch {
+    return raw;
+  }
+}
+
+function copyRequestHeaders(req: IncomingMessage, sharedToken: string): Headers {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value == null) {
+      continue;
+    }
+    const lowered = key.toLowerCase();
+    if (
+      lowered === "host" ||
+      lowered === "connection" ||
+      lowered === "content-length" ||
+      lowered === "upgrade"
+    ) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      headers.set(key, value.join(", "));
+    } else {
+      headers.set(key, value);
+    }
+  }
+  if (sharedToken && !headers.has("authorization")) {
+    headers.set("authorization", `Bearer ${sharedToken}`);
+  }
+  return headers;
+}
+
 function selectWatchTargets(): string[] {
   const targets = [
     docsRoot,
@@ -1151,6 +1251,144 @@ export default defineConfig({
   base: "./",
   publicDir: path.resolve(here, "public"),
   plugins: [
+    {
+      name: "savc-gateway-proxy",
+      configureServer(server) {
+        const proxyWsServer = new WebSocketServer({ noServer: true });
+
+        proxyWsServer.on("connection", (clientSocket, req) => {
+          const upstream = new WebSocket(resolveGatewayProxyWsUrl(req.url || "/gateway"), {
+            perMessageDeflate: false,
+          });
+          const sharedToken = readRuntimeSecret("OPENCLAW_GATEWAY_TOKEN");
+          const pending: Array<{ data: Buffer | string; isBinary: boolean }> = [];
+          let upstreamReady = false;
+
+          const flushPending = () => {
+            if (!upstreamReady) {
+              return;
+            }
+            while (pending.length > 0) {
+              const next = pending.shift();
+              if (!next) {
+                return;
+              }
+              upstream.send(next.data, { binary: next.isBinary });
+            }
+          };
+
+          const closeBoth = (code = 1011, reason = "proxy closed") => {
+            if (clientSocket.readyState === WebSocket.OPEN) {
+              clientSocket.close(code, reason);
+            }
+            if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
+              upstream.close(code, reason);
+            }
+          };
+
+          clientSocket.on("message", (data, isBinary) => {
+            const outbound =
+              isBinary || typeof data === "string"
+                ? data
+                : Buffer.isBuffer(data)
+                  ? data.toString("utf8")
+                  : Buffer.from(data).toString("utf8");
+            const payload =
+              typeof outbound === "string" ? injectGatewayConnectAuth(outbound, sharedToken) : outbound;
+            if (!upstreamReady) {
+              pending.push({
+                data: typeof payload === "string" ? payload : Buffer.from(payload),
+                isBinary,
+              });
+              return;
+            }
+            upstream.send(payload, { binary: isBinary });
+          });
+
+          clientSocket.on("close", (code, reason) => {
+            if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
+              upstream.close(code, reason.toString());
+            }
+          });
+          clientSocket.on("error", () => closeBoth());
+
+          upstream.on("open", () => {
+            upstreamReady = true;
+            flushPending();
+          });
+          upstream.on("message", (data, isBinary) => {
+            if (clientSocket.readyState !== WebSocket.OPEN) {
+              return;
+            }
+            clientSocket.send(data, { binary: isBinary });
+          });
+          upstream.on("close", (code, reason) => {
+            if (clientSocket.readyState === WebSocket.OPEN || clientSocket.readyState === WebSocket.CONNECTING) {
+              clientSocket.close(code, reason.toString());
+            }
+          });
+          upstream.on("error", () => closeBoth());
+        });
+
+        server.middlewares.use(async (req, res, next) => {
+          const rawUrl = req.url || "";
+          const pathname = rawUrl.split("?")[0];
+          if (pathname !== "/gateway" && !pathname.startsWith("/gateway/")) {
+            next();
+            return;
+          }
+          if (req.headers.upgrade && String(req.headers.upgrade).toLowerCase() === "websocket") {
+            next();
+            return;
+          }
+
+          try {
+            const targetUrl = resolveGatewayProxyHttpUrl(rawUrl);
+            const method = (req.method || "GET").toUpperCase();
+            const sharedToken = readRuntimeSecret("OPENCLAW_GATEWAY_TOKEN");
+            const headers = copyRequestHeaders(req, sharedToken);
+            const body =
+              method === "GET" || method === "HEAD" ? undefined : await readRequestBody(req);
+            const response = await fetch(targetUrl, {
+              method,
+              headers,
+              ...(body && body.length > 0 ? { body } : {}),
+            });
+            res.statusCode = response.status;
+            response.headers.forEach((value, key) => {
+              if (key.toLowerCase() === "transfer-encoding") {
+                return;
+              }
+              res.setHeader(key, value);
+            });
+            const responseBody = Buffer.from(await response.arrayBuffer());
+            res.end(responseBody);
+          } catch (error) {
+            json(res, 502, {
+              ok: false,
+              error: "gateway_proxy_failed",
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        });
+
+        server.httpServer?.on("upgrade", (req, socket, head) => {
+          const pathname = (() => {
+            try {
+              return new URL(req.url || "", "http://127.0.0.1").pathname;
+            } catch {
+              return "";
+            }
+          })();
+          if (pathname !== "/gateway" && !pathname.startsWith("/gateway/")) {
+            return;
+          }
+          proxyWsServer.handleUpgrade(req, socket, head, (ws) => {
+            proxyWsServer.emit("connection", ws, req);
+          });
+        });
+      },
+    },
     {
       name: "savc-dev-tts-file-proxy",
       configureServer(server) {

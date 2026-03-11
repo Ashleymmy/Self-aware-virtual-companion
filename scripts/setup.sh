@@ -6,6 +6,9 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${REPO_ROOT}/config/.env.local"
 WORKSPACE_DIR_DEFAULT="${REPO_ROOT}/savc-core"
 
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lib/secret_env.sh"
+
 if [[ -f "${ENV_FILE}" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -14,7 +17,21 @@ if [[ -f "${ENV_FILE}" ]]; then
 fi
 
 # Support both canonical VOLCES_* names and the existing local lowercase keys.
-VOLCES_API_KEY="${VOLCES_API_KEY:-${volces_API_KEY:-}}"
+export_resolved_secret "OPENCLAW_GATEWAY_TOKEN"
+export_resolved_secret "ANTHROPIC_API_KEY"
+export_resolved_secret "OPENAI_API_KEY"
+export_resolved_secret "ANYROUTER_API_KEY"
+export_resolved_secret "WZW_API_KEY"
+export_resolved_secret "GGBOOM_API_KEY"
+export_resolved_secret "CODE_API_KEY"
+export_resolved_secret "LAOYOU_API_KEY"
+export_resolved_secret "NEB_API_KEY"
+export_resolved_secret "OPENAI_BASE_URL"
+export_resolved_secret "DISCORD_BOT_TOKEN"
+export_resolved_secret "TELEGRAM_BOT_TOKEN"
+export_resolved_secret "BRAVE_API_KEY"
+export_resolved_secret "SILICON_EMBEDDING_API_KEY"
+VOLCES_API_KEY="$(resolve_secret_value "VOLCES_API_KEY" "${volces_API_KEY:-}")"
 VOLCES_BASE_URL="${VOLCES_BASE_URL:-${volces_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}}"
 VOLCES_MODEL="${VOLCES_MODEL:-${volces_MODEL:-${model:-doubao-seed-1-8-251228}}}"
 export VOLCES_API_KEY VOLCES_BASE_URL VOLCES_MODEL

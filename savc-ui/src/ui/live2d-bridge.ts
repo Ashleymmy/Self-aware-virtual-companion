@@ -1,6 +1,8 @@
 export type Live2DInteractionType = "tap" | "double_tap" | "long_press" | "drag" | "hover";
 export type Live2DSignalSource = "text" | "voice" | "interaction";
 
+import { readUiEnv, resolveGatewayHttpUrl } from "./gateway-url.js";
+
 type Live2DBridgeMode = "auto" | "gateway" | "mock";
 type BridgeBackend = "gateway" | "mock";
 
@@ -53,7 +55,6 @@ export interface InvokeLive2DInteractionResult {
   error?: string;
 }
 
-const DEFAULT_GATEWAY_URL = "http://127.0.0.1:18789";
 const DEFAULT_SESSION_KEY = "main";
 
 const INTERACTION_PRESET: Record<
@@ -79,11 +80,6 @@ const EXPRESSION_PRESET: Record<
   neutral: { eyeSmile: 0.45, mouthSmile: 0.5, browTilt: 0, bodyAngle: 0 },
 };
 
-function readEnv(name: keyof ImportMetaEnv): string {
-  const raw = import.meta.env[name];
-  return typeof raw === "string" ? raw.trim() : "";
-}
-
 function normalizeMode(value: string): Live2DBridgeMode {
   const lower = value.toLowerCase();
   if (lower === "mock" || lower === "gateway") return lower;
@@ -91,8 +87,7 @@ function normalizeMode(value: string): Live2DBridgeMode {
 }
 
 function normalizeGatewayUrl(value: string): string {
-  const base = value || DEFAULT_GATEWAY_URL;
-  return base.replace(/\/+$/, "");
+  return resolveGatewayHttpUrl(value);
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -230,9 +225,8 @@ function parseSignalFromGateway(payload: unknown): Live2DSignal | null {
 }
 
 async function invokeGateway(params: InvokeLive2DSignalParams): Promise<Live2DSignal> {
-  const gatewayBaseUrl = normalizeGatewayUrl(readEnv("VITE_SAVC_GATEWAY_URL"));
-  const token = readEnv("VITE_SAVC_GATEWAY_TOKEN");
-  const sessionKey = readEnv("VITE_SAVC_SESSION_KEY") || DEFAULT_SESSION_KEY;
+  const gatewayBaseUrl = normalizeGatewayUrl(readUiEnv("VITE_SAVC_GATEWAY_URL"));
+  const sessionKey = readUiEnv("VITE_SAVC_SESSION_KEY") || DEFAULT_SESSION_KEY;
 
   const args: Record<string, unknown> = {
     source: params.source,
@@ -252,7 +246,6 @@ async function invokeGateway(params: InvokeLive2DSignalParams): Promise<Live2DSi
     method: "POST",
     headers: {
       "content-type": "application/json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
       tool: "savc_live2d_signal",
@@ -276,7 +269,7 @@ async function invokeGateway(params: InvokeLive2DSignalParams): Promise<Live2DSi
 export async function invokeLive2DSignal(
   params: InvokeLive2DSignalParams,
 ): Promise<InvokeLive2DInteractionResult> {
-  const mode = normalizeMode(readEnv("VITE_SAVC_UI_LIVE2D_MODE"));
+  const mode = normalizeMode(readUiEnv("VITE_SAVC_UI_LIVE2D_MODE"));
   if (mode === "mock") {
     return {
       ok: true,

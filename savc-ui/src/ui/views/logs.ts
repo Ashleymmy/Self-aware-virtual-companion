@@ -1,5 +1,6 @@
 import { html, type TemplateResult } from "lit";
 import { GatewayBrowserClient } from "../gateway-ws.js";
+import { readUiEnv, resolveGatewayWsUrl as resolveGatewayWsUrlFromEnv } from "../gateway-url.js";
 
 type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -21,7 +22,6 @@ type LogsTailPayload = {
   reset?: boolean;
 };
 
-const DEFAULT_GATEWAY_URL = "ws://127.0.0.1:18789";
 const DEFAULT_LOG_LIMIT = 300;
 const DEFAULT_LOG_MAX_BYTES = 250_000;
 const LOG_BUFFER_LIMIT = 2_000;
@@ -60,11 +60,6 @@ let _autoFollow = true;
 
 let _pollTimer: ReturnType<typeof setInterval> | null = null;
 let _requestUpdate: (() => void) | null = null;
-
-function readEnv(name: keyof ImportMetaEnv): string {
-  const raw = import.meta.env[name];
-  return typeof raw === "string" ? raw.trim() : "";
-}
 
 function toErrorText(error: unknown): string {
   if (error instanceof Error) {
@@ -206,21 +201,7 @@ function matchesFilter(entry: LogEntry, needle: string): boolean {
 }
 
 function resolveGatewayWsUrl(): string {
-  const configured = readEnv("VITE_SAVC_GATEWAY_URL");
-  if (!configured) {
-    return DEFAULT_GATEWAY_URL;
-  }
-  const normalized = configured.replace(/\/+$/, "");
-  if (normalized.startsWith("ws://") || normalized.startsWith("wss://")) {
-    return normalized;
-  }
-  if (normalized.startsWith("http://")) {
-    return `ws://${normalized.slice("http://".length)}`;
-  }
-  if (normalized.startsWith("https://")) {
-    return `wss://${normalized.slice("https://".length)}`;
-  }
-  return `ws://${normalized}`;
+  return resolveGatewayWsUrlFromEnv(readUiEnv("VITE_SAVC_GATEWAY_URL"));
 }
 
 function ensureClient() {
@@ -229,14 +210,12 @@ function ensureClient() {
   }
 
   const url = resolveGatewayWsUrl();
-  const token = readEnv("VITE_SAVC_GATEWAY_TOKEN") || undefined;
 
   _connecting = true;
   _gatewayError = null;
 
   _client = new GatewayBrowserClient({
     url,
-    token,
     clientName: "savc-ui",
     mode: "webchat",
     onHello: () => {

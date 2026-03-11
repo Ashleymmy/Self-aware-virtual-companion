@@ -212,7 +212,7 @@ else
 fi
 
 if [[ -f "${ENV_FILE}" ]]; then
-  if rg -n '^(OPENAI_API_KEY|ANTHROPIC_API_KEY|ANYROUTER_API_KEY|GGBOOM_API_KEY|CODE_API_KEY|LAOYOU_API_KEY|VOLCES_API_KEY|volces_API_KEY)=[^[:space:]]+' "${ENV_FILE}" >/dev/null 2>&1; then
+  if rg -n '^(OPENAI_API_KEY|OPENAI_API_KEY_FILE|ANTHROPIC_API_KEY|ANTHROPIC_API_KEY_FILE|ANYROUTER_API_KEY|ANYROUTER_API_KEY_FILE|GGBOOM_API_KEY|GGBOOM_API_KEY_FILE|CODE_API_KEY|CODE_API_KEY_FILE|LAOYOU_API_KEY|LAOYOU_API_KEY_FILE|VOLCES_API_KEY|VOLCES_API_KEY_FILE|volces_API_KEY)=[^[:space:]]+' "${ENV_FILE}" >/dev/null 2>&1; then
     pass "at least one LLM provider key appears configured"
   else
     warn "no non-empty LLM provider key found in config/.env.local"
