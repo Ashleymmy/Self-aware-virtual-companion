@@ -1,11 +1,14 @@
 import crypto from "node:crypto";
 import type {
   EndReason,
+  GetCallStatusInput,
+  GetCallStatusResult,
   HangupCallInput,
   InitiateCallInput,
   InitiateCallResult,
   NormalizedEvent,
   PlayTtsInput,
+  WebhookParseOptions,
   ProviderWebhookParseResult,
   StartListeningInput,
   StopListeningInput,
@@ -24,11 +27,22 @@ import type { VoiceCallProvider } from "./base.js";
 export class MockProvider implements VoiceCallProvider {
   readonly name = "mock" as const;
 
-  verifyWebhook(_ctx: WebhookContext): WebhookVerificationResult {
-    return { ok: true };
+  verifyWebhook(ctx: WebhookContext): WebhookVerificationResult {
+    const verifiedRequestKey = crypto
+      .createHash("sha256")
+      .update(ctx.method)
+      .update("\n")
+      .update(ctx.url)
+      .update("\n")
+      .update(ctx.rawBody)
+      .digest("hex");
+    return { ok: true, verifiedRequestKey: `mock:req:${verifiedRequestKey}` };
   }
 
-  parseWebhookEvent(ctx: WebhookContext): ProviderWebhookParseResult {
+  parseWebhookEvent(
+    ctx: WebhookContext,
+    _options?: WebhookParseOptions,
+  ): ProviderWebhookParseResult {
     try {
       const payload = JSON.parse(ctx.rawBody);
       const events: NormalizedEvent[] = [];
@@ -59,10 +73,10 @@ export class MockProvider implements VoiceCallProvider {
     }
 
     const base = {
-      id: evt.id || crypto.randomUUID(),
+      id: evt.id ?? crypto.randomUUID(),
       callId: evt.callId,
       providerCallId: evt.providerCallId,
-      timestamp: evt.timestamp || Date.now(),
+      timestamp: evt.timestamp ?? Date.now(),
     };
 
     switch (evt.type) {
@@ -77,7 +91,7 @@ export class MockProvider implements VoiceCallProvider {
         return {
           ...base,
           type: evt.type,
-          text: payload.text || "",
+          text: payload.text ?? "",
         };
       }
 
@@ -92,7 +106,7 @@ export class MockProvider implements VoiceCallProvider {
         return {
           ...base,
           type: evt.type,
-          transcript: payload.transcript || "",
+          transcript: payload.transcript ?? "",
           isFinal: payload.isFinal ?? true,
           confidence: payload.confidence,
         };
@@ -103,7 +117,7 @@ export class MockProvider implements VoiceCallProvider {
         return {
           ...base,
           type: evt.type,
-          durationMs: payload.durationMs || 0,
+          durationMs: payload.durationMs ?? 0,
         };
       }
 
@@ -112,7 +126,7 @@ export class MockProvider implements VoiceCallProvider {
         return {
           ...base,
           type: evt.type,
-          digits: payload.digits || "",
+          digits: payload.digits ?? "",
         };
       }
 
@@ -121,7 +135,7 @@ export class MockProvider implements VoiceCallProvider {
         return {
           ...base,
           type: evt.type,
-          reason: payload.reason || "completed",
+          reason: payload.reason ?? "completed",
         };
       }
 
@@ -130,7 +144,7 @@ export class MockProvider implements VoiceCallProvider {
         return {
           ...base,
           type: evt.type,
-          error: payload.error || "unknown error",
+          error: payload.error ?? "unknown error",
           retryable: payload.retryable,
         };
       }
@@ -161,5 +175,13 @@ export class MockProvider implements VoiceCallProvider {
 
   async stopListening(_input: StopListeningInput): Promise<void> {
     // No-op for mock
+  }
+
+  async getCallStatus(input: GetCallStatusInput): Promise<GetCallStatusResult> {
+    const id = input.providerCallId.toLowerCase();
+    if (id.includes("stale") || id.includes("ended") || id.includes("completed")) {
+      return { status: "completed", isTerminal: true };
+    }
+    return { status: "in-progress", isTerminal: false };
   }
 }
