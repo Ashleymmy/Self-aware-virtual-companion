@@ -1,4 +1,5 @@
 # HEARTBEAT.md
 
-## Tasks
-- Check if any cron greeting jobs are due and ensure they fire on time.
+# Keep this file empty (or with only comments) to skip heartbeat API calls.
+
+# Add tasks below when you want the agent to check something periodically.

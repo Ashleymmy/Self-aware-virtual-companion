@@ -9,8 +9,8 @@ import {
   formatVibeCodingReport,
   runIterativeFixLoop,
   runVibeCodingTask,
-} from '../../savc-core/orchestrator/vibe-coder.mjs';
-import { resetExecutor, spawnAgent, waitForAgent } from '../../savc-core/orchestrator/lifecycle.mjs';
+} from '../../packages/core/orchestrator/vibe-coder.mjs';
+import { resetExecutor, spawnAgent, waitForAgent } from '../../packages/core/orchestrator/lifecycle.mjs';
 
 async function exists(filePath) {
   try {

@@ -8,7 +8,7 @@ import {
   getStatus,
   setExecutor,
   resetExecutor,
-} from '../../savc-core/orchestrator/lifecycle.mjs';
+} from '../../packages/core/orchestrator/lifecycle.mjs';
 
 const defaultExecutor = async ({ agentDef, task }) => `${agentDef?.name || 'agent'}: ${task}`;
 

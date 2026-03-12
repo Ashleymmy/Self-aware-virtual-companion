@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { spawnAgent, waitForAgent } from '../../savc-core/orchestrator/lifecycle.mjs';
+import { spawnAgent, waitForAgent } from '../../packages/core/orchestrator/lifecycle.mjs';
 import {
   analyzeVisionTask,
   classifyVisionTask,
@@ -8,7 +8,7 @@ import {
   generateImage,
   hasImageSignal,
   hasTechnicalSignal,
-} from '../../savc-core/orchestrator/vision.mjs';
+} from '../../packages/core/orchestrator/vision.mjs';
 
 async function main() {
   assert.equal(hasImageSignal('帮我看看这个截图'), true);

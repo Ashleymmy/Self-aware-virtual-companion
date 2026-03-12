@@ -35,25 +35,29 @@ Thumbs.db
 docs/原型.html
 
 # SAVC memory (default local-only, may contain private data)
-savc-core/memory/**
-!savc-core/memory/
-!savc-core/memory/**/
-!savc-core/memory/**/.gitkeep
-!savc-core/memory/README.md
+packages/core/memory/**
+!packages/core/memory/
+!packages/core/memory/**/
+!packages/core/memory/**/.gitkeep
+!packages/core/memory/README.md
 
 # Memory schema templates (safe to track)
-!savc-core/memory/episodic/index.md
-!savc-core/memory/semantic/user-profile.md
-!savc-core/memory/semantic/knowledge-base.md
-!savc-core/memory/semantic/facts.md
-!savc-core/memory/procedural/workflows.md
-!savc-core/memory/procedural/tool-usage.md
-!savc-core/memory/emotional/relationship.md
-!savc-core/memory/emotional/mood-log.md
-!savc-core/memory/emotional/milestones.md
-!savc-core/memory/tools/available.md
-!savc-core/memory/tools/learning-queue.md
-!savc-core/memory/growth/milestones.md
+!packages/core/memory/episodic/index.md
+!packages/core/memory/semantic/user-profile.md
+!packages/core/memory/semantic/knowledge-base.md
+!packages/core/memory/semantic/facts.md
+!packages/core/memory/procedural/workflows.md
+!packages/core/memory/procedural/tool-usage.md
+!packages/core/memory/emotional/relationship.md
+!packages/core/memory/emotional/mood-log.md
+!packages/core/memory/emotional/milestones.md
+!packages/core/memory/tools/available.md
+!packages/core/memory/tools/learning-queue.md
+!packages/core/memory/growth/milestones.md
+
+# OpenClaw framework (managed as submodule or external dependency)
+openclaw/*
+!openclaw/README.md
 
 # Git bundle backup (local-only)
 *.bundle

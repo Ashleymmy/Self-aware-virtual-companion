@@ -2,7 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/paths.sh"
+savc_use_repo_root "${BASH_SOURCE[0]}"
 ENV_FILE="${REPO_ROOT}/config/.env.local"
 OPENCLAW_CONFIG="${HOME}/.openclaw/openclaw.json"
 CONTAINER_COMPOSE="${REPO_ROOT}/infra/docker/docker-compose.cloud.yml"
@@ -70,6 +72,12 @@ if [[ -f "${OPENCLAW_CONFIG}" ]]; then
   pass "openclaw config exists: ~/.openclaw/openclaw.json"
 else
   warn "openclaw config missing (run: bash scripts/setup.sh)"
+fi
+
+if savc_require_openclaw_layout >/dev/null 2>&1; then
+  pass "openclaw source root exists: ${OPENCLAW_ROOT}"
+else
+  fail "openclaw source root invalid: ${OPENCLAW_ROOT}"
 fi
 
 if [[ -f "${OPENCLAW_CONFIG}" ]]; then
@@ -183,10 +191,10 @@ PY
   fi
 fi
 
-if [[ -d "${REPO_ROOT}/openclaw" ]]; then
-  pass "openclaw source directory exists"
+if [[ -d "${REPO_ROOT}/packages/plugin" ]]; then
+  pass "packages/plugin directory exists"
 else
-  fail "openclaw directory missing"
+  warn "packages/plugin directory missing (current plugin root should be packages/plugin)"
 fi
 
 if [[ -f "${CONTAINER_COMPOSE}" ]]; then

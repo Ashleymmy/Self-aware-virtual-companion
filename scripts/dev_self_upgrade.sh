@@ -2,9 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/paths.sh"
+savc_use_repo_root "${BASH_SOURCE[0]}"
 
-WORKSPACE="${REPO_ROOT}/savc-core"
+WORKSPACE="${REPO_ROOT}/packages/core"
 DATE="$(date +%F)"
 MONTHLY=0
 SKIP_DISCOVER=0
@@ -40,7 +42,7 @@ Usage:
   bash scripts/dev_self_upgrade.sh [options]
 
 Options:
-  --workspace <path>        Workspace path (default: ./savc-core)
+  --workspace <path>        Workspace path (default: ./packages/core)
   --date <YYYY-MM-DD>       Date key for reflection/records (default: today)
   --tool <name>             Force a target tool for learn/experiment loop
   --tools <a,b,c>           Manual tools list for discover step
@@ -115,8 +117,8 @@ if [[ ! -d "${WORKSPACE}" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${REPO_ROOT}/scripts/tool_learner_runtime.mjs" ]]; then
-  echo "[ERROR] missing runtime: scripts/tool_learner_runtime.mjs" >&2
+if [[ ! -f "${REPO_ROOT}/scripts/runtime/tool_learner_runtime.mjs" ]]; then
+  echo "[ERROR] missing runtime: scripts/runtime/tool_learner_runtime.mjs" >&2
   exit 1
 fi
 
@@ -145,7 +147,7 @@ pick_tool_from_queue() {
 
 if [[ "${SKIP_DISCOVER}" -eq 0 ]]; then
   discover_args=(
-    "${REPO_ROOT}/scripts/tool_learner_runtime.mjs"
+    "${REPO_ROOT}/scripts/runtime/tool_learner_runtime.mjs"
     discover
     --repo "${REPO_ROOT}"
     --workspace "${WORKSPACE}"
@@ -161,7 +163,7 @@ if [[ "${SKIP_DISCOVER}" -eq 0 ]]; then
   else
     warn "tool discover failed (source=${SOURCE})"
     if [[ -n "${TOOLS}" && "${SOURCE}" != "manual" ]]; then
-      if node "${REPO_ROOT}/scripts/tool_learner_runtime.mjs" discover \
+      if node "${REPO_ROOT}/scripts/runtime/tool_learner_runtime.mjs" discover \
         --repo "${REPO_ROOT}" \
         --workspace "${WORKSPACE}" \
         --date "${DATE}" \
@@ -186,14 +188,14 @@ fi
 
 if [[ -n "${TARGET_TOOL}" ]]; then
   run_node_step "tool learn (${TARGET_TOOL})" \
-    "${REPO_ROOT}/scripts/tool_learner_runtime.mjs" learn \
+    "${REPO_ROOT}/scripts/runtime/tool_learner_runtime.mjs" learn \
     --repo "${REPO_ROOT}" \
     --workspace "${WORKSPACE}" \
     --tool "${TARGET_TOOL}" \
     --date "${DATE}" || true
 
   run_node_step "tool experiment (${TARGET_TOOL})" \
-    "${REPO_ROOT}/scripts/tool_learner_runtime.mjs" experiment \
+    "${REPO_ROOT}/scripts/runtime/tool_learner_runtime.mjs" experiment \
     --repo "${REPO_ROOT}" \
     --workspace "${WORKSPACE}" \
     --tool "${TARGET_TOOL}" \
@@ -201,13 +203,13 @@ if [[ -n "${TARGET_TOOL}" ]]; then
     --date "${DATE}" || true
 
   run_node_step "tool solidify (${TARGET_TOOL})" \
-    "${REPO_ROOT}/scripts/tool_learner_runtime.mjs" solidify \
+    "${REPO_ROOT}/scripts/runtime/tool_learner_runtime.mjs" solidify \
     --workspace "${WORKSPACE}" \
     --tool "${TARGET_TOOL}" \
     --date "${DATE}" || true
 
   run_node_step "tool generalize (${TARGET_TOOL})" \
-    "${REPO_ROOT}/scripts/tool_learner_runtime.mjs" generalize \
+    "${REPO_ROOT}/scripts/runtime/tool_learner_runtime.mjs" generalize \
     --workspace "${WORKSPACE}" \
     --tool "${TARGET_TOOL}" \
     --date "${DATE}" || true
@@ -215,7 +217,7 @@ else
   warn "no target tool selected; skipped learn/experiment/solidify/generalize"
 fi
 
-if node "${REPO_ROOT}/scripts/self_reflection_runtime.mjs" daily \
+if node "${REPO_ROOT}/scripts/runtime/self_reflection_runtime.mjs" daily \
   --workspace "${WORKSPACE}" \
   --date "${DATE}"; then
   pass "daily self reflection"
@@ -224,7 +226,7 @@ else
 fi
 
 if [[ "${APPLY_PERSONA}" -eq 1 ]]; then
-  if node "${REPO_ROOT}/scripts/persona_tuning_runtime.mjs" apply \
+  if node "${REPO_ROOT}/scripts/runtime/persona_tuning_runtime.mjs" apply \
     --workspace "${WORKSPACE}" \
     --date "${DATE}" \
     --user-ok; then
@@ -233,7 +235,7 @@ if [[ "${APPLY_PERSONA}" -eq 1 ]]; then
     warn "persona tuning apply failed"
   fi
 else
-  if node "${REPO_ROOT}/scripts/persona_tuning_runtime.mjs" preview \
+  if node "${REPO_ROOT}/scripts/runtime/persona_tuning_runtime.mjs" preview \
     --workspace "${WORKSPACE}" \
     --date "${DATE}"; then
     pass "persona tuning preview"
@@ -244,7 +246,7 @@ fi
 
 if [[ "${MONTHLY}" -eq 1 ]]; then
   month_key="${DATE:0:7}"
-  if node "${REPO_ROOT}/scripts/self_reflection_runtime.mjs" monthly \
+  if node "${REPO_ROOT}/scripts/runtime/self_reflection_runtime.mjs" monthly \
     --workspace "${WORKSPACE}" \
     --month "${month_key}"; then
     pass "monthly self reflection (${month_key})"

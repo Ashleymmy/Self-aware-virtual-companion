@@ -5,7 +5,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
-import { embed, health, search, store } from '../../scripts/memory_semantic.mjs';
+import { embed, health, search, store } from '../../scripts/runtime/memory_semantic.mjs';
 
 function createDeterministicVector(text, dim) {
   const digest = crypto.createHash('sha256').update(String(text)).digest();

@@ -2,9 +2,28 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/paths.sh"
+savc_use_repo_root "${BASH_SOURCE[0]}"
 
-RUNTIME_ROOT="${XDG_RUNTIME_DIR:-/tmp}"
+resolve_runtime_root() {
+  local candidate=""
+  local probe=""
+  for candidate in "${SAVC_RUNTIME_ROOT:-${REPO_ROOT}/.runtime}" "${XDG_RUNTIME_DIR:-}" "${TMPDIR:-/tmp}"; do
+    [[ -n "${candidate}" ]] || continue
+    mkdir -p "${candidate}" 2>/dev/null || true
+    probe="${candidate}/.savc-ui-write-probe.$$"
+    if : > "${probe}" 2>/dev/null; then
+      rm -f "${probe}" 2>/dev/null || true
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+  echo "[ERROR] Could not find a writable runtime directory for savc-ui service." >&2
+  return 1
+}
+
+RUNTIME_ROOT="$(resolve_runtime_root)"
 PID_FILE="${RUNTIME_ROOT}/savc-ui-dev.pid"
 LOG_FILE="${RUNTIME_ROOT}/savc-ui-dev.log"
 UI_PORT="5174"
@@ -56,9 +75,9 @@ start_ui() {
 
   echo "[INFO] starting savc-ui dev server on :${UI_PORT}"
   if command -v setsid >/dev/null 2>&1; then
-    setsid pnpm --dir "${REPO_ROOT}/savc-ui" dev >"${LOG_FILE}" 2>&1 < /dev/null &
+    setsid pnpm --dir "${REPO_ROOT}/packages/ui" dev >"${LOG_FILE}" 2>&1 < /dev/null &
   else
-    nohup pnpm --dir "${REPO_ROOT}/savc-ui" dev >"${LOG_FILE}" 2>&1 < /dev/null &
+    nohup pnpm --dir "${REPO_ROOT}/packages/ui" dev >"${LOG_FILE}" 2>&1 < /dev/null &
   fi
   local pid=$!
   echo "${pid}" > "${PID_FILE}"

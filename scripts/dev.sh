@@ -2,7 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/paths.sh"
+savc_use_repo_root "${BASH_SOURCE[0]}"
 
 export PATH="${HOME}/.local/bin:${PATH}"
 
@@ -11,7 +13,7 @@ source "${REPO_ROOT}/scripts/lib/secret_env.sh"
 
 ENV_FILE="${REPO_ROOT}/config/.env.local"
 OPENCLAW_CONFIG="${HOME}/.openclaw/openclaw.json"
-OPENCLAW_SUBMODULE="${REPO_ROOT}/openclaw"
+OPENCLAW_SUBMODULE="${OPENCLAW_ROOT}"
 
 upsert_env_var() {
   local file="$1"
@@ -91,11 +93,8 @@ if [[ ! -f "${OPENCLAW_CONFIG}" ]]; then
   exit 1
 fi
 
-if [[ ! -d "${OPENCLAW_SUBMODULE}" ]]; then
-  echo "[ERROR] Missing OpenClaw source directory at: ${OPENCLAW_SUBMODULE}" >&2
-  echo "Ensure this repository checkout includes openclaw/." >&2
-  exit 1
-fi
+savc_require_openclaw_layout || exit 1
+savc_ensure_openclaw_deps || exit 1
 
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "[ERROR] pnpm not found in PATH." >&2

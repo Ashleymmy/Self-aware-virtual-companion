@@ -1,6 +1,6 @@
 # SAVC Phase 1 System Prompt (Assembled)
 
-> generated_at: 2026-02-19 06:35:26 UTC
+> generated_at: 2026-03-12 07:55:54 UTC
 
 ## 1) 人格定义（PERSONA）
 
@@ -227,6 +227,6 @@ last_updated: "2026-02-06"
 
 ## 5) 当前时间与环境信息
 
-- current_time_utc: 2026-02-19 06:35:26 UTC
-- workspace: /Users/xiaoming/ITEM/SAVC/Self-aware-virtual-companion/savc-core
+- current_time_utc: 2026-03-12 07:55:54 UTC
+- workspace: /home/min/SAVC/Self-aware-virtual-companion/packages/core
 - language_preference: zh-CN

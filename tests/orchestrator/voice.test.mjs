@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 
-import { spawnAgent, waitForAgent } from '../../savc-core/orchestrator/lifecycle.mjs';
+import { spawnAgent, waitForAgent } from '../../packages/core/orchestrator/lifecycle.mjs';
 import {
   buildVoiceExecutionPlan,
   buildVoiceLive2DSignal,
   inferVoiceAction,
   inferVoiceEmotion,
   mapEmotionToVoiceStyle,
-} from '../../savc-core/orchestrator/voice.mjs';
+} from '../../packages/core/orchestrator/voice.mjs';
 
 async function main() {
   assert.equal(inferVoiceAction('请帮我发起语音通话'), 'initiate');

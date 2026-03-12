@@ -4,7 +4,9 @@ set -euo pipefail
 export PATH="${HOME}/.local/bin:${PATH}"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/paths.sh"
+savc_use_repo_root "${BASH_SOURCE[0]}"
 ENV_FILE="${REPO_ROOT}/config/.env.local"
 
 # shellcheck disable=SC1091
@@ -108,4 +110,6 @@ upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "CODE_API_KEY" "${CODE_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_API_KEY" "${OPENAI_API_KEY:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "OPENAI_BASE_URL" "${OPENAI_BASE_URL:-}"
 
-exec openclaw "$@"
+savc_ensure_openclaw_ready
+
+exec node "${OPENCLAW_ROOT}/openclaw.mjs" "$@"

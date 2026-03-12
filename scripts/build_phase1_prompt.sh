@@ -5,12 +5,12 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 OUTPUT_PATH="${1:-${REPO_ROOT}/tests/artifacts/phase1-system-prompt.md}"
 
-PERSONA_FILE="${REPO_ROOT}/savc-core/persona/PERSONA.md"
-VOICE_FILE="${REPO_ROOT}/savc-core/persona/voice.yaml"
-VALUES_FILE="${REPO_ROOT}/savc-core/persona/values.yaml"
-PROFILE_FILE="${REPO_ROOT}/savc-core/memory/semantic/user-profile.md"
-EPISODIC_INDEX_FILE="${REPO_ROOT}/savc-core/memory/episodic/index.md"
-RELATIONSHIP_FILE="${REPO_ROOT}/savc-core/memory/emotional/relationship.md"
+PERSONA_FILE="${REPO_ROOT}/packages/core/persona/PERSONA.md"
+VOICE_FILE="${REPO_ROOT}/packages/core/persona/voice.yaml"
+VALUES_FILE="${REPO_ROOT}/packages/core/persona/values.yaml"
+PROFILE_FILE="${REPO_ROOT}/packages/core/memory/semantic/user-profile.md"
+EPISODIC_INDEX_FILE="${REPO_ROOT}/packages/core/memory/episodic/index.md"
+RELATIONSHIP_FILE="${REPO_ROOT}/packages/core/memory/emotional/relationship.md"
 
 mkdir -p "$(dirname -- "${OUTPUT_PATH}")"
 
@@ -54,7 +54,7 @@ $(cat "${RELATIONSHIP_FILE}")
 ## 5) 当前时间与环境信息
 
 - current_time_utc: ${now_utc}
-- workspace: ${REPO_ROOT}/savc-core
+- workspace: ${REPO_ROOT}/packages/core
 - language_preference: zh-CN
 DOC
 

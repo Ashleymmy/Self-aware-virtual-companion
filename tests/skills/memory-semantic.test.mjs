@@ -13,7 +13,7 @@ import {
   search,
   stats,
   store,
-} from '../../scripts/memory_semantic.mjs';
+} from '../../scripts/runtime/memory_semantic.mjs';
 
 async function main() {
   process.env.SAVC_EMBEDDING_MODE = 'mock';

@@ -12,7 +12,7 @@ import {
   inferInteractionType,
   mapEmotionToExpression,
   normalizeEmotionTag,
-} from '../../savc-core/orchestrator/live2d.mjs';
+} from '../../packages/core/orchestrator/live2d.mjs';
 
 async function main() {
   assert.equal(normalizeEmotionTag('cheerful'), 'happy');

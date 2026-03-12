@@ -2,9 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/paths.sh"
+savc_use_repo_root "${BASH_SOURCE[0]}"
 ENV_FILE="${REPO_ROOT}/config/.env.local"
-WORKSPACE_DIR_DEFAULT="${REPO_ROOT}/savc-core"
+WORKSPACE_DIR_DEFAULT="${REPO_ROOT}/packages/core"
 
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/lib/secret_env.sh"
@@ -161,7 +163,8 @@ fi
 # Derived values
 # ──────────────────────────────────────────────
 OPENCLAW_PORT_EFFECTIVE="${OPENCLAW_PORT:-18789}"
-OPENCLAW_SUBMODULE="${REPO_ROOT}/openclaw"
+# OPENCLAW_ROOT can be set externally to point to a custom openclaw installation
+OPENCLAW_SUBMODULE="${OPENCLAW_ROOT}"
 VOLCES_BASE_URL_EFFECTIVE="${VOLCES_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}"
 VOLCES_MODEL_EFFECTIVE="${VOLCES_MODEL:-doubao-seed-1-8-251228}"
 PRIMARY_LLM_REF="volces/${VOLCES_MODEL_EFFECTIVE}"
@@ -584,7 +587,7 @@ ${IMESSAGE_BLOCK}
   "plugins": {
     "load": {
       "paths": [
-        "${OPENCLAW_SUBMODULE}/extensions/savc-orchestrator",
+        "${REPO_ROOT}/packages/plugin",
         "${OPENCLAW_SUBMODULE}/extensions/imessage"
       ]
     },
@@ -615,7 +618,7 @@ echo "[OK] Wrote OpenClaw config: ${OPENCLAW_CONFIG}"
 # ══════════════════════════════════════════════
 # Register agents — SOUL.md + models.json + auth-profiles.json
 # ══════════════════════════════════════════════
-AGENTS_TEMPLATE_DIR="${REPO_ROOT}/config/openclaw/agents"
+AGENTS_TEMPLATE_DIR="${REPO_ROOT}/config/agents"
 AGENTS=(main companion memory technical creative tooling voice vision vibe-coder)
 
 for agent in "${AGENTS[@]}"; do
@@ -794,7 +797,7 @@ find "${OPENCLAW_DIR}/agents" -name "auth-profiles.json" -exec chmod 600 {} \; 2
 echo "[OK] Synced OpenClaw env: ${OPENCLAW_GLOBAL_ENV}"
 echo "[OK] Workspace set to: ${WORKSPACE_DIR_ABS}"
 echo "[OK] Agents registered: ${AGENTS[*]}"
-echo "[OK] Plugin: savc-orchestrator → ${OPENCLAW_SUBMODULE}/extensions/savc-orchestrator"
+echo "[OK] Plugin: savc-orchestrator → ${REPO_ROOT}/packages/plugin"
 if [[ "${SAVC_AUTODEV_ENABLE}" == "1" ]]; then
   echo "[OK] Yuanyuan autodev mode: enabled (workspaceAccess=rw, main tools=coding)"
 else

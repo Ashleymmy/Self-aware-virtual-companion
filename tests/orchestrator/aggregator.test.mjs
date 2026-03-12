@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { aggregate } from '../../savc-core/orchestrator/aggregator.mjs';
+import { aggregate } from '../../packages/core/orchestrator/aggregator.mjs';
 
 async function main() {
   const single = await aggregate(

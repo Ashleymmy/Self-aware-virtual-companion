@@ -9,7 +9,7 @@ import {
   matchByIntent,
   matchByKeyword,
   closeWatcher,
-} from '../../savc-core/orchestrator/registry.mjs';
+} from '../../packages/core/orchestrator/registry.mjs';
 
 async function copyDir(from, to) {
   await fs.mkdir(to, { recursive: true });
@@ -35,7 +35,7 @@ async function waitFor(condition, timeoutMs = 2000) {
 }
 
 async function main() {
-  const sourceDir = path.resolve('savc-core/agents');
+  const sourceDir = path.resolve('packages/core/agents');
   const tempDir = path.join(os.tmpdir(), 'savc_phase4b_registry_test');
   await fs.rm(tempDir, { recursive: true, force: true });
   await copyDir(sourceDir, tempDir);

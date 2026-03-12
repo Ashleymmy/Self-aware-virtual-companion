@@ -39,4 +39,4 @@ watch:
   ignore:
     - "**/.git/**"
     - "**/node_modules/**"
-    - "**/openclaw/dist/**"
+    - "**/openclaw/**"

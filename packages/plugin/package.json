@@ -1,0 +1,30 @@
+{
+  "name": "@savc/plugin",
+  "version": "0.1.0",
+  "description": "SAVC multi-agent orchestrator plugin for OpenClaw",
+  "type": "module",
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.48"
+  },
+  "scripts": {
+    "test": "vitest run src/*.test.ts"
+  },
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "openclaw": "file:../../openclaw",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

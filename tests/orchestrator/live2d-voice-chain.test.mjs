@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 
-import { aggregate } from '../../savc-core/orchestrator/aggregator.mjs';
-import { analyze } from '../../savc-core/orchestrator/decomposer.mjs';
-import { spawnAgent, waitForAgent } from '../../savc-core/orchestrator/lifecycle.mjs';
+import { aggregate } from '../../packages/core/orchestrator/aggregator.mjs';
+import { analyze } from '../../packages/core/orchestrator/decomposer.mjs';
+import { spawnAgent, waitForAgent } from '../../packages/core/orchestrator/lifecycle.mjs';
 
 async function main() {
   const message = '点击模型并语音播报一句欢迎回来';
   const plan = await analyze(message, {
-    agentsDir: 'savc-core/agents',
+    agentsDir: 'packages/core/agents',
   });
   assert.equal(plan.type, 'compound');
   assert.equal(plan.execution, 'sequential');
