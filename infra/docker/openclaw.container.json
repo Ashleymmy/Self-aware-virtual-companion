@@ -10,7 +10,7 @@
   },
   "agents": {
     "defaults": {
-      "workspace": "/workspace/savc-core",
+      "workspace": "/workspace/packages/core",
       "memorySearch": {
         "enabled": true,
         "provider": "openai",
@@ -24,11 +24,16 @@
     }
   },
   "plugins": {
+    "load": {
+      "paths": [
+        "/workspace/packages/plugin"
+      ]
+    },
     "entries": {
       "savc-orchestrator": {
         "enabled": true,
         "config": {
-          "savcCorePath": "/workspace/savc-core",
+          "savcCorePath": "/workspace/packages/core",
           "spawnMode": "real",
           "defaultWait": true,
           "defaultTimeoutMs": 120000,

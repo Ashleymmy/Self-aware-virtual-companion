@@ -4,12 +4,11 @@ RUN corepack enable
 
 WORKDIR /workspace
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY savc-ui/package.json ./savc-ui/package.json
-
-RUN pnpm install --frozen-lockfile
-
 COPY . /workspace
+
+RUN pnpm -C /workspace/openclaw install --frozen-lockfile \
+ && pnpm -C /workspace/openclaw exec tsdown --no-clean \
+ && pnpm install --frozen-lockfile
 
 ENV NODE_ENV=production
 

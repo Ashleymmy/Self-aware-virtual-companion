@@ -6,12 +6,12 @@ It is intended for development staging and should be hardened before production.
 ## Quick Start
 
 ```bash
-bash scripts/dev_container.sh init-env
+bash scripts/infra/dev_container.sh init-env
 # edit infra/docker/.env
-bash scripts/dev_container.sh up
+bash scripts/infra/dev_container.sh up
 
 # optional: also start proactive daemon
-COMPOSE_PROFILES=automation bash scripts/dev_container.sh up
+COMPOSE_PROFILES=automation bash scripts/infra/dev_container.sh up
 ```
 
 ## Files
@@ -26,7 +26,7 @@ COMPOSE_PROFILES=automation bash scripts/dev_container.sh up
 ## Notes
 
 - The first container boot copies `openclaw.container.json` into `/home/node/.openclaw/openclaw.json`.
-- The repo is mounted at `/workspace`; SAVC workspace path is `/workspace/savc-core`.
+- The repo is mounted at `/workspace`; canonical paths are `/workspace/openclaw`, `/workspace/packages/core`, `/workspace/packages/plugin`, `/workspace/packages/ui`.
 - Default services are `savc-gateway` and `savc-ui`; `savc-proactive` is available via `COMPOSE_PROFILES=automation`.
 - `savc-ui` now proxies gateway traffic through the Vite server, so browser clients no longer need `VITE_SAVC_GATEWAY_TOKEN`.
 - Set `OPENCLAW_HOST_CREDENTIALS_DIR` to your host `~/.openclaw/credentials` if you want Docker to inherit existing pairing approvals/allowlists.
@@ -36,10 +36,10 @@ COMPOSE_PROFILES=automation bash scripts/dev_container.sh up
 
 ```bash
 mkdir -p infra/docker/secrets
-bash scripts/prod_container.sh init-env
+bash scripts/infra/prod_container.sh init-env
 # edit infra/docker/.env.prod and populate infra/docker/secrets/*
-bash scripts/prod_container.sh validate
-bash scripts/prod_container.sh up
+bash scripts/infra/prod_container.sh validate
+bash scripts/infra/prod_container.sh up
 ```
 
 - Prefer `*_FILE` env vars that point to files under `infra/docker/secrets/` or your cloud secret mount.

@@ -4,16 +4,17 @@ services:
   savc-gateway:
     image: ${SAVC_GATEWAY_IMAGE:-savc-openclaw:dev}
     build:
-      context: ../../openclaw
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.gateway
       args:
         OPENCLAW_DOCKER_SKIP_CHOWN: "1"
     init: true
     restart: unless-stopped
-    working_dir: /app
+    working_dir: /workspace
     user: "0:0"
     environment:
       HOME: /home/node
+      OPENCLAW_ROOT: /workspace/openclaw
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -38,6 +39,7 @@ services:
       - -lc
       - |
         set -e
+        corepack enable
         mkdir -p /home/node/.openclaw
         if [ -d /bootstrap/openclaw-credentials ]; then
           mkdir -p /home/node/.openclaw/credentials
@@ -45,7 +47,7 @@ services:
             -exec cp -f {} /home/node/.openclaw/credentials/ \;
         fi
         bash /workspace/scripts/setup.sh
-        exec node dist/index.js gateway --bind lan --port 18789
+        exec bash /workspace/scripts/openclaw.sh gateway --bind lan --port 18789
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
     healthcheck:
@@ -55,16 +57,21 @@ services:
       retries: 5
 
   savc-ui:
-    image: node:22-bookworm
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.runtime
+      args:
+        SAVC_RUNTIME_SKIP_CHOWN: "1"
     init: true
     restart: unless-stopped
-    working_dir: /workspace/savc-ui
+    working_dir: /workspace
     user: "0:0"
     depends_on:
       savc-gateway:
         condition: service_healthy
     environment:
       HOME: /home/node
+      OPENCLAW_ROOT: /workspace/openclaw
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       SAVC_GATEWAY_INTERNAL_URL: ${SAVC_GATEWAY_INTERNAL_URL:-http://savc-gateway:18789}
@@ -80,10 +87,10 @@ services:
       - |
         set -e
         corepack enable
-        if [ ! -x /workspace/savc-ui/node_modules/.bin/vite ]; then
-          pnpm --dir /workspace/savc-ui install
+        if ! pnpm --dir /workspace/packages/ui exec vite --version >/dev/null 2>&1; then
+          pnpm --dir /workspace install
         fi
-        exec pnpm --dir /workspace/savc-ui exec vite --host 0.0.0.0 --port ${SAVC_UI_PORT:-5174}
+        exec pnpm --dir /workspace/packages/ui exec vite --host 0.0.0.0 --port ${SAVC_UI_PORT:-5174}
     ports:
       - "${SAVC_UI_PORT:-5174}:${SAVC_UI_PORT:-5174}"
     healthcheck:
@@ -93,7 +100,11 @@ services:
       retries: 5
 
   savc-proactive:
-    image: node:22-bookworm
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.runtime
+      args:
+        SAVC_RUNTIME_SKIP_CHOWN: "1"
     profiles: ["automation"]
     init: true
     restart: unless-stopped
@@ -104,6 +115,7 @@ services:
         condition: service_healthy
     environment:
       HOME: /home/node
+      OPENCLAW_ROOT: /workspace/openclaw
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -141,18 +153,14 @@ services:
         if [ ! -d /workspace/node_modules ]; then
           pnpm --dir /workspace install
         fi
-        if [ ! -x /workspace/openclaw/node_modules/.bin/openclaw ]; then
-          pnpm -C /workspace/openclaw install --frozen-lockfile
-        fi
-        export PATH="/workspace/openclaw/node_modules/.bin:/workspace/node_modules/.bin:${PATH}"
         bash /workspace/scripts/setup.sh
-        exec node /workspace/scripts/proactive_daemon.mjs run \
+        exec node /workspace/scripts/runtime/proactive_daemon.mjs run \
           --repo /workspace \
-          --workspace /workspace/savc-core \
+          --workspace /workspace/packages/core \
           --config /workspace/config/proactive.yaml \
           --channels /workspace/config/channels.yaml
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'scripts/proactive_daemon.mjs run' >/dev/null"]
+      test: ["CMD-SHELL", "pgrep -f 'scripts/runtime/proactive_daemon.mjs run' >/dev/null"]
       interval: 30s
       timeout: 5s
       retries: 5

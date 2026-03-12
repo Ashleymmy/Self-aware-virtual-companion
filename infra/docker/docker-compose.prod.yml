@@ -10,6 +10,7 @@ services:
     restart: unless-stopped
     environment:
       HOME: /home/node
+      OPENCLAW_ROOT: /workspace/openclaw
       SAVC_AUTODEV_ENABLE: ${SAVC_AUTODEV_ENABLE:-0}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
@@ -61,6 +62,7 @@ services:
         condition: service_healthy
     environment:
       HOME: /home/node
+      OPENCLAW_ROOT: /workspace/openclaw
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       SAVC_GATEWAY_INTERNAL_URL: ${SAVC_GATEWAY_INTERNAL_URL:-http://savc-gateway:18789}
@@ -76,7 +78,7 @@ services:
       - bash
       - -lc
       - |
-        exec pnpm --dir /workspace/savc-ui exec vite --host 0.0.0.0 --port ${SAVC_UI_PORT:-5174}
+        exec pnpm --dir /workspace/packages/ui exec vite --host 0.0.0.0 --port ${SAVC_UI_PORT:-5174}
     ports:
       - "${SAVC_UI_PORT:-5174}:${SAVC_UI_PORT:-5174}"
     healthcheck:
@@ -98,6 +100,7 @@ services:
         condition: service_healthy
     environment:
       HOME: /home/node
+      OPENCLAW_ROOT: /workspace/openclaw
       SAVC_AUTODEV_ENABLE: ${SAVC_AUTODEV_ENABLE:-0}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
@@ -143,13 +146,13 @@ services:
       - |
         mkdir -p /home/node/.openclaw
         bash /workspace/scripts/setup.sh
-        exec node /workspace/scripts/proactive_daemon.mjs run \
+        exec node /workspace/scripts/runtime/proactive_daemon.mjs run \
           --repo /workspace \
-          --workspace /workspace/savc-core \
+          --workspace /workspace/packages/core \
           --config /workspace/config/proactive.yaml \
           --channels /workspace/config/channels.yaml
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'scripts/proactive_daemon.mjs run' >/dev/null"]
+      test: ["CMD-SHELL", "pgrep -f 'scripts/runtime/proactive_daemon.mjs run' >/dev/null"]
       interval: 30s
       timeout: 5s
       retries: 5

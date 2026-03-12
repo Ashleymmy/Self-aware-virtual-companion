@@ -5,24 +5,18 @@ ENV PATH="/root/.bun/bin:${PATH}"
 
 RUN corepack enable
 
-WORKDIR /workspace/openclaw
-
-COPY openclaw/package.json openclaw/pnpm-lock.yaml openclaw/pnpm-workspace.yaml openclaw/.npmrc ./
-COPY openclaw/ui/package.json ./ui/package.json
-COPY openclaw/patches ./patches
-COPY openclaw/scripts ./scripts
-
-RUN pnpm install --frozen-lockfile
-
+# OpenClaw must be provided externally (git submodule, mounted volume, or pre-built)
+# If openclaw/ contains a built version, it will be used directly
 WORKDIR /workspace
+
 COPY . /workspace
 
-WORKDIR /workspace/openclaw
-RUN OPENCLAW_A2UI_SKIP_MISSING=1 pnpm build
-ENV OPENCLAW_PREFER_PNPM=1
-RUN pnpm ui:build
+# Prepare vendored OpenClaw snapshot.
+RUN if [ -f /workspace/openclaw/package.json ]; then \
+      pnpm -C /workspace/openclaw install --frozen-lockfile && \
+      pnpm -C /workspace/openclaw exec tsdown --no-clean; \
+    fi
 
-WORKDIR /workspace
 ENV NODE_ENV=production
 
 ARG OPENCLAW_DOCKER_SKIP_CHOWN="0"
@@ -30,4 +24,4 @@ RUN if [ "${OPENCLAW_DOCKER_SKIP_CHOWN}" != "1" ]; then chown -R node:node /work
 
 USER node
 
-CMD ["bash", "-lc", "mkdir -p /home/node/.openclaw && bash /workspace/scripts/setup.sh && exec node /workspace/openclaw/dist/index.js gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789}"]
+CMD ["bash", "-lc", "mkdir -p /home/node/.openclaw && bash /workspace/scripts/setup.sh && exec node /workspace/openclaw/openclaw.mjs gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789}"]
