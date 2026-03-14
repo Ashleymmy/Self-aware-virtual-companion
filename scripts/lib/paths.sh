@@ -66,7 +66,11 @@ savc_ensure_openclaw_deps() {
     return 1
   fi
   echo "[INFO] Installing OpenClaw dependencies in ${OPENCLAW_ROOT}"
-  pnpm -C "${OPENCLAW_ROOT}" install --frozen-lockfile
+  if [[ -f "${OPENCLAW_ROOT}/pnpm-lock.yaml" ]]; then
+    pnpm -C "${OPENCLAW_ROOT}" install --frozen-lockfile
+  else
+    pnpm -C "${OPENCLAW_ROOT}" install --no-frozen-lockfile
+  fi
 }
 
 savc_ensure_openclaw_build() {

@@ -16,6 +16,7 @@ ENV_SAVC_CODEX_ACP_AGENT_OVERRIDE="${SAVC_CODEX_ACP_AGENT-}"
 ENV_SAVC_CODEX_ACP_COMMAND_OVERRIDE="${SAVC_CODEX_ACP_COMMAND-}"
 ENV_SAVC_CODEX_ACP_PERMISSION_MODE_OVERRIDE="${SAVC_CODEX_ACP_PERMISSION_MODE-}"
 ENV_SAVC_CODEX_ACP_NON_INTERACTIVE_OVERRIDE="${SAVC_CODEX_ACP_NON_INTERACTIVE-}"
+ENV_SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK_OVERRIDE="${SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK-}"
 
 restore_env_override() {
   local key="$1"
@@ -45,6 +46,7 @@ restore_env_override "SAVC_CODEX_ACP_AGENT" "${ENV_SAVC_CODEX_ACP_AGENT_OVERRIDE
 restore_env_override "SAVC_CODEX_ACP_COMMAND" "${ENV_SAVC_CODEX_ACP_COMMAND_OVERRIDE}"
 restore_env_override "SAVC_CODEX_ACP_PERMISSION_MODE" "${ENV_SAVC_CODEX_ACP_PERMISSION_MODE_OVERRIDE}"
 restore_env_override "SAVC_CODEX_ACP_NON_INTERACTIVE" "${ENV_SAVC_CODEX_ACP_NON_INTERACTIVE_OVERRIDE}"
+restore_env_override "SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK" "${ENV_SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK_OVERRIDE}"
 
 # Support both canonical VOLCES_* names and the existing local lowercase keys.
 export_resolved_secret "OPENCLAW_GATEWAY_TOKEN"
@@ -277,6 +279,7 @@ SAVC_CODEX_ACP_AGENT="${SAVC_CODEX_ACP_AGENT:-codex}"
 SAVC_CODEX_ACP_COMMAND="${SAVC_CODEX_ACP_COMMAND:-codex-acp}"
 SAVC_CODEX_ACP_PERMISSION_MODE="${SAVC_CODEX_ACP_PERMISSION_MODE:-approve-all}"
 SAVC_CODEX_ACP_NON_INTERACTIVE="${SAVC_CODEX_ACP_NON_INTERACTIVE:-fail}"
+SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK="${SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK:-0}"
 
 if [[ "${SAVC_AUTODEV_ENABLE}" == "1" ]]; then
   SANDBOX_WORKSPACE_ACCESS="rw"
@@ -321,6 +324,17 @@ JSON
 )"
 fi
 
+if [[ "${SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK}" == "1" ]]; then
+  GATEWAY_CONTROL_UI_BLOCK="$(cat <<'JSON'
+    "controlUi": {
+      "dangerouslyAllowHostHeaderOriginFallback": true
+    },
+JSON
+)"
+else
+  GATEWAY_CONTROL_UI_BLOCK=''
+fi
+
 # ══════════════════════════════════════════════
 # Generate openclaw.json — full config
 # ══════════════════════════════════════════════
@@ -331,7 +345,7 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
     "providers": {
       "volces": {
         "baseUrl": "${VOLCES_BASE_URL_EFFECTIVE}",
-        "apiKey": "\${VOLCES_API_KEY}",
+        "apiKey": "${VOLCES_API_KEY:-}",
         "api": "openai-completions",
         "models": [
           {
@@ -348,7 +362,7 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
       },
       "anyrouter": {
         "baseUrl": "https://anyrouter.top",
-        "apiKey": "\${ANYROUTER_API_KEY}",
+        "apiKey": "${ANYROUTER_API_KEY:-}",
         "api": "anthropic-messages",
         "models": [
           {
@@ -382,7 +396,7 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
       },
       "laoyou": {
         "baseUrl": "https://api.freestyle.cc.cd",
-        "apiKey": "\${LAOYOU_API_KEY}",
+        "apiKey": "${LAOYOU_API_KEY:-}",
         "api": "openai-completions",
         "models": [
           {
@@ -416,7 +430,7 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
       },
       "code": {
         "baseUrl": "https://code.claudex.us.ci",
-        "apiKey": "\${CODE_API_KEY}",
+        "apiKey": "${CODE_API_KEY:-}",
         "api": "openai-completions",
         "models": [
           {
@@ -441,7 +455,7 @@ cat > "${OPENCLAW_CONFIG}" <<JSON
       },
       "ggboom": {
         "baseUrl": "https://ai.qaq.al",
-        "apiKey": "\${GGBOOM_API_KEY}",
+        "apiKey": "${GGBOOM_API_KEY:-}",
         "api": "openai-responses",
         "models": [
           {
@@ -610,6 +624,7 @@ ${IMESSAGE_BLOCK}
   "gateway": {
     "port": ${OPENCLAW_PORT_EFFECTIVE},
     "mode": "local",
+${GATEWAY_CONTROL_UI_BLOCK}
     "auth": {
       "mode": "token",
       "token": "\${OPENCLAW_GATEWAY_TOKEN}"

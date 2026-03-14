@@ -1,8 +1,14 @@
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "tsdown";
 
 const env = {
   NODE_ENV: "production",
 };
+
+const rootDir = dirname(fileURLToPath(import.meta.url));
+type BuildEntry = string | string[] | Record<string, string>;
 
 function buildInputOptions(options: { onLog?: unknown; [key: string]: unknown }) {
   if (process.env.OPENCLAW_BUILD_VERBOSE === "1") {
@@ -38,6 +44,33 @@ function nodeBuildConfig(config: Record<string, unknown>) {
     platform: "node",
     inputOptions: buildInputOptions,
   };
+}
+
+function resolveExistingEntry(entry: BuildEntry): BuildEntry | undefined {
+  if (typeof entry === "string") {
+    return existsSync(resolve(rootDir, entry)) ? entry : undefined;
+  }
+
+  if (Array.isArray(entry)) {
+    const existing = entry.filter((item) => existsSync(resolve(rootDir, item)));
+    return existing.length > 0 ? existing : undefined;
+  }
+
+  const existing = Object.fromEntries(
+    Object.entries(entry).filter(([, target]) => existsSync(resolve(rootDir, target))),
+  );
+  return Object.keys(existing).length > 0 ? existing : undefined;
+}
+
+function maybeNodeBuildConfig(config: Record<string, unknown> & { entry: BuildEntry }) {
+  const entry = resolveExistingEntry(config.entry);
+  if (!entry) {
+    return null;
+  }
+  return nodeBuildConfig({
+    ...config,
+    entry,
+  });
 }
 
 const pluginSdkEntrypoints = [
@@ -87,21 +120,27 @@ const pluginSdkEntrypoints = [
   "keyed-async-queue",
 ] as const;
 
+// Vendored snapshots can lag behind upstream package exports; skip absent entry files
+// so local/container builds can still produce the runtime artifacts this repo uses.
+const availablePluginSdkEntrypoints = pluginSdkEntrypoints.filter((entry) =>
+  existsSync(resolve(rootDir, "src/plugin-sdk", `${entry}.ts`)),
+);
+
 export default defineConfig([
-  nodeBuildConfig({
+  maybeNodeBuildConfig({
     entry: "src/index.ts",
   }),
-  nodeBuildConfig({
+  maybeNodeBuildConfig({
     entry: "src/entry.ts",
   }),
-  nodeBuildConfig({
+  maybeNodeBuildConfig({
     // Ensure this module is bundled as an entry so legacy CLI shims can resolve its exports.
     entry: "src/cli/daemon-cli.ts",
   }),
-  nodeBuildConfig({
+  maybeNodeBuildConfig({
     entry: "src/infra/warning-filter.ts",
   }),
-  nodeBuildConfig({
+  maybeNodeBuildConfig({
     // Keep sync lazy-runtime channel modules as concrete dist files.
     entry: {
       "channels/plugins/agent-tools/whatsapp-login":
@@ -116,16 +155,16 @@ export default defineConfig([
       "line/template-messages": "src/line/template-messages.ts",
     },
   }),
-  ...pluginSdkEntrypoints.map((entry) =>
-    nodeBuildConfig({
+  ...availablePluginSdkEntrypoints.map((entry) =>
+    maybeNodeBuildConfig({
       entry: `src/plugin-sdk/${entry}.ts`,
       outDir: "dist/plugin-sdk",
     }),
   ),
-  nodeBuildConfig({
+  maybeNodeBuildConfig({
     entry: "src/extensionAPI.ts",
   }),
-  nodeBuildConfig({
+  maybeNodeBuildConfig({
     entry: ["src/hooks/bundled/*/handler.ts", "src/hooks/llm-slug-generator.ts"],
   }),
-]);
+].filter((config): config is NonNullable<typeof config> => config !== null));

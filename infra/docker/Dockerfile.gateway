@@ -17,7 +17,11 @@ COPY . /workspace
 
 # Prepare vendored OpenClaw snapshot.
 RUN if [ -f /workspace/openclaw/package.json ]; then \
-      pnpm -C /workspace/openclaw install --frozen-lockfile && \
+      if [ -f /workspace/openclaw/pnpm-lock.yaml ]; then \
+        pnpm -C /workspace/openclaw install --frozen-lockfile; \
+      else \
+        pnpm -C /workspace/openclaw install --no-frozen-lockfile; \
+      fi && \
       pnpm -C /workspace/openclaw exec tsdown --no-clean; \
     fi
 

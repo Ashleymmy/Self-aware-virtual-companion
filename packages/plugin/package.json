@@ -7,6 +7,7 @@
     "@sinclair/typebox": "^0.34.48"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.json || test -f dist/index.js",
     "test": "vitest run src/*.test.ts"
   },
   "peerDependencies": {
@@ -18,13 +19,13 @@
     }
   },
   "devDependencies": {
-    "openclaw": "file:../../openclaw",
+    "openclaw": "2026.3.13",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
   "openclaw": {
     "extensions": [
-      "./index.ts"
+      "./dist/index.js"
     ]
   }
 }

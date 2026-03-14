@@ -2,19 +2,15 @@ name: savc-cloud
 
 services:
   savc-gateway:
-    image: ${SAVC_GATEWAY_IMAGE:-savc-openclaw:dev}
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.gateway
-      args:
-        OPENCLAW_DOCKER_SKIP_CHOWN: "1"
+    image: ${SAVC_GATEWAY_IMAGE:-node:22-bookworm}
     init: true
     restart: unless-stopped
     working_dir: /workspace
     user: "0:0"
     environment:
       HOME: /home/node
-      OPENCLAW_ROOT: /workspace/openclaw
+      NODE_OPTIONS: ${SAVC_GATEWAY_NODE_OPTIONS:---max-old-space-size=1536}
+      OPENCLAW_ROOT: ${SAVC_CONTAINER_OPENCLAW_ROOT:-/workspace/node_modules/.pnpm/node_modules/openclaw}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -24,6 +20,7 @@ services:
       SAVC_CODEX_ACP_COMMAND: ${SAVC_CODEX_ACP_COMMAND:-codex-acp}
       SAVC_CODEX_ACP_PERMISSION_MODE: ${SAVC_CODEX_ACP_PERMISSION_MODE:-approve-all}
       SAVC_CODEX_ACP_NON_INTERACTIVE: ${SAVC_CODEX_ACP_NON_INTERACTIVE:-fail}
+      SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK: ${SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK:-1}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANYROUTER_API_KEY: ${ANYROUTER_API_KEY:-}
       WZW_API_KEY: ${WZW_API_KEY:-}
@@ -48,27 +45,26 @@ services:
         set -e
         corepack enable
         mkdir -p /home/node/.openclaw
+        if [ ! -f "$${OPENCLAW_ROOT}/openclaw.mjs" ]; then
+          pnpm --dir /workspace install --no-frozen-lockfile --lockfile=false
+        fi
         if [ -d /bootstrap/openclaw-credentials ]; then
           mkdir -p /home/node/.openclaw/credentials
           find /bootstrap/openclaw-credentials -maxdepth 1 -type f -name '*.json' \
             -exec cp -f {} /home/node/.openclaw/credentials/ \;
         fi
         bash /workspace/scripts/setup.sh
-        exec bash /workspace/scripts/openclaw.sh gateway --bind lan --port 18789
+        exec node "$${OPENCLAW_ROOT}/openclaw.mjs" gateway --bind lan --port 18789
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
       timeout: 5s
       retries: 5
 
   savc-ui:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.runtime
-      args:
-        SAVC_RUNTIME_SKIP_CHOWN: "1"
+    image: node:22-bookworm
     init: true
     restart: unless-stopped
     working_dir: /workspace
@@ -78,7 +74,8 @@ services:
         condition: service_healthy
     environment:
       HOME: /home/node
-      OPENCLAW_ROOT: /workspace/openclaw
+      NODE_OPTIONS: ${SAVC_GATEWAY_NODE_OPTIONS:---max-old-space-size=1536}
+      OPENCLAW_ROOT: ${SAVC_CONTAINER_OPENCLAW_ROOT:-/workspace/node_modules/.pnpm/node_modules/openclaw}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       SAVC_GATEWAY_INTERNAL_URL: ${SAVC_GATEWAY_INTERNAL_URL:-http://savc-gateway:18789}
@@ -94,8 +91,8 @@ services:
       - |
         set -e
         corepack enable
-        if ! pnpm --dir /workspace/packages/ui exec vite --version >/dev/null 2>&1; then
-          pnpm --dir /workspace install
+        if [ ! -f "$${OPENCLAW_ROOT}/openclaw.mjs" ]; then
+          pnpm --dir /workspace install --no-frozen-lockfile --lockfile=false
         fi
         exec pnpm --dir /workspace/packages/ui exec vite --host 0.0.0.0 --port ${SAVC_UI_PORT:-5174}
     ports:
@@ -107,11 +104,7 @@ services:
       retries: 5
 
   savc-proactive:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.runtime
-      args:
-        SAVC_RUNTIME_SKIP_CHOWN: "1"
+    image: node:22-bookworm
     profiles: ["automation"]
     init: true
     restart: unless-stopped
@@ -122,7 +115,7 @@ services:
         condition: service_healthy
     environment:
       HOME: /home/node
-      OPENCLAW_ROOT: /workspace/openclaw
+      OPENCLAW_ROOT: ${SAVC_CONTAINER_OPENCLAW_ROOT:-/workspace/node_modules/.pnpm/node_modules/openclaw}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -147,6 +140,7 @@ services:
       OPENWEATHER_API_KEY_FILE: ${OPENWEATHER_API_KEY_FILE:-}
       OPENWEATHER_LAT: ${OPENWEATHER_LAT:-}
       OPENWEATHER_LON: ${OPENWEATHER_LON:-}
+      SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK: ${SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK:-1}
     volumes:
       - ../../:/workspace
       - savc_openclaw_state:/home/node/.openclaw
@@ -157,8 +151,8 @@ services:
         set -e
         mkdir -p /home/node/.openclaw
         corepack enable
-        if [ ! -d /workspace/node_modules ]; then
-          pnpm --dir /workspace install
+        if [ ! -f "$${OPENCLAW_ROOT}/openclaw.mjs" ]; then
+          pnpm --dir /workspace install --no-frozen-lockfile --lockfile=false
         fi
         bash /workspace/scripts/setup.sh
         exec node /workspace/scripts/runtime/proactive_daemon.mjs run \

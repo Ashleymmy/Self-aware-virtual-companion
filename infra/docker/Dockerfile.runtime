@@ -6,7 +6,11 @@ WORKDIR /workspace
 
 COPY . /workspace
 
-RUN pnpm -C /workspace/openclaw install --frozen-lockfile \
+RUN if [ -f /workspace/openclaw/pnpm-lock.yaml ]; then \
+      pnpm -C /workspace/openclaw install --frozen-lockfile; \
+    else \
+      pnpm -C /workspace/openclaw install --no-frozen-lockfile; \
+    fi \
  && pnpm -C /workspace/openclaw exec tsdown --no-clean \
  && pnpm install --frozen-lockfile
 
