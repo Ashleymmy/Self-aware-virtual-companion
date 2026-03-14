@@ -26,7 +26,7 @@ export type Tab =
   | "logs"
   | "progressHub";
 
-export type ExternalNavLinkId = "taskRuntime" | "openclawControl";
+export type ExternalNavLinkId = "studioWorkbench" | "taskRuntime" | "openclawControl";
 
 export type ExternalNavLink = {
   id: ExternalNavLinkId;
@@ -36,6 +36,12 @@ export type ExternalNavLink = {
 };
 
 export const EXTERNAL_NAV_LINKS: ExternalNavLink[] = [
+  {
+    id: "studioWorkbench",
+    groupLabel: "navGroups.system",
+    label: "links.studioWorkbench",
+    icon: "monitor",
+  },
   {
     id: "taskRuntime",
     groupLabel: "navGroups.system",

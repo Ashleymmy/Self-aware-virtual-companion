@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "description": "Self-aware Virtual Companion (SAVC)",
   "scripts": {
+    "service:commercial": "node packages/service/src/server.mjs",
+    "test:commercial-service": "node --test packages/service/src/*.test.mjs",
     "setup": "bash scripts/setup.sh",
     "dev:check": "bash scripts/dev_preflight.sh",
     "dev": "bash scripts/dev.sh",

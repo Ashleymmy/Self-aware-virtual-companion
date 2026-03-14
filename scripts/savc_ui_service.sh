@@ -26,7 +26,7 @@ resolve_runtime_root() {
 RUNTIME_ROOT="$(resolve_runtime_root)"
 PID_FILE="${RUNTIME_ROOT}/savc-ui-dev.pid"
 LOG_FILE="${RUNTIME_ROOT}/savc-ui-dev.log"
-UI_PORT="5174"
+UI_PORT="${SAVC_UI_PORT:-5174}"
 
 is_listening() {
   ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)${UI_PORT}$"

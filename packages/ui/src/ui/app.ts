@@ -13,7 +13,7 @@ import { renderPersona } from "./views/persona.js";
 import { renderOrchestrator } from "./views/orchestrator.js";
 import { renderLogs, activateLogsView, deactivateLogsView } from "./views/logs.js";
 import { GatewayBrowserClient } from "./gateway-ws.js";
-import { readUiEnv, resolveGatewayWsUrl } from "./gateway-url.js";
+import { readUiEnv, resolveGatewayHttpUrl, resolveGatewayWsUrl } from "./gateway-url.js";
 
 const GATEWAY_STATUS_POLL_INTERVAL_MS = 15_000;
 const GATEWAY_REQUEST_TIMEOUT_MS = 8_000;
@@ -193,12 +193,16 @@ export class SavcApp extends LitElement {
   }
 
   private _onExternalNavClick = (linkId: ExternalNavLinkId) => {
+    if (linkId === "studioWorkbench") {
+      this._openExternal(new URL("/studio/index.html", window.location.origin));
+      return;
+    }
     if (linkId === "taskRuntime") {
       this._openExternal(new URL("/progress-hub/task-runtime.html", window.location.origin));
       return;
     }
     if (linkId === "openclawControl") {
-      this._openExternal(new URL("http://127.0.0.1:18789/"));
+      this._openExternal(new URL(resolveGatewayHttpUrl(readUiEnv("VITE_SAVC_GATEWAY_URL"))));
     }
   };
 

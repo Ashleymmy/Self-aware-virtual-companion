@@ -7,6 +7,24 @@ source "${SCRIPT_DIR}/lib/paths.sh"
 savc_use_repo_root "${BASH_SOURCE[0]}"
 ENV_FILE="${REPO_ROOT}/config/.env.local"
 WORKSPACE_DIR_DEFAULT="${REPO_ROOT}/packages/core"
+ENV_OPENCLAW_PORT_OVERRIDE="${OPENCLAW_PORT-}"
+ENV_OPENCLAW_WORKSPACE_OVERRIDE="${OPENCLAW_WORKSPACE-}"
+ENV_SAVC_AUTODEV_ENABLE_OVERRIDE="${SAVC_AUTODEV_ENABLE-}"
+ENV_SAVC_CODEX_ACP_ENABLE_OVERRIDE="${SAVC_CODEX_ACP_ENABLE-}"
+ENV_SAVC_CODEX_ACP_CWD_OVERRIDE="${SAVC_CODEX_ACP_CWD-}"
+ENV_SAVC_CODEX_ACP_AGENT_OVERRIDE="${SAVC_CODEX_ACP_AGENT-}"
+ENV_SAVC_CODEX_ACP_COMMAND_OVERRIDE="${SAVC_CODEX_ACP_COMMAND-}"
+ENV_SAVC_CODEX_ACP_PERMISSION_MODE_OVERRIDE="${SAVC_CODEX_ACP_PERMISSION_MODE-}"
+ENV_SAVC_CODEX_ACP_NON_INTERACTIVE_OVERRIDE="${SAVC_CODEX_ACP_NON_INTERACTIVE-}"
+
+restore_env_override() {
+  local key="$1"
+  local value="$2"
+  if [[ -n "${value}" ]]; then
+    printf -v "${key}" '%s' "${value}"
+    export "${key}"
+  fi
+}
 
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/lib/secret_env.sh"
@@ -17,6 +35,16 @@ if [[ -f "${ENV_FILE}" ]]; then
   source "${ENV_FILE}"
   set +a
 fi
+
+restore_env_override "OPENCLAW_PORT" "${ENV_OPENCLAW_PORT_OVERRIDE}"
+restore_env_override "OPENCLAW_WORKSPACE" "${ENV_OPENCLAW_WORKSPACE_OVERRIDE}"
+restore_env_override "SAVC_AUTODEV_ENABLE" "${ENV_SAVC_AUTODEV_ENABLE_OVERRIDE}"
+restore_env_override "SAVC_CODEX_ACP_ENABLE" "${ENV_SAVC_CODEX_ACP_ENABLE_OVERRIDE}"
+restore_env_override "SAVC_CODEX_ACP_CWD" "${ENV_SAVC_CODEX_ACP_CWD_OVERRIDE}"
+restore_env_override "SAVC_CODEX_ACP_AGENT" "${ENV_SAVC_CODEX_ACP_AGENT_OVERRIDE}"
+restore_env_override "SAVC_CODEX_ACP_COMMAND" "${ENV_SAVC_CODEX_ACP_COMMAND_OVERRIDE}"
+restore_env_override "SAVC_CODEX_ACP_PERMISSION_MODE" "${ENV_SAVC_CODEX_ACP_PERMISSION_MODE_OVERRIDE}"
+restore_env_override "SAVC_CODEX_ACP_NON_INTERACTIVE" "${ENV_SAVC_CODEX_ACP_NON_INTERACTIVE_OVERRIDE}"
 
 # Support both canonical VOLCES_* names and the existing local lowercase keys.
 export_resolved_secret "OPENCLAW_GATEWAY_TOKEN"
@@ -243,6 +271,12 @@ fi
 # - 1 (default): enable yuanyuan autonomous dev path (coding tools + workspace access)
 # - 0: keep conservative messaging-only defaults
 SAVC_AUTODEV_ENABLE="${SAVC_AUTODEV_ENABLE:-1}"
+SAVC_CODEX_ACP_ENABLE="${SAVC_CODEX_ACP_ENABLE:-0}"
+SAVC_CODEX_ACP_CWD="${SAVC_CODEX_ACP_CWD:-${REPO_ROOT}}"
+SAVC_CODEX_ACP_AGENT="${SAVC_CODEX_ACP_AGENT:-codex}"
+SAVC_CODEX_ACP_COMMAND="${SAVC_CODEX_ACP_COMMAND:-codex-acp}"
+SAVC_CODEX_ACP_PERMISSION_MODE="${SAVC_CODEX_ACP_PERMISSION_MODE:-approve-all}"
+SAVC_CODEX_ACP_NON_INTERACTIVE="${SAVC_CODEX_ACP_NON_INTERACTIVE:-fail}"
 
 if [[ "${SAVC_AUTODEV_ENABLE}" == "1" ]]; then
   SANDBOX_WORKSPACE_ACCESS="rw"
@@ -587,14 +621,12 @@ ${IMESSAGE_BLOCK}
   "plugins": {
     "load": {
       "paths": [
-        "${REPO_ROOT}/packages/plugin",
-        "${OPENCLAW_SUBMODULE}/extensions/imessage"
+        "${REPO_ROOT}/packages/plugin"
       ]
     },
     "entries": {
       "discord": { "enabled": true },
       "telegram": { "enabled": true },
-      "imessage": { "enabled": true },
       "savc-orchestrator": {
         "enabled": true,
         "config": {
@@ -612,6 +644,16 @@ ${IMESSAGE_BLOCK}
   }
 }
 JSON
+
+if [[ "${SAVC_CODEX_ACP_ENABLE}" == "1" ]]; then
+  bash "${REPO_ROOT}/scripts/yuanyuan_enable_codex_acp.sh" \
+    --config "${OPENCLAW_CONFIG}" \
+    --workspace "${SAVC_CODEX_ACP_CWD}" \
+    --agent "${SAVC_CODEX_ACP_AGENT}" \
+    --command "${SAVC_CODEX_ACP_COMMAND}" \
+    --permission-mode "${SAVC_CODEX_ACP_PERMISSION_MODE}" \
+    --non-interactive "${SAVC_CODEX_ACP_NON_INTERACTIVE}"
+fi
 
 echo "[OK] Wrote OpenClaw config: ${OPENCLAW_CONFIG}"
 

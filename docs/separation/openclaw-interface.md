@@ -2,6 +2,18 @@
 
 > 本文档记录当前仓库基线下，`packages/plugin` 如何与 `openclaw/`、`packages/core`、`scripts/runtime/*` 对接。这里描述的是已落地结构，不再讨论旧的 `openclaw/extensions/savc-orchestrator` 布局。
 
+## 内核边界
+
+- `openclaw/` 视为仓库内核快照，默认不在日常 SAVC 开发中直接修改其源码。
+- SAVC 的功能扩展优先落在：
+  - `packages/plugin`
+  - `packages/core`
+  - `packages/ui`
+  - `scripts/*`
+  - `config/*`
+- 若 OpenClaw 升级导致接口变化，优先通过 SAVC 侧适配收口，而不是继续把业务逻辑散落回 `openclaw/src/*`。
+- 只有在确认是 OpenClaw 内核缺陷、且无法通过外层适配解决时，才单独评估对 `openclaw/` vendor 快照做最小修补，并应作为例外处理。
+
 ## 当前基线
 
 - OpenClaw 根目录：`<REPO_ROOT>/openclaw`
@@ -152,8 +164,7 @@ export default function register(api: OpenClawPluginApi) {
   "plugins": {
     "load": {
       "paths": [
-        "<REPO_ROOT>/packages/plugin",
-        "<OPENCLAW_ROOT>/extensions/imessage"
+        "<REPO_ROOT>/packages/plugin"
       ]
     },
     "entries": {

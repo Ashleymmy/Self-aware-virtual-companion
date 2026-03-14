@@ -39,6 +39,8 @@ set +a
 
 HOST_SECRET_DIR="${SAVC_HOST_SECRETS_DIR:-${REPO_ROOT}/infra/docker/secrets}"
 SECRETS_MOUNT="${SAVC_SECRETS_MOUNT:-/run/savc-secrets}"
+HOST_CODEX_HOME_DIR="${SAVC_HOST_CODEX_HOME_DIR:-${REPO_ROOT}/infra/docker/bootstrap/empty-codex-home}"
+HOST_DEV_WORKSPACE_DIR="${SAVC_HOST_DEV_WORKSPACE_DIR:-${REPO_ROOT}/infra/docker/bootstrap/empty-workspace}"
 
 map_secret_file_to_host() {
   local configured_path="$1"
@@ -93,6 +95,12 @@ else
   fail "host secret dir missing: ${HOST_SECRET_DIR}"
 fi
 
+if [[ -d "${HOST_CODEX_HOME_DIR}" ]]; then
+  pass "codex home dir exists: ${HOST_CODEX_HOME_DIR}"
+else
+  warn "codex home dir missing: ${HOST_CODEX_HOME_DIR}"
+fi
+
 check_secret_var "OPENCLAW_GATEWAY_TOKEN" "required" "gateway token"
 
 providers=(
@@ -130,6 +138,29 @@ if [[ "${VITE_SAVC_GATEWAY_URL:-/gateway}" == "/gateway" ]]; then
   pass "frontend gateway URL uses in-app proxy path"
 else
   warn "VITE_SAVC_GATEWAY_URL is not /gateway (current: ${VITE_SAVC_GATEWAY_URL})"
+fi
+
+if [[ "${SAVC_CODEX_ACP_ENABLE:-0}" == "1" ]]; then
+  if [[ -n "${OPENAI_API_KEY:-}" || -n "${OPENAI_API_KEY_FILE:-}" ]]; then
+    pass "codex ACP auth configured via OPENAI_API_KEY"
+  else
+    fail "codex ACP enabled but OPENAI_API_KEY / OPENAI_API_KEY_FILE is not configured"
+  fi
+
+  if [[ "${SAVC_CODEX_ACP_CWD:-}" == /workspace-devrepo* ]]; then
+    if [[ -d "${HOST_DEV_WORKSPACE_DIR}" ]]; then
+      pass "codex workspace dir exists: ${HOST_DEV_WORKSPACE_DIR}"
+      if find "${HOST_DEV_WORKSPACE_DIR}" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
+        pass "codex workspace dir is non-empty"
+      else
+        warn "codex workspace dir is empty: ${HOST_DEV_WORKSPACE_DIR}"
+      fi
+    else
+      fail "codex workspace dir missing: ${HOST_DEV_WORKSPACE_DIR}"
+    fi
+  else
+    warn "codex ACP cwd does not use /workspace-devrepo (current: ${SAVC_CODEX_ACP_CWD:-unset})"
+  fi
 fi
 
 if [[ -n "${GOOGLE_CALENDAR_ID:-}" ]]; then

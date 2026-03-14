@@ -57,6 +57,7 @@ export const zhCN = {
 
   // 外部导航入口
   links: {
+    studioWorkbench: "Studio 工作台",
     taskRuntime: "任务运行态联调台",
     openclawControl: "OpenClaw Control",
   },

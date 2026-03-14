@@ -5,6 +5,10 @@ ENV PATH="/root/.bun/bin:${PATH}"
 
 RUN corepack enable
 
+ARG OPENAI_CODEX_CLI_VERSION="0.114.0"
+ARG OPENAI_CODEX_ACP_VERSION="0.10.0"
+RUN npm install -g "@openai/codex@${OPENAI_CODEX_CLI_VERSION}" "@zed-industries/codex-acp@${OPENAI_CODEX_ACP_VERSION}"
+
 # OpenClaw must be provided externally (git submodule, mounted volume, or pre-built)
 # If openclaw/ contains a built version, it will be used directly
 WORKDIR /workspace

@@ -170,6 +170,15 @@ type RuntimeTaskSnapshot = {
 
 const TASK_STATES: TaskState[] = ["queued", "running", "retry", "succeeded", "failed", "canceled"];
 
+function resolveUiPort(): number {
+  const raw = String(process.env.SAVC_UI_PORT || "").trim();
+  if (!raw) {
+    return 5174;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 5174;
+}
+
 type ModuleBlueprint = {
   id: string;
   name: string;
@@ -3003,7 +3012,7 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: 5174,
+    port: resolveUiPort(),
     strictPort: true,
   },
 });

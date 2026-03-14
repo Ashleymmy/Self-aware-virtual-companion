@@ -14,6 +14,20 @@ source "${REPO_ROOT}/scripts/lib/secret_env.sh"
 ENV_FILE="${REPO_ROOT}/config/.env.local"
 OPENCLAW_CONFIG="${HOME}/.openclaw/openclaw.json"
 OPENCLAW_SUBMODULE="${OPENCLAW_ROOT}"
+ENV_OPENCLAW_PORT_OVERRIDE="${OPENCLAW_PORT-}"
+ENV_OPENCLAW_GATEWAY_PORT_OVERRIDE="${OPENCLAW_GATEWAY_PORT-}"
+ENV_SAVC_UI_PORT_OVERRIDE="${SAVC_UI_PORT-}"
+ENV_SAVC_GATEWAY_INTERNAL_URL_OVERRIDE="${SAVC_GATEWAY_INTERNAL_URL-}"
+ENV_VITE_SAVC_GATEWAY_URL_OVERRIDE="${VITE_SAVC_GATEWAY_URL-}"
+
+restore_env_override() {
+  local key="$1"
+  local value="$2"
+  if [[ -n "${value}" ]]; then
+    printf -v "${key}" '%s' "${value}"
+    export "${key}"
+  fi
+}
 
 upsert_env_var() {
   local file="$1"
@@ -75,6 +89,12 @@ else
   exit 1
 fi
 
+restore_env_override "OPENCLAW_PORT" "${ENV_OPENCLAW_PORT_OVERRIDE}"
+restore_env_override "OPENCLAW_GATEWAY_PORT" "${ENV_OPENCLAW_GATEWAY_PORT_OVERRIDE}"
+restore_env_override "SAVC_UI_PORT" "${ENV_SAVC_UI_PORT_OVERRIDE}"
+restore_env_override "SAVC_GATEWAY_INTERNAL_URL" "${ENV_SAVC_GATEWAY_INTERNAL_URL_OVERRIDE}"
+restore_env_override "VITE_SAVC_GATEWAY_URL" "${ENV_VITE_SAVC_GATEWAY_URL_OVERRIDE}"
+
 export_resolved_secret "OPENCLAW_GATEWAY_TOKEN"
 export_resolved_secret "BRAVE_API_KEY"
 export_resolved_secret "SILICON_EMBEDDING_API_KEY"
@@ -102,19 +122,24 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 1
 fi
 
+SAVC_UI_PORT_EFFECTIVE="${SAVC_UI_PORT:-5174}"
+OPENCLAW_GATEWAY_PORT_EFFECTIVE="${OPENCLAW_PORT:-18789}"
+SAVC_DEV_NO_WATCH="${SAVC_DEV_NO_WATCH:-0}"
+
 SAVC_UI_STARTED_BY_DEV=0
 if bash "${REPO_ROOT}/scripts/savc_ui_service.sh" status >/dev/null 2>&1; then
-  echo "[INFO] savc-ui already running (:5174)"
+  echo "[INFO] savc-ui already running (:${SAVC_UI_PORT_EFFECTIVE})"
 else
-  echo "[INFO] starting savc-ui companion service (:5174)"
+  echo "[INFO] starting savc-ui companion service (:${SAVC_UI_PORT_EFFECTIVE})"
   bash "${REPO_ROOT}/scripts/savc_ui_service.sh" start
   SAVC_UI_STARTED_BY_DEV=1
 fi
-echo "[INFO] SAVC-UI URL: http://localhost:5174/"
-echo "[INFO] Progress Hub URL: http://localhost:5174/progress-hub/index.html"
+echo "[INFO] SAVC-UI URL: http://localhost:${SAVC_UI_PORT_EFFECTIVE}/"
+echo "[INFO] Progress Hub URL: http://localhost:${SAVC_UI_PORT_EFFECTIVE}/progress-hub/index.html"
 
-# OpenClaw uses OPENCLAW_GATEWAY_PORT (docs: --port > OPENCLAW_GATEWAY_PORT > gateway.port > default 18789)
-export OPENCLAW_GATEWAY_PORT="${OPENCLAW_PORT:-18789}"
+# Keep env and CLI in sync so local dev can safely avoid default Docker ports.
+export OPENCLAW_GATEWAY_PORT="${OPENCLAW_GATEWAY_PORT_EFFECTIVE}"
+echo "[INFO] OpenClaw Gateway URL: http://localhost:${OPENCLAW_GATEWAY_PORT_EFFECTIVE}/"
 
 # Ensure a local token exists when gateway.auth.token uses env substitution in ~/.openclaw/openclaw.json
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
@@ -142,14 +167,23 @@ upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "VOLCES_BASE_URL" "${VOLCES_BASE_URL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "VOLCES_MODEL" "${VOLCES_MODEL:-}"
 upsert_env_var "${OPENCLAW_GLOBAL_ENV}" "CODE_API_KEY" "${CODE_API_KEY:-}"
 
-# Note: upstream `pnpm gateway:watch` can get stuck if a watch rebuild deletes `dist/entry.js`
-# during a Node `--watch` restart. We run the equivalent watch pipeline but disable cleaning.
-pnpm -C "${OPENCLAW_SUBMODULE}" exec tsdown --no-clean
-pnpm -C "${OPENCLAW_SUBMODULE}" exec tsdown --watch --no-clean &
-COMPILER_PID=$!
+COMPILER_PID=""
+
+if [[ "${SAVC_DEV_NO_WATCH}" == "1" ]]; then
+  echo "[INFO] OpenClaw watch disabled; running single build + gateway"
+  pnpm -C "${OPENCLAW_SUBMODULE}" exec tsdown --no-clean
+else
+  # Note: upstream `pnpm gateway:watch` can get stuck if a watch rebuild deletes `dist/entry.js`
+  # during a Node `--watch` restart. We run the equivalent watch pipeline but disable cleaning.
+  pnpm -C "${OPENCLAW_SUBMODULE}" exec tsdown --no-clean
+  pnpm -C "${OPENCLAW_SUBMODULE}" exec tsdown --watch --no-clean &
+  COMPILER_PID=$!
+fi
 
 cleanup() {
-  kill "${COMPILER_PID}" 2>/dev/null || true
+  if [[ -n "${COMPILER_PID}" ]]; then
+    kill "${COMPILER_PID}" 2>/dev/null || true
+  fi
   if [[ "${SAVC_UI_STARTED_BY_DEV}" -eq 1 ]]; then
     bash "${REPO_ROOT}/scripts/savc_ui_service.sh" stop >/dev/null 2>&1 || true
   fi
@@ -157,4 +191,8 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cd "${OPENCLAW_SUBMODULE}"
-node --watch openclaw.mjs gateway --force
+if [[ "${SAVC_DEV_NO_WATCH}" == "1" ]]; then
+  node openclaw.mjs gateway --force --port "${OPENCLAW_GATEWAY_PORT_EFFECTIVE}"
+else
+  node --watch openclaw.mjs gateway --force --port "${OPENCLAW_GATEWAY_PORT_EFFECTIVE}"
+fi

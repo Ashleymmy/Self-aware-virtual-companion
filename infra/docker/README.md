@@ -31,6 +31,9 @@ COMPOSE_PROFILES=automation bash scripts/infra/dev_container.sh up
 - `savc-ui` now proxies gateway traffic through the Vite server, so browser clients no longer need `VITE_SAVC_GATEWAY_TOKEN`.
 - Set `OPENCLAW_HOST_CREDENTIALS_DIR` to your host `~/.openclaw/credentials` if you want Docker to inherit existing pairing approvals/allowlists.
 - For production cloud deployment, replace local bind mounts with image-based artifacts and secrets manager integration.
+- To let yuanyuan drive Codex on a cloud host, enable `SAVC_CODEX_ACP_ENABLE=1` and provide `OPENAI_API_KEY` / `OPENAI_API_KEY_FILE`.
+- For production self-development, point `SAVC_HOST_DEV_WORKSPACE_DIR` at a persistent repo checkout and keep `SAVC_CODEX_ACP_CWD=/workspace-devrepo`.
+- `SAVC_HOST_CODEX_HOME_DIR` is an optional bind mount for `/home/node/.codex`; it lets you persist Codex CLI local config, but remote/cloud runs should still prefer API key auth.
 
 ## Production
 
