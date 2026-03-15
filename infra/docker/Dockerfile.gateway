@@ -1,29 +1,11 @@
 FROM node:22-bookworm
 
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:${PATH}"
-
 RUN corepack enable
+RUN npm install -g @openai/codex@0.114.0 @zed-industries/codex-acp@0.10.0
 
-ARG OPENAI_CODEX_CLI_VERSION="0.114.0"
-ARG OPENAI_CODEX_ACP_VERSION="0.10.0"
-RUN npm install -g "@openai/codex@${OPENAI_CODEX_CLI_VERSION}" "@zed-industries/codex-acp@${OPENAI_CODEX_ACP_VERSION}"
-
-# OpenClaw must be provided externally (git submodule, mounted volume, or pre-built)
-# If openclaw/ contains a built version, it will be used directly
 WORKDIR /workspace
 
 COPY . /workspace
-
-# Prepare vendored OpenClaw snapshot.
-RUN if [ -f /workspace/openclaw/package.json ]; then \
-      if [ -f /workspace/openclaw/pnpm-lock.yaml ]; then \
-        pnpm -C /workspace/openclaw install --frozen-lockfile; \
-      else \
-        pnpm -C /workspace/openclaw install --no-frozen-lockfile; \
-      fi && \
-      pnpm -C /workspace/openclaw exec tsdown --no-clean; \
-    fi
 
 ENV NODE_ENV=production
 
@@ -32,4 +14,4 @@ RUN if [ "${OPENCLAW_DOCKER_SKIP_CHOWN}" != "1" ]; then chown -R node:node /work
 
 USER node
 
-CMD ["bash", "-lc", "mkdir -p /home/node/.openclaw && bash /workspace/scripts/setup.sh && exec node /workspace/openclaw/openclaw.mjs gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789}"]
+CMD ["bash", "-lc", "corepack enable && OPENCLAW_ROOT_RUNTIME=\"${OPENCLAW_ROOT:-/workspace/node_modules/.pnpm/node_modules/openclaw}\" && if [ ! -f \"$OPENCLAW_ROOT_RUNTIME/openclaw.mjs\" ]; then pnpm --dir /workspace install --no-frozen-lockfile --lockfile=false; fi && mkdir -p /home/node/.openclaw && bash /workspace/scripts/setup.sh && exec node \"$OPENCLAW_ROOT_RUNTIME/openclaw.mjs\" gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789}"]

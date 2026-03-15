@@ -1,10 +1,10 @@
 # SAVC storage disaster backup
 savcStorageBackup:
-  generatedAt: "2026-03-12T16:05:31.963Z"
+  generatedAt: "2026-03-14T23:10:22.790Z"
   reason: runtime_log
   status:
     ok: true
-    generatedAt: "2026-03-12T16:05:31.962Z"
+    generatedAt: "2026-03-14T23:10:22.789Z"
     mode:
       primary: sqlite
       cache: memory
@@ -16,7 +16,7 @@ savcStorageBackup:
         configured: true
         state: online
         message: ready
-        latencyMs: 3
+        latencyMs: 1
       cache:
         name: cache
         engine: memory
@@ -39,15 +39,79 @@ savcStorageBackup:
         message: "backup ready"
         latencyMs: null
     metrics:
-      runtimeLogCount: 23
+      runtimeLogCount: 31
       kvCount: 0
       cacheEntries: 0
     paths:
-      sqlite: /home/min/SAVC/Self-aware-virtual-companion/packages/config/storage/savc-system.sqlite
-      yamlBackup: /home/min/SAVC/Self-aware-virtual-companion/packages/config/storage/savc-disaster-backup.yaml
+      sqlite: /workspace/packages/config/storage/savc-system.sqlite
+      yamlBackup: /workspace/packages/config/storage/savc-disaster-backup.yaml
   kv:
     []
   recentLogs:
+    -
+      id: 31
+      level: info
+      subsystem: storage
+      message: "sqlite initialized"
+      context:
+        sqlitePath: /workspace/packages/config/storage/savc-system.sqlite
+      createdAt: "2026-03-14T23:10:22.788Z"
+    -
+      id: 30
+      level: info
+      subsystem: server
+      message: "savc-ui storage service booted"
+      context:
+        pid: 32
+      createdAt: "2026-03-14T22:14:22.665Z"
+    -
+      id: 29
+      level: info
+      subsystem: storage
+      message: "sqlite initialized"
+      context:
+        sqlitePath: /workspace/packages/config/storage/savc-system.sqlite
+      createdAt: "2026-03-14T22:14:22.658Z"
+    -
+      id: 28
+      level: info
+      subsystem: server
+      message: "savc-ui storage service booted"
+      context:
+        pid: 32
+      createdAt: "2026-03-14T13:29:54.247Z"
+    -
+      id: 27
+      level: info
+      subsystem: storage
+      message: "sqlite initialized"
+      context:
+        sqlitePath: /workspace/packages/config/storage/savc-system.sqlite
+      createdAt: "2026-03-14T13:29:54.245Z"
+    -
+      id: 26
+      level: info
+      subsystem: server
+      message: "savc-ui storage service booted"
+      context:
+        pid: 33
+      createdAt: "2026-03-14T10:52:10.498Z"
+    -
+      id: 25
+      level: info
+      subsystem: storage
+      message: "sqlite initialized"
+      context:
+        sqlitePath: /workspace/packages/config/storage/savc-system.sqlite
+      createdAt: "2026-03-14T10:52:10.486Z"
+    -
+      id: 24
+      level: info
+      subsystem: server
+      message: "savc-ui storage service booted"
+      context:
+        pid: 28382
+      createdAt: "2026-03-12T16:05:31.964Z"
     -
       id: 23
       level: info

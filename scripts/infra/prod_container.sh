@@ -12,14 +12,14 @@ ENV_EXAMPLE="${REPO_ROOT}/infra/docker/.env.prod.example"
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/prod_container.sh init-env
-  bash scripts/prod_container.sh validate
-  bash scripts/prod_container.sh up
-  bash scripts/prod_container.sh down
-  bash scripts/prod_container.sh restart
-  bash scripts/prod_container.sh logs [service]
-  bash scripts/prod_container.sh ps
-  bash scripts/prod_container.sh config
+  bash scripts/infra/prod_container.sh init-env
+  bash scripts/infra/prod_container.sh validate
+  bash scripts/infra/prod_container.sh up
+  bash scripts/infra/prod_container.sh down
+  bash scripts/infra/prod_container.sh restart
+  bash scripts/infra/prod_container.sh logs [service]
+  bash scripts/infra/prod_container.sh ps
+  bash scripts/infra/prod_container.sh config
 
 Env:
   SAVC_DOCKER_ENV_FILE=/path/to/.env.prod
@@ -47,7 +47,7 @@ ensure_env() {
 }
 
 validate_env() {
-  bash "${REPO_ROOT}/scripts/validate_cloud_env.sh" "${ENV_FILE}"
+  bash "${REPO_ROOT}/scripts/infra/validate_cloud_env.sh" "${ENV_FILE}"
 }
 
 compose() {

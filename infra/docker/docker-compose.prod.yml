@@ -2,21 +2,27 @@ name: savc-prod
 
 services:
   savc-gateway:
+    image: ${SAVC_GATEWAY_IMAGE:-savc-prod-gateway:local}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.gateway
       args:
         OPENCLAW_DOCKER_SKIP_CHOWN: "1"
+    init: true
+    working_dir: /workspace
+    user: "0:0"
     restart: unless-stopped
     environment:
       HOME: /home/node
-      OPENCLAW_ROOT: /workspace/openclaw
+      NODE_OPTIONS: ${SAVC_GATEWAY_NODE_OPTIONS:---max-old-space-size=1536}
+      OPENCLAW_ROOT: ${SAVC_CONTAINER_OPENCLAW_ROOT:-/workspace/node_modules/.pnpm/node_modules/openclaw}
       SAVC_AUTODEV_ENABLE: ${SAVC_AUTODEV_ENABLE:-0}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_API_KEY_FILE: ${OPENAI_API_KEY_FILE:-}
       SAVC_CODEX_ACP_ENABLE: ${SAVC_CODEX_ACP_ENABLE:-0}
+      SAVC_CODEX_ACP_AUTH_MODE: ${SAVC_CODEX_ACP_AUTH_MODE:-api-key}
       SAVC_CODEX_ACP_CWD: ${SAVC_CODEX_ACP_CWD:-/workspace-devrepo}
       SAVC_CODEX_ACP_AGENT: ${SAVC_CODEX_ACP_AGENT:-codex}
       SAVC_CODEX_ACP_COMMAND: ${SAVC_CODEX_ACP_COMMAND:-codex-acp}
@@ -38,8 +44,11 @@ services:
       VOLCES_API_KEY_FILE: ${VOLCES_API_KEY_FILE:-}
       VOLCES_BASE_URL: ${VOLCES_BASE_URL:-}
       VOLCES_MODEL: ${VOLCES_MODEL:-}
+      SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK: ${SAVC_GATEWAY_CONTROL_UI_HOST_FALLBACK:-1}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
       DISCORD_BOT_TOKEN_FILE: ${DISCORD_BOT_TOKEN_FILE:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_CHANNEL_ID: ${DISCORD_CHANNEL_ID:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_TOKEN_FILE: ${TELEGRAM_BOT_TOKEN_FILE:-}
       SILICON_EMBEDDING_API_KEY: ${SILICON_EMBEDDING_API_KEY:-}
@@ -47,30 +56,58 @@ services:
     volumes:
       - savc_openclaw_state:/home/node/.openclaw
       - ${SAVC_HOST_CODEX_HOME_DIR:-./bootstrap/empty-codex-home}:/home/node/.codex
+      - ${SAVC_HOST_CODEX_AUTH_FILE:-./bootstrap/empty-codex-home/auth.json}:/home/node/.codex/auth.json:ro
       - ${SAVC_HOST_DEV_WORKSPACE_DIR:-./bootstrap/empty-workspace}:/workspace-devrepo
       - ${SAVC_HOST_SECRETS_DIR:-./secrets}:${SAVC_SECRETS_MOUNT:-/run/savc-secrets}:ro
       - ${OPENCLAW_HOST_CREDENTIALS_DIR:-./bootstrap/empty-credentials}:/bootstrap/openclaw-credentials:ro
+    command:
+      - sh
+      - -lc
+      - |
+        set -e
+        corepack enable
+        if [ ! -f "$${OPENCLAW_ROOT}/openclaw.mjs" ]; then
+          pnpm --dir /workspace install --no-frozen-lockfile --lockfile=false
+        fi
+        mkdir -p /home/node/.openclaw
+        if [ -d /bootstrap/openclaw-credentials ]; then
+          mkdir -p /home/node/.openclaw/credentials
+          find /bootstrap/openclaw-credentials -maxdepth 1 -type f -name '*.json' \
+            -exec cp -f {} /home/node/.openclaw/credentials/ \;
+        fi
+        bash /workspace/scripts/setup.sh
+        if [ -f /home/node/.openclaw/.env ]; then
+          set -a
+          . /home/node/.openclaw/.env
+          set +a
+        fi
+        exec node "$${OPENCLAW_ROOT}/openclaw.mjs" gateway --bind lan --port ${OPENCLAW_GATEWAY_PORT:-18789}
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
       timeout: 5s
       retries: 5
 
   savc-ui:
+    image: ${SAVC_RUNTIME_IMAGE:-savc-prod-runtime:local}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.runtime
       args:
         SAVC_RUNTIME_SKIP_CHOWN: "1"
+    init: true
+    working_dir: /workspace
+    user: "0:0"
     restart: unless-stopped
     depends_on:
       savc-gateway:
         condition: service_healthy
     environment:
       HOME: /home/node
-      OPENCLAW_ROOT: /workspace/openclaw
+      NODE_OPTIONS: ${SAVC_GATEWAY_NODE_OPTIONS:---max-old-space-size=1536}
+      OPENCLAW_ROOT: ${SAVC_CONTAINER_OPENCLAW_ROOT:-/workspace/node_modules/.pnpm/node_modules/openclaw}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       SAVC_GATEWAY_INTERNAL_URL: ${SAVC_GATEWAY_INTERNAL_URL:-http://savc-gateway:18789}
@@ -86,6 +123,13 @@ services:
       - bash
       - -lc
       - |
+        set -e
+        corepack enable
+        . /workspace/scripts/lib/secret_env.sh
+        export_resolved_secret "OPENCLAW_GATEWAY_TOKEN"
+        if [ ! -f "$${OPENCLAW_ROOT}/openclaw.mjs" ]; then
+          pnpm --dir /workspace install --no-frozen-lockfile --lockfile=false
+        fi
         exec pnpm --dir /workspace/packages/ui exec vite --host 0.0.0.0 --port ${SAVC_UI_PORT:-5174}
     ports:
       - "${SAVC_UI_PORT:-5174}:${SAVC_UI_PORT:-5174}"
@@ -96,19 +140,23 @@ services:
       retries: 5
 
   savc-proactive:
+    image: ${SAVC_RUNTIME_IMAGE:-savc-prod-runtime:local}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.runtime
       args:
         SAVC_RUNTIME_SKIP_CHOWN: "1"
     profiles: ["automation"]
+    init: true
+    working_dir: /workspace
+    user: "0:0"
     restart: unless-stopped
     depends_on:
       savc-gateway:
         condition: service_healthy
     environment:
       HOME: /home/node
-      OPENCLAW_ROOT: /workspace/openclaw
+      OPENCLAW_ROOT: ${SAVC_CONTAINER_OPENCLAW_ROOT:-/workspace/node_modules/.pnpm/node_modules/openclaw}
       SAVC_AUTODEV_ENABLE: ${SAVC_AUTODEV_ENABLE:-0}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
@@ -134,6 +182,8 @@ services:
       SILICON_EMBEDDING_API_KEY_FILE: ${SILICON_EMBEDDING_API_KEY_FILE:-}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
       DISCORD_BOT_TOKEN_FILE: ${DISCORD_BOT_TOKEN_FILE:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_CHANNEL_ID: ${DISCORD_CHANNEL_ID:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_TOKEN_FILE: ${TELEGRAM_BOT_TOKEN_FILE:-}
       GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-}
@@ -152,8 +202,18 @@ services:
       - bash
       - -lc
       - |
+        set -e
+        corepack enable
         mkdir -p /home/node/.openclaw
+        if [ ! -f "$${OPENCLAW_ROOT}/openclaw.mjs" ]; then
+          pnpm --dir /workspace install --no-frozen-lockfile --lockfile=false
+        fi
         bash /workspace/scripts/setup.sh
+        if [ -f /home/node/.openclaw/.env ]; then
+          set -a
+          . /home/node/.openclaw/.env
+          set +a
+        fi
         exec node /workspace/scripts/runtime/proactive_daemon.mjs run \
           --repo /workspace \
           --workspace /workspace/packages/core \

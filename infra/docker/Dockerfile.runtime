@@ -6,14 +6,6 @@ WORKDIR /workspace
 
 COPY . /workspace
 
-RUN if [ -f /workspace/openclaw/pnpm-lock.yaml ]; then \
-      pnpm -C /workspace/openclaw install --frozen-lockfile; \
-    else \
-      pnpm -C /workspace/openclaw install --no-frozen-lockfile; \
-    fi \
- && pnpm -C /workspace/openclaw exec tsdown --no-clean \
- && pnpm install --frozen-lockfile
-
 ENV NODE_ENV=production
 
 ARG SAVC_RUNTIME_SKIP_CHOWN="0"

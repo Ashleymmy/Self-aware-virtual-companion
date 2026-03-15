@@ -5,7 +5,7 @@ channels:
     bot_token_env: "TELEGRAM_BOT_TOKEN"
     proactive:
       enabled: true
-      default_chat_id: ""
+      default_chat_id: "6260789852"
 
   # 注意：OpenClaw Discord 自动回复的运行时主配置在 ~/.openclaw/openclaw.json；
   # 此文件主要用于 Phase2 proactive 脚本的渠道路由与发送目标。
@@ -14,7 +14,7 @@ channels:
     bot_token_env: "DISCORD_BOT_TOKEN"
     proactive:
       enabled: true
-      default_channel_id: ""
+      default_channel_id: "1469643433026261067"
 
   web:
     enabled: true

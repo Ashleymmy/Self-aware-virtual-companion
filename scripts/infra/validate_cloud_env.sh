@@ -7,6 +7,7 @@ source "${BOOTSTRAP_DIR}/../lib/paths.sh"
 savc_use_repo_root "${BASH_SOURCE[0]}"
 ENV_FILE="${1:-${REPO_ROOT}/infra/docker/.env.prod}"
 COMPOSE_FILE="${REPO_ROOT}/infra/docker/docker-compose.prod.yml"
+COMPOSE_DIR="$(cd -- "$(dirname -- "${COMPOSE_FILE}")" && pwd)"
 
 pass_count=0
 warn_count=0
@@ -37,10 +38,32 @@ set -a
 source "${ENV_FILE}"
 set +a
 
-HOST_SECRET_DIR="${SAVC_HOST_SECRETS_DIR:-${REPO_ROOT}/infra/docker/secrets}"
 SECRETS_MOUNT="${SAVC_SECRETS_MOUNT:-/run/savc-secrets}"
-HOST_CODEX_HOME_DIR="${SAVC_HOST_CODEX_HOME_DIR:-${REPO_ROOT}/infra/docker/bootstrap/empty-codex-home}"
-HOST_DEV_WORKSPACE_DIR="${SAVC_HOST_DEV_WORKSPACE_DIR:-${REPO_ROOT}/infra/docker/bootstrap/empty-workspace}"
+
+resolve_host_path() {
+  local configured_path="$1"
+  if [[ -z "${configured_path}" ]]; then
+    return 1
+  fi
+  if [[ "${configured_path}" = /* ]]; then
+    printf '%s' "${configured_path}"
+    return 0
+  fi
+  printf '%s/%s' "${COMPOSE_DIR}" "${configured_path#./}"
+}
+
+HOST_SECRET_DIR="$(
+  resolve_host_path "${SAVC_HOST_SECRETS_DIR:-./secrets}"
+)"
+HOST_CODEX_HOME_DIR="$(
+  resolve_host_path "${SAVC_HOST_CODEX_HOME_DIR:-./bootstrap/empty-codex-home}"
+)"
+HOST_CODEX_AUTH_FILE="$(
+  resolve_host_path "${SAVC_HOST_CODEX_AUTH_FILE:-./bootstrap/empty-codex-home/auth.json}"
+)"
+HOST_DEV_WORKSPACE_DIR="$(
+  resolve_host_path "${SAVC_HOST_DEV_WORKSPACE_DIR:-./bootstrap/empty-workspace}"
+)"
 
 map_secret_file_to_host() {
   local configured_path="$1"
@@ -117,9 +140,16 @@ providers=(
 provider_ready=0
 for key in "${providers[@]}"; do
   file_var="${key}_FILE"
-  if [[ -n "${!key-}" || -n "${!file_var-}" ]]; then
+  if [[ -n "${!key-}" ]]; then
     provider_ready=1
     break
+  fi
+  if [[ -n "${!file_var-}" ]]; then
+    provider_host_path="$(map_secret_file_to_host "${!file_var-}")"
+    if [[ -f "${provider_host_path}" ]]; then
+      provider_ready=1
+      break
+    fi
   fi
 done
 if [[ "${provider_ready}" -eq 1 ]]; then
@@ -141,11 +171,30 @@ else
 fi
 
 if [[ "${SAVC_CODEX_ACP_ENABLE:-0}" == "1" ]]; then
-  if [[ -n "${OPENAI_API_KEY:-}" || -n "${OPENAI_API_KEY_FILE:-}" ]]; then
-    pass "codex ACP auth configured via OPENAI_API_KEY"
-  else
-    fail "codex ACP enabled but OPENAI_API_KEY / OPENAI_API_KEY_FILE is not configured"
-  fi
+  case "${SAVC_CODEX_ACP_AUTH_MODE:-api-key}" in
+    api-key)
+      if [[ -n "${OPENAI_API_KEY:-}" || -n "${OPENAI_API_KEY_FILE:-}" ]]; then
+        pass "codex ACP auth configured via OPENAI_API_KEY"
+      else
+        fail "codex ACP enabled but OPENAI_API_KEY / OPENAI_API_KEY_FILE is not configured"
+      fi
+      ;;
+    auth)
+      if [[ -f "${HOST_CODEX_AUTH_FILE}" ]]; then
+        auth_payload="$(tr -d '[:space:]' < "${HOST_CODEX_AUTH_FILE}" 2>/dev/null || true)"
+        if [[ -n "${auth_payload}" && "${auth_payload}" != "{}" && "${auth_payload}" != "null" ]]; then
+          pass "codex ACP auth configured via auth file: ${HOST_CODEX_AUTH_FILE}"
+        else
+          fail "codex ACP auth file is still placeholder/empty: ${HOST_CODEX_AUTH_FILE}"
+        fi
+      else
+        fail "codex ACP auth file missing: ${HOST_CODEX_AUTH_FILE}"
+      fi
+      ;;
+    *)
+      fail "unsupported codex ACP auth mode: ${SAVC_CODEX_ACP_AUTH_MODE}"
+      ;;
+  esac
 
   if [[ "${SAVC_CODEX_ACP_CWD:-}" == /workspace-devrepo* ]]; then
     if [[ -d "${HOST_DEV_WORKSPACE_DIR}" ]]; then

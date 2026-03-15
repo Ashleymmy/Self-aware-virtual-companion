@@ -235,11 +235,28 @@ else
 fi
 
 if [[ -n "${DISCORD_BOT_TOKEN:-}" ]]; then
-  DISCORD_BLOCK="$(cat <<'JSON'
+  DISCORD_GUILD_BLOCK=''
+  if [[ -n "${DISCORD_GUILD_ID:-}" && -n "${DISCORD_CHANNEL_ID:-}" ]]; then
+    DISCORD_GUILD_BLOCK="$(cat <<JSON
+,
+      "guilds": {
+        "${DISCORD_GUILD_ID}": {
+          "channels": {
+            "${DISCORD_CHANNEL_ID}": {
+              "allow": true,
+              "requireMention": false
+            }
+          }
+        }
+      }
+JSON
+)"
+  fi
+  DISCORD_BLOCK="$(cat <<JSON
     "discord": {
       "enabled": true,
       "groupPolicy": "allowlist",
-      "dm": { "enabled": true, "policy": "pairing" }
+      "dm": { "enabled": true, "policy": "pairing" }${DISCORD_GUILD_BLOCK}
     }
 JSON
 )"

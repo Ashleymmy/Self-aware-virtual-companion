@@ -1,0 +1,7 @@
+disable_response_storage = true
+
+[projects."/workspace"]
+trust_level = "trusted"
+
+[projects."/workspace-devrepo"]
+trust_level = "trusted"

@@ -15,6 +15,7 @@ services:
       OPENCLAW_GATEWAY_TOKEN_FILE: ${OPENCLAW_GATEWAY_TOKEN_FILE:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       SAVC_CODEX_ACP_ENABLE: ${SAVC_CODEX_ACP_ENABLE:-0}
+      SAVC_CODEX_ACP_AUTH_MODE: ${SAVC_CODEX_ACP_AUTH_MODE:-api-key}
       SAVC_CODEX_ACP_CWD: ${SAVC_CODEX_ACP_CWD:-/workspace}
       SAVC_CODEX_ACP_AGENT: ${SAVC_CODEX_ACP_AGENT:-codex}
       SAVC_CODEX_ACP_COMMAND: ${SAVC_CODEX_ACP_COMMAND:-codex-acp}
@@ -37,6 +38,7 @@ services:
       - ../../:/workspace
       - savc_openclaw_state:/home/node/.openclaw
       - ${SAVC_HOST_CODEX_HOME_DIR:-./bootstrap/empty-codex-home}:/home/node/.codex
+      - ${SAVC_HOST_CODEX_AUTH_FILE:-./bootstrap/empty-codex-home/auth.json}:/home/node/.codex/auth.json:ro
       - ${OPENCLAW_HOST_CREDENTIALS_DIR:-./bootstrap/empty-credentials}:/bootstrap/openclaw-credentials:ro
     command:
       - sh
