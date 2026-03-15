@@ -21,6 +21,7 @@ COMPOSE_PROFILES=automation bash scripts/infra/dev_container.sh up
 - `openclaw.container.json`: container-side OpenClaw bootstrap config
 - `.env.example`: environment template for container runtime
 - `.env.prod.example`: production env template (prefers `*_FILE` secrets)
+- `.env.prod.sample`: production filled example with placeholder values and file-backed secret paths
 - `bootstrap/empty-credentials`: placeholder bind mount target when you do not sync host approvals
 
 ## Notes
@@ -40,6 +41,8 @@ COMPOSE_PROFILES=automation bash scripts/infra/dev_container.sh up
 ```bash
 mkdir -p infra/docker/secrets
 bash scripts/infra/prod_container.sh init-env
+# or copy the filled example:
+# cp infra/docker/.env.prod.sample infra/docker/.env.prod
 # edit infra/docker/.env.prod and populate infra/docker/secrets/*
 bash scripts/infra/prod_container.sh validate
 bash scripts/infra/prod_container.sh up

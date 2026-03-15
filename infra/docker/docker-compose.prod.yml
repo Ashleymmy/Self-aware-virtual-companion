@@ -81,7 +81,7 @@ services:
     volumes:
       - ${SAVC_HOST_SECRETS_DIR:-./secrets}:${SAVC_SECRETS_MOUNT:-/run/savc-secrets}:ro
       - savc_runtime_data:/workspace/.runtime
-      - savc_storage_data:/workspace/config/storage
+      - savc_storage_data:/workspace/packages/config/storage
     command:
       - bash
       - -lc
@@ -147,7 +147,7 @@ services:
       - savc_openclaw_state:/home/node/.openclaw
       - ${SAVC_HOST_SECRETS_DIR:-./secrets}:${SAVC_SECRETS_MOUNT:-/run/savc-secrets}:ro
       - savc_runtime_data:/workspace/.runtime
-      - savc_storage_data:/workspace/config/storage
+      - savc_storage_data:/workspace/packages/config/storage
     command:
       - bash
       - -lc
